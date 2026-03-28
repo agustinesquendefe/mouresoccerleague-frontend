@@ -116,13 +116,13 @@ export default function EventsPage() {
         if (!confirmed) return;
 
         try {
-        await deleteEvent(event.id);
-        setEvents((prev) => prev.filter((item) => item.id !== event.id));
-        showToast('Event deleted successfully', 'success');
+            await deleteEvent(event.id);
+            setEvents((prev) => prev.filter((item) => item.id !== event.id));
+            showToast('Event deleted successfully', 'success');
         } catch (error) {
-        const message =
-            error instanceof Error ? error.message : 'Failed to delete event';
-        showToast(message, 'error');
+            const message =
+                error instanceof Error ? error.message : 'Failed to delete event';
+            showToast(message, 'error');
         }
     };
 

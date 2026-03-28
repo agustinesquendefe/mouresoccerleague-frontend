@@ -1,24 +1,22 @@
 import { supabase } from '@/lib/supabaseClient';
+import type { Field } from '@/models/field';
 
-export async function getEventTeams(eventId: number) {
+export async function getFields(): Promise<Field[]> {
   const { data, error } = await supabase
-    .from('event_teams')
+    .from('fields')
     .select(`
-      id,
-      team_id,
-      teams (
+      *,
+      field_formats (
         id,
-        name,
-        key,
-        code
+        field_id,
+        format_type
       )
     `)
-    .eq('event_id', eventId)
     .order('id', { ascending: true });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return data;
+  return (data ?? []) as Field[];
 }

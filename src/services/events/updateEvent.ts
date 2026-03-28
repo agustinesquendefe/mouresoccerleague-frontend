@@ -18,6 +18,12 @@ export async function updateEvent(
       status: payload.status,
       format_type: payload.format_type,
       round_robin_cycles: payload.round_robin_cycles,
+      match_day_of_week: payload.match_day_of_week,
+      match_format: payload.match_format,
+      venue_type: payload.venue_type,
+      field_count: payload.field_count,
+      match_duration_minutes: payload.match_duration_minutes,
+      simultaneous_matches: payload.simultaneous_matches,
     })
     .eq('id', id)
     .select()

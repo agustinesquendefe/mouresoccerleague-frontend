@@ -44,6 +44,12 @@ const initialValues: EventFormData = {
   status: 'draft',
   format_type: 'round_robin',
   round_robin_cycles: 1,
+  match_day_of_week: 1,
+  match_format: '11v11',
+  venue_type: 'outside',
+  field_count: 4,
+  match_duration_minutes: 80,
+  simultaneous_matches: true,
 };
 
 const initialConflicts: ConflictState = {
@@ -92,6 +98,12 @@ export default function EventDialog({
         status: event.status ?? 'draft',
         format_type: event.format_type ?? 'round_robin',
         round_robin_cycles: event.round_robin_cycles ?? 1,
+        match_day_of_week: event.match_day_of_week ?? 1,
+        match_format: event.match_format ?? '11v11',
+        venue_type: event.venue_type ?? 'outside',
+        field_count: event.field_count ?? 4,
+        match_duration_minutes: event.match_duration_minutes ?? 80,
+        simultaneous_matches: event.simultaneous_matches ?? true,
       });
       setConflicts(initialConflicts);
       setSubmitError(null);
@@ -211,6 +223,12 @@ export default function EventDialog({
           values.format_type === 'round_robin'
             ? Number(values.round_robin_cycles)
             : 1,
+        match_day_of_week: Number(values.match_day_of_week),
+        match_format: values.match_format,
+        venue_type: values.venue_type,
+        field_count: Number(values.field_count),
+        match_duration_minutes: Number(values.match_duration_minutes),
+        simultaneous_matches: values.simultaneous_matches,
       });
     } catch (error) {
       const message =
@@ -298,6 +316,75 @@ export default function EventDialog({
             )}
 
             <TextField
+              select
+              label="Match Day"
+              value={values.match_day_of_week}
+              onChange={(e) => handleChange('match_day_of_week', Number(e.target.value))}
+              fullWidth
+            >
+              <MenuItem value={1}>Monday</MenuItem>
+              <MenuItem value={2}>Tuesday</MenuItem>
+              <MenuItem value={3}>Wednesday</MenuItem>
+              <MenuItem value={4}>Thursday</MenuItem>
+              <MenuItem value={5}>Friday</MenuItem>
+              <MenuItem value={6}>Saturday</MenuItem>
+              <MenuItem value={7}>Sunday</MenuItem>
+            </TextField>
+
+            <TextField
+              select
+              label="Match Format"
+              value={values.match_format}
+              onChange={(e) => handleChange('match_format', e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="5v5">5v5</MenuItem>
+              <MenuItem value="7v7">7v7</MenuItem>
+              <MenuItem value="11v11">11v11</MenuItem>
+            </TextField>
+
+            {/* <TextField
+              select
+              label="Venue Type"
+              value={values.venue_type}
+              onChange={(e) => handleChange('venue_type', e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="inside">Inside</MenuItem>
+              <MenuItem value="outside">Outside</MenuItem>
+            </TextField> */}
+
+            {/* <TextField
+              label="Field Count"
+              type="number"
+              value={values.field_count}
+              onChange={(e) => handleChange('field_count', Number(e.target.value))}
+              fullWidth
+            /> */}
+
+            <TextField
+              label="Match Duration (minutes)"
+              type="number"
+              value={values.match_duration_minutes}
+              onChange={(e) =>
+                handleChange('match_duration_minutes', Number(e.target.value))
+              }
+              fullWidth
+            />
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={values.simultaneous_matches}
+                  onChange={(e) =>
+                    handleChange('simultaneous_matches', e.target.checked)
+                  }
+                />
+              }
+              label="Simultaneous Matches"
+            />
+
+            <TextField
               label="Start Date"
               type="date"
               value={values.start_date}
@@ -306,14 +393,14 @@ export default function EventDialog({
               InputLabelProps={{ shrink: true }}
             />
 
-            <TextField
+            {/* <TextField
               label="End Date"
               type="date"
               value={values.end_date}
               onChange={(e) => handleChange('end_date', e.target.value)}
               fullWidth
               InputLabelProps={{ shrink: true }}
-            />
+            /> */}
 
             <TextField
               select

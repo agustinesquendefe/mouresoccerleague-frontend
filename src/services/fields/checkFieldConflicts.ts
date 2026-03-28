@@ -1,17 +1,17 @@
 import { supabase } from '@/lib/supabaseClient';
 
-type TeamConflicts = {
+type FieldConflictResult = {
   nameExists: boolean;
   keyExists: boolean;
 };
 
-export async function checkTeamConflicts(
+export async function checkFieldConflicts(
   name: string,
   key: string,
   excludeId?: number
-): Promise<TeamConflicts> {
+): Promise<FieldConflictResult> {
   let query = supabase
-    .from('teams')
+    .from('fields')
     .select('id, name, key')
     .or(`name.eq.${name},key.eq.${key}`);
 

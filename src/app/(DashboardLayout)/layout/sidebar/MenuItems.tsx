@@ -1,5 +1,6 @@
 import GroupsIcon from '@mui/icons-material/Groups';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import StadiumIcon from '@mui/icons-material/Stadium';
 import {
   IconAperture,
   IconCopy,
@@ -91,6 +92,16 @@ const Menuitems = [
     title: "Teams",
     icon: GroupsIcon,
     href: "/teams",
+  },
+  {
+    navlabel: true,
+    subheader: " FIELDS",
+  },
+  {
+    id: uniqueId(),
+    title: "Fields",
+    icon: StadiumIcon,
+    href: "/fields",
   },
 
 ];

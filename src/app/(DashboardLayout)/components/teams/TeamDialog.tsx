@@ -30,7 +30,6 @@ type TeamDialogProps = {
 type ConflictState = {
   nameExists: boolean;
   keyExists: boolean;
-  codeExists: boolean;
 };
 
 const initialValues: TeamFormData = {
@@ -44,7 +43,6 @@ const initialValues: TeamFormData = {
 const initialConflicts: ConflictState = {
   nameExists: false,
   keyExists: false,
-  codeExists: false,
 };
 
 function generateTeamKey(name: string): string {
@@ -156,7 +154,6 @@ export default function TeamDialog({
         const result = await checkTeamConflicts(
           trimmedName,
           trimmedKey,
-          trimmedCode,
           mode === 'edit' && team ? team.id : undefined
         );
 
@@ -181,7 +178,7 @@ export default function TeamDialog({
   };
 
   const hasConflicts =
-    conflicts.nameExists || conflicts.keyExists || conflicts.codeExists;
+    conflicts.nameExists || conflicts.keyExists;
 
   const isDisabled =
     !values.name.trim() ||
@@ -202,7 +199,6 @@ export default function TeamDialog({
       const latestConflicts = await checkTeamConflicts(
         trimmedName,
         trimmedKey,
-        trimmedCode,
         mode === 'edit' && team ? team.id : undefined
       );
 
@@ -210,8 +206,7 @@ export default function TeamDialog({
 
       if (
         latestConflicts.nameExists ||
-        latestConflicts.keyExists ||
-        latestConflicts.codeExists
+        latestConflicts.keyExists
       ) {
         setSubmitError('Please resolve duplicate values before saving.');
         return;
@@ -248,6 +243,7 @@ export default function TeamDialog({
               required
               error={conflicts.nameExists}
               helperText={conflicts.nameExists ? 'A team with this name already exists.' : ' '}
+              autoCapitalize='words'
             />
 
             <TextField
@@ -264,8 +260,7 @@ export default function TeamDialog({
               value={values.code}
               fullWidth
               InputProps={{ readOnly: true }}
-              error={conflicts.codeExists}
-              helperText={conflicts.codeExists ? 'This code is already in use.' : 'Generated automatically from the name.'}
+              helperText="Generated automatically from the name."
             />
 
             <FormControlLabel
