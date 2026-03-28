@@ -18,7 +18,7 @@ export const Upgrade = () => {
                     </Button>
                 </Box>
                 <Box mt="-35px" >
-                    <Image alt="Remy Sharp" src='/images/backgrounds/rocket.png' width={100} height={100} />
+                    <Image alt="Remy Sharp" src='/images/backgrounds/rocket.png' loading="eager" width={100} height={100} />
                 </Box>
             </>
         </Box>

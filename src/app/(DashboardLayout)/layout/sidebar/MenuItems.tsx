@@ -1,3 +1,5 @@
+import GroupsIcon from '@mui/icons-material/Groups';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import {
   IconAperture,
   IconCopy,
@@ -69,6 +71,26 @@ const Menuitems = [
     title: "Sample Page",
     icon: IconAperture,
     href: "/sample-page",
+  },
+  {
+    navlabel: true,
+    subheader: " EVENTS",
+  },
+  {
+    id: uniqueId(),
+    title: "Events",
+    icon: EmojiEventsIcon,
+    href: "/events",
+  },
+  {
+    navlabel: true,
+    subheader: " TEAMS",
+  },
+  {
+    id: uniqueId(),
+    title: "Teams",
+    icon: GroupsIcon,
+    href: "/teams",
   },
 
 ];

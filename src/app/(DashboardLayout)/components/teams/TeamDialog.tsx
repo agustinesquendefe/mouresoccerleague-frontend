@@ -1,0 +1,312 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  Stack,
+  TextField,
+} from '@mui/material';
+import type { Team, TeamFormData } from '@/models/team';
+import { checkTeamConflicts } from '@/services/teams/checkTeamConflicts';
+
+type TeamDialogProps = {
+  open: boolean;
+  mode: 'create' | 'edit';
+  team?: Team | null;
+  loading?: boolean;
+  onClose: () => void;
+  onSubmit: (values: TeamFormData) => Promise<void>;
+};
+
+type ConflictState = {
+  nameExists: boolean;
+  keyExists: boolean;
+  codeExists: boolean;
+};
+
+const initialValues: TeamFormData = {
+  key: '',
+  name: '',
+  code: '',
+  club: true,
+  national: false,
+};
+
+const initialConflicts: ConflictState = {
+  nameExists: false,
+  keyExists: false,
+  codeExists: false,
+};
+
+function generateTeamKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 50);
+}
+
+function generateTeamCode(name: string): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+    if (words.length === 0) return '';
+
+    const codeParts: string[] = [];
+
+    for (const word of words) {
+      const cleanWord = word
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]/g, '');
+
+      // Si es una sigla (2-3 letras), tomar todas
+      if (cleanWord.length <= 3) {
+        codeParts.push(cleanWord.toUpperCase());
+      } else {
+        // Si es palabra larga, tomar solo la primera letra
+        codeParts.push(cleanWord[0].toUpperCase());
+      }
+    }
+
+    return codeParts.join('').slice(0, 5); // opcional límite
+}
+
+export default function TeamDialog({
+  open,
+  mode,
+  team,
+  loading = false,
+  onClose,
+  onSubmit,
+}: TeamDialogProps) {
+  const [values, setValues] = useState<TeamFormData>(initialValues);
+  const [conflicts, setConflicts] = useState<ConflictState>(initialConflicts);
+  const [checkingConflicts, setCheckingConflicts] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (mode === 'edit' && team) {
+      setValues({
+        key: team.key ?? '',
+        name: team.name ?? '',
+        code: team.code ?? '',
+        club: team.club ?? false,
+        national: team.national ?? false,
+      });
+      setConflicts(initialConflicts);
+      setSubmitError(null);
+      return;
+    }
+
+    if (mode === 'create') {
+      setValues(initialValues);
+      setConflicts(initialConflicts);
+      setSubmitError(null);
+    }
+  }, [open, mode, team]);
+
+  const generatedKey = useMemo(() => generateTeamKey(values.name), [values.name]);
+  const generatedCode = useMemo(() => generateTeamCode(values.name), [values.name]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    setValues((prev) => ({
+      ...prev,
+      key: generatedKey,
+      code: generatedCode,
+    }));
+  }, [generatedKey, generatedCode, open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const trimmedName = values.name.trim();
+    const trimmedKey = values.key.trim();
+    const trimmedCode = values.code.trim();
+
+    if (!trimmedName || !trimmedKey || !trimmedCode) {
+      setConflicts(initialConflicts);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      try {
+        setCheckingConflicts(true);
+
+        const result = await checkTeamConflicts(
+          trimmedName,
+          trimmedKey,
+          trimmedCode,
+          mode === 'edit' && team ? team.id : undefined
+        );
+
+        setConflicts(result);
+      } catch (error) {
+        console.error('Conflict validation failed:', error);
+      } finally {
+        setCheckingConflicts(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [open, values.name, values.key, values.code, mode, team]);
+
+  const handleChange = (field: keyof TeamFormData, value: string | boolean) => {
+    setSubmitError(null);
+
+    setValues((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const hasConflicts =
+    conflicts.nameExists || conflicts.keyExists || conflicts.codeExists;
+
+  const isDisabled =
+    !values.name.trim() ||
+    !values.key.trim() ||
+    !values.code.trim() ||
+    loading ||
+    checkingConflicts ||
+    hasConflicts;
+
+  const handleSubmit = async () => {
+    try {
+      setSubmitError(null);
+
+      const trimmedName = values.name.trim();
+      const trimmedKey = values.key.trim();
+      const trimmedCode = values.code.trim();
+
+      const latestConflicts = await checkTeamConflicts(
+        trimmedName,
+        trimmedKey,
+        trimmedCode,
+        mode === 'edit' && team ? team.id : undefined
+      );
+
+      setConflicts(latestConflicts);
+
+      if (
+        latestConflicts.nameExists ||
+        latestConflicts.keyExists ||
+        latestConflicts.codeExists
+      ) {
+        setSubmitError('Please resolve duplicate values before saving.');
+        return;
+      }
+
+      await onSubmit({
+        key: trimmedKey,
+        name: trimmedName,
+        code: trimmedCode,
+        club: values.club,
+        national: values.national,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to save team';
+      setSubmitError(message);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{mode === 'create' ? 'Create Team' : 'Edit Team'}</DialogTitle>
+
+      <DialogContent>
+        <Box mt={1}>
+          <Stack spacing={2}>
+            {submitError && <Alert severity="error">{submitError}</Alert>}
+
+            <TextField
+              label="Name"
+              value={values.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              fullWidth
+              required
+              error={conflicts.nameExists}
+              helperText={conflicts.nameExists ? 'A team with this name already exists.' : ' '}
+            />
+
+            <TextField
+              label="Key"
+              value={values.key}
+              fullWidth
+              InputProps={{ readOnly: true }}
+              error={conflicts.keyExists}
+              helperText={conflicts.keyExists ? 'This key is already in use.' : 'Generated automatically from the name.'}
+            />
+
+            <TextField
+              label="Code"
+              value={values.code}
+              fullWidth
+              InputProps={{ readOnly: true }}
+              error={conflicts.codeExists}
+              helperText={conflicts.codeExists ? 'This code is already in use.' : 'Generated automatically from the name.'}
+            />
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={values.club}
+                  onChange={(e) => handleChange('club', e.target.checked)}
+                />
+              }
+              label="Club"
+            />
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={values.national}
+                  onChange={(e) => handleChange('national', e.target.checked)}
+                />
+              }
+              label="National Team"
+            />
+
+            {checkingConflicts && (
+              <Stack direction="row" spacing={1} alignItems="center">
+                <CircularProgress size={16} />
+                <Box component="span">Checking duplicates...</Box>
+              </Stack>
+            )}
+          </Stack>
+        </Box>
+      </DialogContent>
+
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+
+        <Button variant="contained" onClick={handleSubmit} disabled={isDisabled}>
+          {mode === 'create' ? 'Create' : 'Save'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
