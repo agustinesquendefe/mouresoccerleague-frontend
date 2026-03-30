@@ -117,7 +117,7 @@ export default function AddFieldToEventDialog({
         >
           {availableFields.map((field) => (
             <MenuItem key={field.id} value={field.id}>
-              {field.name} — {field.field_type} — {field.format_supported}
+              {field.name} — {field.field_type} — {field.field_formats?.join(', ')}
             </MenuItem>
           ))}
         </TextField>

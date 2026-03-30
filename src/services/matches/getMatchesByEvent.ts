@@ -10,6 +10,9 @@ export async function getMatchesByEvent(eventId: number): Promise<Match[]> {
     .from('matches')
     .select('*')
     .eq('event_id', eventId)
+    .order('stage_type', { ascending: true })
+    .order('bracket_round', { ascending: true })
+    .order('round_number', { ascending: true })
     .order('id', { ascending: true });
 
   if (error) {

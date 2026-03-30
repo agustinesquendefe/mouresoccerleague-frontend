@@ -50,6 +50,10 @@ const initialValues: EventFormData = {
   field_count: 4,
   match_duration_minutes: 80,
   simultaneous_matches: true,
+
+  has_playoffs: false,
+  playoff_teams_count: null,
+  playoff_home_away: false,
 };
 
 const initialConflicts: ConflictState = {
@@ -104,6 +108,10 @@ export default function EventDialog({
         field_count: event.field_count ?? 4,
         match_duration_minutes: event.match_duration_minutes ?? 80,
         simultaneous_matches: event.simultaneous_matches ?? true,
+
+        has_playoffs: event.has_playoffs ?? false,
+        playoff_teams_count: event.playoff_teams_count ?? null,
+        playoff_home_away: event.playoff_home_away ?? false,
       });
       setConflicts(initialConflicts);
       setSubmitError(null);
@@ -171,7 +179,7 @@ export default function EventDialog({
 
   const handleChange = (
     field: keyof EventFormData,
-    value: string | number | boolean
+    value: string | number | boolean | null
   ) => {
     setSubmitError(null);
 
@@ -188,6 +196,7 @@ export default function EventDialog({
     !values.key.trim() ||
     !values.start_date ||
     !values.format_type ||
+    (values.has_playoffs && !values.playoff_teams_count) ||
     loading ||
     checkingConflicts ||
     hasConflicts;
@@ -206,6 +215,11 @@ export default function EventDialog({
 
       if (latestConflicts.nameExists || latestConflicts.keyExists) {
         setSubmitError('Please resolve duplicate values before saving.');
+        return;
+      }
+
+      if (values.has_playoffs && !values.playoff_teams_count) {
+        setSubmitError('Please select how many teams qualify for playoffs.');
         return;
       }
 
@@ -229,6 +243,13 @@ export default function EventDialog({
         field_count: Number(values.field_count),
         match_duration_minutes: Number(values.match_duration_minutes),
         simultaneous_matches: values.simultaneous_matches,
+        has_playoffs: values.has_playoffs,
+        playoff_teams_count: values.has_playoffs
+          ? values.playoff_teams_count
+          : null,
+        playoff_home_away: values.has_playoffs
+          ? values.playoff_home_away
+          : false,
       });
     } catch (error) {
       const message =
@@ -342,6 +363,50 @@ export default function EventDialog({
               <MenuItem value="7v7">7v7</MenuItem>
               <MenuItem value="11v11">11v11</MenuItem>
             </TextField>
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={values.has_playoffs}
+                  onChange={(e) => handleChange('has_playoffs', e.target.checked)}
+                />
+              }
+              label="Has Playoffs"
+            />
+
+            {values.has_playoffs && (
+              <>
+                <TextField
+                  select
+                  label="Playoff Teams Count"
+                  value={values.playoff_teams_count ?? ''}
+                  onChange={(e) =>
+                    handleChange(
+                      'playoff_teams_count',
+                      e.target.value === '' ? null : Number(e.target.value)
+                    )
+                  }
+                  fullWidth
+                >
+                  <MenuItem value={2}>2 teams</MenuItem>
+                  <MenuItem value={4}>4 teams</MenuItem>
+                  <MenuItem value={8}>8 teams</MenuItem>
+                  <MenuItem value={16}>16 teams</MenuItem>
+                </TextField>
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={values.playoff_home_away}
+                      onChange={(e) =>
+                        handleChange('playoff_home_away', e.target.checked)
+                      }
+                    />
+                  }
+                  label="Playoffs Home and Away"
+                />
+              </>
+            )}
 
             {/* <TextField
               select

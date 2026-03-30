@@ -1,4 +1,11 @@
 export type MatchStatus = 'scheduled' | 'in_progress' | 'played' | 'cancelled';
+export type MatchStageType = 'league' | 'knockout';
+export type MatchBracketRound =
+  | 'round_of_16'
+  | 'quarterfinal'
+  | 'semifinal'
+  | 'final'
+  | 'third_place';
 
 export type Match = {
   id: number;
@@ -7,24 +14,26 @@ export type Match = {
   team2_id: number;
   round_id: number | null;
   round_number: number | null;
-  status: string | null;
+  status: MatchStatus | string | null;
   score1: number | null;
   score2: number | null;
   date: string | null;
+  field_number: number | null;
+  field_id: number | null;
+
+  stage_type: MatchStageType | string | null;
+  bracket_round: MatchBracketRound | string | null;
+  leg_number: number | null;
+
   created_at: string;
   updated_at: string;
-  field_id?: number | null;
-  field_number: number | null;
 };
 
 export type MatchFormData = {
-  team1_id?: number;
-  team2_id?: number;
-  round_id?: number | null;
-  status?: string | null;
+  status: MatchStatus;
   score1: number | null;
   score2: number | null;
-  date?: string | null;
-  field_id?: number | null;
-  field_number?: number | null;
+  date: string | null;
+  field_id: number | null;
+  field_number: number | null;
 };

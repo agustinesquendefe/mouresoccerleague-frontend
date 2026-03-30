@@ -31,7 +31,7 @@ export default function GroupedMatchesTable({
   }, {});
 
   const grouped = matches.reduce<Record<string, Match[]>>((acc, match) => {
-    const key = groupByDate ? match.date ?? 'No Date' : 'selected-date';
+    const key = groupByDate ? match.date ?? 'No Date' : 'all';
 
     if (!acc[key]) {
       acc[key] = [];
@@ -44,8 +44,8 @@ export default function GroupedMatchesTable({
   const sortedGroups = Object.keys(grouped).sort((a, b) => {
     if (a === 'No Date') return 1;
     if (b === 'No Date') return -1;
-    if (a === 'selected-date') return -1;
-    if (b === 'selected-date') return 1;
+    if (a === 'all') return -1;
+    if (b === 'all') return 1;
     return a.localeCompare(b);
   });
 
@@ -54,9 +54,9 @@ export default function GroupedMatchesTable({
       {sortedGroups.map((groupKey, index) => (
         <Paper key={groupKey} sx={{ p: 2 }}>
           <Stack spacing={2}>
-            {groupByDate && (
+            {groupByDate && groupKey !== 'all' && (
               <Typography variant="h6" fontWeight={700}>
-                Round {index + 1} — {groupKey}
+                Fecha {index + 1} — {groupKey}
               </Typography>
             )}
 
@@ -89,6 +89,12 @@ export default function GroupedMatchesTable({
                         ? fieldMap[match.field_id] ?? `#${match.field_id}`
                         : '-'}
                     </Typography>
+
+                    {match.leg_number && (
+                      <Typography variant="body2" color="text.secondary">
+                        Leg: {match.leg_number}
+                      </Typography>
+                    )}
                   </Stack>
 
                   <Stack direction="row" spacing={1} alignItems="center">

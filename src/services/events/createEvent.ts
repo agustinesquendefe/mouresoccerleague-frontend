@@ -22,6 +22,10 @@ export async function createEvent(payload: EventFormData): Promise<Event> {
         field_count: payload.field_count,
         match_duration_minutes: payload.match_duration_minutes,
         simultaneous_matches: payload.simultaneous_matches,
+
+        has_playoffs: payload.has_playoffs,
+        playoff_teams_count: payload.playoff_teams_count,
+        playoff_home_away: payload.playoff_home_away,
       },
     ])
     .select()

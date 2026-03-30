@@ -22,6 +22,11 @@ export type Event = {
   field_count: number | null;
   match_duration_minutes: number | null;
   simultaneous_matches: boolean;
+
+  has_playoffs: boolean;
+  playoff_teams_count: number | null;
+  playoff_home_away: boolean;
+
   created_at: string;
   updated_at: string;
 };
@@ -43,4 +48,8 @@ export type EventFormData = {
   field_count: number;
   match_duration_minutes: number;
   simultaneous_matches: boolean;
+
+  has_playoffs: boolean;
+  playoff_teams_count: number | null;
+  playoff_home_away: boolean;
 };
