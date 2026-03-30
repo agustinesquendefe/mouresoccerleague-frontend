@@ -194,6 +194,7 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
     field_number: number | null;
     field_id: number | null;
     round_id: number | null;
+    round_number: number | null;
   }> = [];
 
   let posCounter = 1;
@@ -219,6 +220,7 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
           field_number: index + 1,
           field_id: assignedField?.id ?? null,
           round_id: null,
+          round_number: globalRoundIndex + 1, 
         });
 
         posCounter += 1;
