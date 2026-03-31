@@ -75,7 +75,14 @@ export default function EventFieldsSection({ eventId }: Props) {
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography fontWeight={600}>{field.name}</Typography>
                 <Chip label={field.field_type} size="small" />
-                <Chip label={field.format_supported} size="small" color="primary" />
+                {(field.field_formats ?? []).map((format) => (
+                  <Chip
+                    key={`${field.id}-${format.id}`}
+                    label={format.format_type}
+                    size="small"
+                    color="primary"
+                  />
+                ))}
               </Stack>
 
               <IconButton onClick={() => handleRemove(field.id)}>

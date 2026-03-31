@@ -17,14 +17,15 @@ export type Match = {
   status: MatchStatus | string | null;
   score1: number | null;
   score2: number | null;
+  penalty_score1: number | null;
+  penalty_score2: number | null;
+  winner_team_id: number | null;
   date: string | null;
   field_number: number | null;
   field_id: number | null;
-
   stage_type: MatchStageType | string | null;
   bracket_round: MatchBracketRound | string | null;
   leg_number: number | null;
-
   created_at: string;
   updated_at: string;
 };
@@ -33,6 +34,9 @@ export type MatchFormData = {
   status: MatchStatus;
   score1: number | null;
   score2: number | null;
+  penalty_score1: number | null;
+  penalty_score2: number | null;
+  winner_team_id: number | null;
   date: string | null;
   field_id: number | null;
   field_number: number | null;

@@ -10,6 +10,7 @@ type KnockoutMatchRow = {
   status: string | null;
   bracket_round: string | null;
   leg_number: number | null;
+  winner_team_id: number | null;
 };
 
 const ROUND_ORDER = [
@@ -28,13 +29,17 @@ function getNextRound(currentRound: BracketRound): BracketRound | null {
 }
 
 function getWinner(match: KnockoutMatchRow): number {
+  if (match.winner_team_id) {
+    return match.winner_team_id;
+  }
+
   if (match.score1 === null || match.score2 === null) {
     throw new Error(`Match ${match.id} does not have a valid score.`);
   }
 
   if (match.score1 === match.score2) {
     throw new Error(
-      `Match ${match.id} is tied. Penalty resolution is not implemented yet.`
+      `Match ${match.id} is tied and no winner has been set.`
     );
   }
 
@@ -57,7 +62,8 @@ export async function advanceKnockoutRound(eventId: number): Promise<void> {
       score2,
       status,
       bracket_round,
-      leg_number
+      leg_number,
+      winner_team_id
     `)
     .eq('event_id', eventId)
     .eq('stage_type', 'knockout');

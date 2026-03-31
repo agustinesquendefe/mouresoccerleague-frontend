@@ -12,6 +12,7 @@ import { IconPoint } from '@tabler/icons-react';
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Upgrade } from "./Updrade";
+import Profile from "../header/Profile";
 
 
 const renderMenuItems = (items: any, pathDirect: any) => {
@@ -77,10 +78,13 @@ const SidebarItems = () => {
 
         <Logo img='/images/logos/dark-logo.svg' component={Link} to="/" >Modernize</Logo>
 
-        {renderMenuItems(Menuitems, pathDirect)}
-        <Box px={2}>
+        {renderMenuItems(Menuitems, pathDirect)} 
+
+        <Profile />
+
+        {/* <Box px={2}>
           <Upgrade />
-        </Box>
+        </Box> */}
       </MUI_Sidebar>
 
     </>

@@ -79,6 +79,21 @@ export default function GroupedMatchesTable({
                       Score: {match.score1 ?? '-'} : {match.score2 ?? '-'}
                     </Typography>
 
+                    {match.penalty_score1 !== null &&
+                      match.penalty_score2 !== null && (
+                        <Typography variant="body2" color="text.secondary">
+                          Penalties: {match.penalty_score1} : {match.penalty_score2}
+                        </Typography>
+                      )}
+
+                    {match.winner_team_id && (
+                      <Typography variant="body2" color="text.secondary">
+                        Winner:{' '}
+                        {teamMap[match.winner_team_id] ??
+                          `#${match.winner_team_id}`}
+                      </Typography>
+                    )}
+
                     <Typography variant="body2" color="text.secondary">
                       Date: {match.date ?? '-'}
                     </Typography>
@@ -95,11 +110,21 @@ export default function GroupedMatchesTable({
                         Leg: {match.leg_number}
                       </Typography>
                     )}
+
+                    {match.bracket_round && (
+                      <Typography variant="body2" color="text.secondary">
+                        Stage: {match.bracket_round}
+                      </Typography>
+                    )}
                   </Stack>
 
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Chip label={match.status ?? 'scheduled'} size="small" />
-                    <Button variant="outlined" size="small" onClick={() => onEdit(match)}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => onEdit(match)}
+                    >
                       Edit
                     </Button>
                   </Stack>

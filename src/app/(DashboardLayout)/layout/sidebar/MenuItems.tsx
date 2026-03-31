@@ -1,15 +1,14 @@
 import GroupsIcon from '@mui/icons-material/Groups';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StadiumIcon from '@mui/icons-material/Stadium';
-import {
-  IconAperture,
-  IconCopy,
-  IconLayoutDashboard,
-  IconLogin,
-  IconMoodHappy,
-  IconTypography,
-  IconUserPlus,
-} from "@tabler/icons-react";
+import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
+import Diversity3Icon from '@mui/icons-material/Diversity3';
+import SettingsAccessibilityIcon from '@mui/icons-material/SettingsAccessibility';
+import SportsIcon from '@mui/icons-material/Sports';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import SettingsIcon from '@mui/icons-material/Settings';
+import DashboardIcon from '@mui/icons-material/Dashboard';    
 
 import { uniqueId } from "lodash";
 
@@ -22,60 +21,12 @@ const Menuitems = [
   {
     id: uniqueId(),
     title: "Dashboard",
-    icon: IconLayoutDashboard,
+    icon: DashboardIcon,
     href: "/",
   },
   {
     navlabel: true,
-    subheader: "UTILITIES",
-  },
-  {
-    id: uniqueId(),
-    title: "Typography",
-    icon: IconTypography,
-    href: "/utilities/typography",
-  },
-  {
-    id: uniqueId(),
-    title: "Shadow",
-    icon: IconCopy,
-    href: "/utilities/shadow",
-  },
-  {
-    navlabel: true,
-    subheader: "AUTH",
-  },
-  {
-    id: uniqueId(),
-    title: "Login",
-    icon: IconLogin,
-    href: "/authentication/login",
-  },
-  {
-    id: uniqueId(),
-    title: "Register",
-    icon: IconUserPlus,
-    href: "/authentication/register",
-  },
-  {
-    navlabel: true,
-    subheader: " EXTRA",
-  },
-  {
-    id: uniqueId(),
-    title: "Icons",
-    icon: IconMoodHappy,
-    href: "/icons",
-  },
-  {
-    id: uniqueId(),
-    title: "Sample Page",
-    icon: IconAperture,
-    href: "/sample-page",
-  },
-  {
-    navlabel: true,
-    subheader: " EVENTS",
+    subheader: "COMPETITION",
   },
   {
     id: uniqueId(),
@@ -84,18 +35,10 @@ const Menuitems = [
     href: "/events",
   },
   {
-    navlabel: true,
-    subheader: " TEAMS",
-  },
-  {
     id: uniqueId(),
     title: "Teams",
-    icon: GroupsIcon,
+    icon: Diversity3Icon,
     href: "/teams",
-  },
-  {
-    navlabel: true,
-    subheader: " FIELDS",
   },
   {
     id: uniqueId(),
@@ -103,9 +46,82 @@ const Menuitems = [
     icon: StadiumIcon,
     href: "/fields",
   },
+  {
+    navlabel: true,
+    subheader: "MATCHES OPERATIONS",
+  },
+  {
+    id: uniqueId(),
+    title: "Matches",
+    icon: SportsSoccerIcon,
+    href: "/matches",
+  },
+  {
+    navlabel: true,
+    subheader: " PEOPLE",
+  },
+  {
+    id: uniqueId(),
+    title: "Players",
+    icon: GroupsIcon,
+    href: "/players",
+  },
+  {
+    id: uniqueId(),
+    title: "Coachs",
+    icon: SportsIcon,
+    href: "/coachs",
+  },
+  {
+    id: uniqueId(),
+    title: "Referees",
+    icon: SettingsAccessibilityIcon,
+    href: "/referees",
+  },
+  {
+    navlabel: true,
+    subheader: " CONTROL",
+  },
+  {
+    id: uniqueId(),
+    title: "Check-ins",
+    icon: AssignmentTurnedInIcon,
+    href: "/check-ins",
+  },
+  {
+    id: uniqueId(),
+    title: "Standings",
+    icon: FormatListNumberedIcon,
+    href: "/standings",
+  },
+  {
+    navlabel: true,
+    subheader: " SETTINGS",
+  },
+  {
+    id: uniqueId(),
+    title: "Settings",
+    icon: SettingsIcon,
+    href: "/settings",
+  },
 
 ];
 
 export default Menuitems;
+
+/*
+{
+  id: uniqueId(),
+  title: "Login",
+  icon: IconLogin,
+  href: "/authentication/login",
+},
+{
+  id: uniqueId(),
+  title: "Register",
+  icon: IconUserPlus,
+  href: "/authentication/register",
+},
+*/
 
 

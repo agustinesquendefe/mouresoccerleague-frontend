@@ -1,7 +1,7 @@
 import { useMediaQuery, Box, Drawer } from "@mui/material";
 import SidebarItems from "./SidebarItems";
-
-
+import Profile from "../header/Profile";
+import Header from "../header/Header";
 
 interface ItemType {
   isMobileSidebarOpen: boolean;
