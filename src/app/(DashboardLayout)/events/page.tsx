@@ -156,10 +156,10 @@ export default function EventsPage() {
                 <Alert severity="info">No events found.</Alert>
             ) : (
                 <EventsTable
-                events={events}
-                onEdit={handleOpenEdit}
-                onDelete={handleDelete}
-                onView={(event) => router.push(`/events/${event.id}`)}
+                    events={events}
+                    onEdit={handleOpenEdit}
+                    onDelete={handleDelete}
+                    onView={(event) => router.push(`/events/${event.id}`)}
                 />
             )}
 

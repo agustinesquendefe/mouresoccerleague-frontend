@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@mui/material';
 import type { MatchListRow } from '@/services/matches/getAllMatches';
+import Link from 'next/link';
 
 type Props = {
   matches: MatchListRow[];
@@ -67,7 +68,16 @@ export default function MatchesPageTable({ matches, onEdit }: Props) {
                 <Chip label={match.status ?? 'scheduled'} size="small" />
               </TableCell>
               <TableCell align="right">
-                <Stack direction="row" justifyContent="flex-end">
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  <Link href={`/matches/${match.id}`} passHref legacyBehavior>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      color='success'
+                    >
+                      View
+                    </Button>
+                  </Link>
                   <Button size="small" variant="outlined" onClick={() => onEdit(match)}>
                     Edit
                   </Button>

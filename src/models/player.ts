@@ -1,3 +1,5 @@
+"use client";
+
 export type Player = {
   id: number;
   first_name: string;

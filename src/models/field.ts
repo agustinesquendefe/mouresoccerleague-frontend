@@ -1,3 +1,5 @@
+"use client";
+
 export type FieldType = 'inside' | 'outside';
 export type FormatSupported = '5v5' | '7v7' | '11v11';
 

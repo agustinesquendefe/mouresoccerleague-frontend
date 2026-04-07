@@ -70,7 +70,7 @@ const Menuitems = [
     id: uniqueId(),
     title: "Coachs",
     icon: SportsIcon,
-    href: "/coachs",
+    href: "/coaches",
   },
   {
     id: uniqueId(),

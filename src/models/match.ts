@@ -1,3 +1,5 @@
+"use client";
+
 export type MatchStatus = 'scheduled' | 'in_progress' | 'played' | 'cancelled';
 export type MatchStageType = 'league' | 'knockout';
 export type MatchBracketRound =

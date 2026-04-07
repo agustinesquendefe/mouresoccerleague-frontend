@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import type { Match } from '@/models/match';
 import type { Field } from '@/models/field';
+import Link from 'next/link';
 
 type TeamMap = Record<number, string>;
 
@@ -68,6 +69,16 @@ export default function MatchesTable({
                 <Chip label={match.status ?? 'scheduled'} size="small" />
               </TableCell>
               <TableCell align="right">
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  <Button
+                    component={Link}
+                    href={`/matches/${match.id}`}
+                    variant="contained"
+                    size="small"
+                  >
+                    View
+                  </Button>
+                </Stack>
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
                   <Button variant="outlined" size="small" onClick={() => onEdit(match)}>
                     Edit

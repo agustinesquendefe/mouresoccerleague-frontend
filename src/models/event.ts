@@ -1,3 +1,5 @@
+"use client";
+
 export type EventFormatType = 'round_robin' | 'groups' | 'knockout' | 'mixed';
 export type EventStatus = 'draft' | 'active' | 'completed' | 'archived';
 export type MatchFormat = '5v5' | '7v7' | '11v11';
