@@ -1,9 +1,10 @@
 "use client";
+
 import Link from "next/link";
 import { Grid, Box, Card, Stack, Typography } from "@mui/material";
 // components
-import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
-import Logo from "@/app/(DashboardLayout)/layout/shared/logo/Logo";
+import PageContainer from "@/app/(admin)/components/container/PageContainer";
+import Logo from "@/app/(admin)/layout/shared/logo/Logo";
 import AuthLogin from "../auth/AuthLogin";
 
 const Login2 = () => {
@@ -48,43 +49,33 @@ const Login2 = () => {
                 <Logo />
               </Box>
               <AuthLogin
-                subtext={
-                  <Typography
-                    variant="subtitle1"
-                    textAlign="center"
-                    color="textSecondary"
-                    mb={1}
-                  >
-                    Your Social Campaigns
-                  </Typography>
-                }
-                subtitle={
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    justifyContent="center"
-                    mt={3}
-                  >
-                    <Typography
-                      color="textSecondary"
-                      variant="h6"
-                      fontWeight="500"
-                    >
-                      New to Modernize?
-                    </Typography>
-                    <Typography
-                      component={Link}
-                      href="/authentication/register"
-                      fontWeight="500"
-                      sx={{
-                        textDecoration: "none",
-                        color: "primary.main",
-                      }}
-                    >
-                      Create an account
-                    </Typography>
-                  </Stack>
-                }
+                // subtitle={
+                //   <Stack
+                //     direction="row"
+                //     spacing={1}
+                //     justifyContent="center"
+                //     mt={5}
+                //   >
+                //     <Typography
+                //       color="textSecondary"
+                //       variant="h6"
+                //       fontWeight="500"
+                //     >
+                //       New to Modernize?
+                //     </Typography>
+                //     <Typography
+                //       component={Link}
+                //       href="/authentication/register"
+                //       fontWeight="500"
+                //       sx={{
+                //         textDecoration: "none",
+                //         color: "primary.main",
+                //       }}
+                //     >
+                //       Create an account
+                //     </Typography>
+                //   </Stack>
+                // }
               />
             </Card>
           </Grid>
