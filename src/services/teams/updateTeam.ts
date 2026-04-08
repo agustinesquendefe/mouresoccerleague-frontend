@@ -13,6 +13,7 @@ export async function updateTeam(
       code: payload.code || null,
       club: payload.club,
       national: payload.national,
+      logo_url: payload.logo_url ?? null,
     })
     .eq('id', id)
     .select()

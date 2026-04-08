@@ -41,7 +41,7 @@ export default function MatchesPageTable({ matches, onEdit }: Props) {
         <TableBody>
           {matches.map((match) => (
             <TableRow key={match.id} hover>
-              <TableCell>{match.date ?? '-'}</TableCell>
+              <TableCell>{match.date ?? '-'}{match.time ? ` ${match.time}` : ''}</TableCell>
               <TableCell>{match.event_name ?? '-'}</TableCell>
               <TableCell>
                 <Chip label={match.stage_type ?? '-'} size="small" />
@@ -69,7 +69,7 @@ export default function MatchesPageTable({ matches, onEdit }: Props) {
               </TableCell>
               <TableCell align="right">
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
-                  <Link href={`/matches/${match.id}`} passHref legacyBehavior>
+                  <Link href={`/admin/matches/${match.id}`} passHref legacyBehavior>
                     <Button
                       variant="contained"
                       size="small"

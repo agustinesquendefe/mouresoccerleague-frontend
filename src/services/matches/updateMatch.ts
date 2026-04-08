@@ -15,6 +15,7 @@ export async function updateMatch(
       penalty_score2: payload.penalty_score2,
       winner_team_id: payload.winner_team_id,
       date: payload.date,
+      time: payload.time,
       field_id: payload.field_id,
       field_number: payload.field_number,
     })

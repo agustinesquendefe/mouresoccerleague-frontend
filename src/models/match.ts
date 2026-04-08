@@ -23,6 +23,7 @@ export type Match = {
   penalty_score2: number | null;
   winner_team_id: number | null;
   date: string | null;
+  time: string | null;
   field_number: number | null;
   field_id: number | null;
   stage_type: MatchStageType | string | null;
@@ -40,6 +41,7 @@ export type MatchFormData = {
   penalty_score2: number | null;
   winner_team_id: number | null;
   date: string | null;
+  time: string | null;
   field_id: number | null;
   field_number: number | null;
 };

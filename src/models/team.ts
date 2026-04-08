@@ -5,6 +5,7 @@ export type Team = {
   key: string;
   name: string;
   code: string | null;
+  logo_url: string | null;
   country_id: number | null;
   city_id: number | null;
   club: boolean;
@@ -19,4 +20,5 @@ export type TeamFormData = {
   code: string;
   club: boolean;
   national: boolean;
+  logo_url?: string | null;
 };

@@ -159,7 +159,7 @@ export default function EventsPage() {
                     events={events}
                     onEdit={handleOpenEdit}
                     onDelete={handleDelete}
-                    onView={(event) => router.push(`/events/${event.id}`)}
+                    onView={(event) => router.push(`/admin/events/${event.id}`)}
                 />
             )}
 

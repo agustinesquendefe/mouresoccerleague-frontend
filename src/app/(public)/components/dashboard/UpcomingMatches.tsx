@@ -134,10 +134,11 @@ export default function UpcomingMatches({ event, compact = false }: UpcomingMatc
                         {row.team1_name}
                       </Typography>
                       <Image
-                        src="/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg"
+                        src={row.team1_logo ?? '/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg'}
                         width={30}
                         height={30}
-                        alt="Team 1 Logo"
+                        alt={row.team1_name}
+                        style={{ objectFit: 'contain' }}
                       />
                     </Stack>
 
@@ -152,10 +153,11 @@ export default function UpcomingMatches({ event, compact = false }: UpcomingMatc
                     {/* Team 2 */}
                     <Stack direction="row" alignItems="center" gap={1} flex={1}>
                       <Image
-                        src="/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg"
+                        src={row.team2_logo ?? '/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg'}
                         width={30}
                         height={30}
-                        alt="Team 2 Logo"
+                        alt={row.team2_name}
+                        style={{ objectFit: 'contain' }}
                       />
                       <Typography fontSize={13} className="font-filson-bold">
                         {row.team2_name}

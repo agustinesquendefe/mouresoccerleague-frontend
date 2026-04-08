@@ -97,7 +97,7 @@ export default function TeamsTable({
 
               <TableCell>
                 <Link
-                  href={`/teams/${team.id}`}
+                  href={`/admin/teams/${team.id}`}
                   style={{
                     textDecoration: 'none',
                     color: 'inherit',
@@ -150,7 +150,7 @@ export default function TeamsTable({
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
                   <Button
                     component={Link}
-                    href={`/teams/${team.id}`}
+                    href={`/admin/teams/${team.id}`}
                     variant="contained"
                     size="small"
                     color='success'

@@ -21,7 +21,7 @@ export default async function MatchCheckInPage({ params }: Props) {
   return (
     <Stack spacing={3} sx={{ p: 3 }}>
       <Box>
-        <Link href={`/matches/${matchId}`} passHref>
+        <Link href={`/admin/matches/${matchId}`} passHref>
             <Button variant="text" sx={{ px: 0, mb: 1 }}>
                ← Back to match
             </Button>

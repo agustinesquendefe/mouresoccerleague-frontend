@@ -10,7 +10,9 @@ export type UpcomingMatchRow = {
   stage_type: string | null;
   bracket_round: string | null;
   team1_name: string;
+  team1_logo: string | null;
   team2_name: string;
+  team2_logo: string | null;
   field_name: string | null;
 };
 
@@ -35,6 +37,7 @@ type UpcomingMatchQueryRow = {
 type TeamNameRow = {
   id: number;
   name: string;
+  logo_url: string | null;
 };
 
 type FieldNameRow = {
@@ -91,19 +94,19 @@ export async function getUpcomingMatches(eventIdOrLimit?: number, eventId?: numb
     new Set(matches.map((match) => match.field_id).filter((id): id is number => Number.isFinite(id)))
   );
 
-  let teamNameById = new Map<number, string>();
+  let teamNameById = new Map<number, TeamNameRow>();
   let fieldNameById = new Map<number, string>();
 
   if (teamIds.length > 0) {
     const { data: teams, error: teamsError } = await supabase
       .from('teams')
-      .select('id, name')
+      .select('id, name, logo_url')
       .in('id', teamIds);
 
     if (teamsError) throw new Error(teamsError.message);
 
     teamNameById = new Map(
-      ((teams ?? []) as TeamNameRow[]).map((team) => [team.id, team.name])
+      ((teams ?? []) as TeamNameRow[]).map((team) => [team.id, team])
     );
   }
 
@@ -129,9 +132,13 @@ export async function getUpcomingMatches(eventIdOrLimit?: number, eventId?: numb
     stage_type: row.stage_type,
     bracket_round: row.bracket_round,
     team1_name:
-      row.team1_id !== null ? (teamNameById.get(row.team1_id) ?? '-') : '-',
+      row.team1_id !== null ? (teamNameById.get(row.team1_id)?.name ?? '-') : '-',
+    team1_logo:
+      row.team1_id !== null ? (teamNameById.get(row.team1_id)?.logo_url ?? null) : null,
     team2_name:
-      row.team2_id !== null ? (teamNameById.get(row.team2_id) ?? '-') : '-',
+      row.team2_id !== null ? (teamNameById.get(row.team2_id)?.name ?? '-') : '-',
+    team2_logo:
+      row.team2_id !== null ? (teamNameById.get(row.team2_id)?.logo_url ?? null) : null,
     field_name:
       row.field_id !== null ? (fieldNameById.get(row.field_id) ?? null) : null,
   }));

@@ -16,7 +16,7 @@ export async function uploadImage({
   const { error } = await supabase.storage
     .from(bucket)
     .upload(path, file, {
-      cacheControl: '3600',
+      cacheControl: '0',
       upsert,
     });
 
@@ -28,6 +28,6 @@ export async function uploadImage({
 
   return {
     path,
-    publicUrl: data.publicUrl,
+    publicUrl: `${data.publicUrl}?t=${Date.now()}`,
   };
 }

@@ -70,7 +70,7 @@ export default function CoachesTable({
 
               <TableCell>
                 <Link
-                  href={`/coaches/${coach.id}`}
+                  href={`/admin/coaches/${coach.id}`}
                   style={{ textDecoration: 'none', color: 'inherit' }}
                 >
                   <Typography
@@ -103,7 +103,7 @@ export default function CoachesTable({
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
                   <Button
                     component={Link}
-                    href={`/coaches/${coach.id}`}
+                    href={`/admin/coaches/${coach.id}`}
                     variant="outlined"
                     size="small"
                   >

@@ -72,7 +72,7 @@ export default function RefereesTable({
 
               <TableCell>
                 <Link
-                  href={`/referees/${referee.id}`}
+                  href={`/admin/referees/${referee.id}`}
                   style={{ textDecoration: 'none', color: 'inherit' }}
                 >
                   <Typography
@@ -105,7 +105,7 @@ export default function RefereesTable({
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
                   <Button
                     component={Link}
-                    href={`/referees/${referee.id}`}
+                    href={`/admin/referees/${referee.id}`}
                     variant="outlined"
                     size="small"
                   >

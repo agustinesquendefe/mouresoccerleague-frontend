@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Checkbox,
@@ -14,9 +15,11 @@ import {
   FormControlLabel,
   Stack,
   TextField,
+  Typography,
 } from '@mui/material';
 import type { Team, TeamFormData } from '@/models/team';
 import { checkTeamConflicts } from '@/services/teams/checkTeamConflicts';
+import { uploadImage } from '@/services/storage/uploadImage';
 
 type TeamDialogProps = {
   open: boolean;
@@ -38,6 +41,7 @@ const initialValues: TeamFormData = {
   code: '',
   club: true,
   national: false,
+  logo_url: null,
 };
 
 const initialConflicts: ConflictState = {
@@ -98,6 +102,9 @@ export default function TeamDialog({
   const [conflicts, setConflicts] = useState<ConflictState>(initialConflicts);
   const [checkingConflicts, setCheckingConflicts] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -109,9 +116,12 @@ export default function TeamDialog({
         code: team.code ?? '',
         club: team.club ?? false,
         national: team.national ?? false,
+        logo_url: team.logo_url ?? null,
       });
       setConflicts(initialConflicts);
       setSubmitError(null);
+      setLogoFile(null);
+      setLogoPreview(team.logo_url ?? null);
       return;
     }
 
@@ -119,6 +129,8 @@ export default function TeamDialog({
       setValues(initialValues);
       setConflicts(initialConflicts);
       setSubmitError(null);
+      setLogoFile(null);
+      setLogoPreview(null);
     }
   }, [open, mode, team]);
 
@@ -212,12 +224,22 @@ export default function TeamDialog({
         return;
       }
 
+      // Upload logo if a new file was selected
+      let logoUrl: string | null | undefined = values.logo_url ?? null;
+      if (logoFile) {
+        const ext = logoFile.name.split('.').pop() ?? 'png';
+        const path = `${trimmedKey}.${ext}`;
+        const { publicUrl } = await uploadImage({ bucket: 'team-logos', path, file: logoFile, upsert: true });
+        logoUrl = publicUrl;
+      }
+
       await onSubmit({
         key: trimmedKey,
         name: trimmedName,
         code: trimmedCode,
         club: values.club,
         national: values.national,
+        logo_url: logoUrl,
       });
     } catch (error) {
       const message =
@@ -282,6 +304,52 @@ export default function TeamDialog({
               }
               label="National Team"
             />
+
+            {/* Logo upload */}
+            <Stack spacing={1}>
+              <Typography variant="body2" fontWeight={600}>Logo (PNG, WebP, SVG)</Typography>
+              <Stack direction="row" alignItems="center" spacing={2}>
+                <Avatar
+                  src={logoPreview ?? undefined}
+                  variant="rounded"
+                  sx={{ width: 56, height: 56 }}
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                </Button>
+                {logoPreview && (
+                  <Button
+                    variant="text"
+                    size="small"
+                    color="error"
+                    onClick={() => {
+                      setLogoFile(null);
+                      setLogoPreview(null);
+                      setValues((prev) => ({ ...prev, logo_url: null }));
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </Stack>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/webp,image/svg+xml"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setLogoFile(file);
+                  setLogoPreview(URL.createObjectURL(file));
+                  e.target.value = '';
+                }}
+              />
+            </Stack>
 
             {checkingConflicts && (
               <Stack direction="row" spacing={1} alignItems="center">

@@ -34,6 +34,7 @@ const initialValues: MatchFormData = {
   penalty_score2: null,
   winner_team_id: null,
   date: null,
+  time: null,
   field_id: null,
   field_number: null,
 };
@@ -61,6 +62,7 @@ export default function MatchDialog({
       penalty_score2: match.penalty_score2,
       winner_team_id: match.winner_team_id,
       date: match.date,
+      time: match.time,
       field_id: match.field_id,
       field_number: match.field_number,
     });
@@ -260,6 +262,20 @@ export default function MatchDialog({
               setValues((prev) => ({
                 ...prev,
                 date: e.target.value || null,
+              }))
+            }
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+          />
+
+          <TextField
+            label="Time"
+            type="time"
+            value={values.time ?? ''}
+            onChange={(e) =>
+              setValues((prev) => ({
+                ...prev,
+                time: e.target.value || null,
               }))
             }
             fullWidth

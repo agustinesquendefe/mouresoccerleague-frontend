@@ -95,7 +95,7 @@ export default function GroupedMatchesTable({
                     )}
 
                     <Typography variant="body2" color="text.secondary">
-                      Date: {match.date ?? '-'}
+                      Date: {match.date ?? '-'}{match.time ? ` — ${match.time}` : ''}
                     </Typography>
 
                     <Typography variant="body2" color="text.secondary">

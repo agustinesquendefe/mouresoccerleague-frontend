@@ -4,6 +4,7 @@ export type PublicMatchRow = {
   id: number;
   event_id: number;
   date: string | null;
+  time: string | null;
   round_number: number | null;
   status: string | null;
   stage_type: string | null;
@@ -13,7 +14,9 @@ export type PublicMatchRow = {
   team1_id: number;
   team2_id: number;
   team1_name: string;
+  team1_logo: string | null;
   team2_name: string;
+  team2_logo: string | null;
   field_name: string | null;
 };
 
@@ -21,6 +24,7 @@ type RawMatch = {
   id: number;
   event_id: number;
   date: string | null;
+  time: string | null;
   round_number: number | null;
   status: string | null;
   stage_type: string | null;
@@ -39,6 +43,7 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
       id,
       event_id,
       date,
+      time,
       round_number,
       status,
       stage_type,
@@ -68,7 +73,7 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
 
   const [teamRes, fieldRes] = await Promise.all([
     teamIds.length > 0
-      ? supabase.from('teams').select('id, name').in('id', teamIds)
+      ? supabase.from('teams').select('id, name, logo_url').in('id', teamIds)
       : Promise.resolve({ data: [], error: null }),
     fieldIds.length > 0
       ? supabase.from('fields').select('id, name').in('id', fieldIds)
@@ -78,8 +83,8 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
   if (teamRes.error) throw new Error(teamRes.error.message);
   if (fieldRes.error) throw new Error(fieldRes.error.message);
 
-  const teamById = new Map<number, string>(
-    ((teamRes.data ?? []) as { id: number; name: string }[]).map((t) => [t.id, t.name])
+  const teamById = new Map<number, { name: string; logo_url: string | null }>(
+    ((teamRes.data ?? []) as { id: number; name: string; logo_url: string | null }[]).map((t) => [t.id, t])
   );
   const fieldById = new Map<number, string>(
     ((fieldRes.data ?? []) as { id: number; name: string }[]).map((f) => [f.id, f.name])
@@ -89,6 +94,7 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
     id: m.id,
     event_id: m.event_id,
     date: m.date,
+    time: m.time,
     round_number: m.round_number,
     status: m.status,
     stage_type: m.stage_type,
@@ -97,8 +103,10 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
     score2: m.score2,
     team1_id: m.team1_id ?? 0,
     team2_id: m.team2_id ?? 0,
-    team1_name: m.team1_id != null ? (teamById.get(m.team1_id) ?? '-') : '-',
-    team2_name: m.team2_id != null ? (teamById.get(m.team2_id) ?? '-') : '-',
+    team1_name: m.team1_id != null ? (teamById.get(m.team1_id)?.name ?? '-') : '-',
+    team1_logo: m.team1_id != null ? (teamById.get(m.team1_id)?.logo_url ?? null) : null,
+    team2_name: m.team2_id != null ? (teamById.get(m.team2_id)?.name ?? '-') : '-',
+    team2_logo: m.team2_id != null ? (teamById.get(m.team2_id)?.logo_url ?? null) : null,
     field_name: m.field_id != null ? (fieldById.get(m.field_id) ?? null) : null,
   }));
 }

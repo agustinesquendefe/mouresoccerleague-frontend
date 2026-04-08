@@ -17,22 +17,22 @@ import type { Event } from '@/models/event';
 import type { PublicMatchRow } from '@/services/matches/getPublicMatches';
 
 const BRACKET_ROUND_LABELS: Record<string, string> = {
-  round_of_16: 'Octavos de final',
-  quarterfinal: 'Cuartos de final',
+  round_of_16: 'Round of 16',
+  quarterfinal: 'Quarterfinal',
   semifinal: 'Semifinal',
   final: 'Final',
-  third_place: 'Tercer puesto',
+  third_place: 'Third Place',
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: 'default' | 'success' | 'warning' | 'error' }> = {
-  scheduled: { label: 'Programado', color: 'default' },
-  in_progress: { label: 'En curso', color: 'warning' },
-  played: { label: 'Jugado', color: 'success' },
-  cancelled: { label: 'Cancelado', color: 'error' },
+  scheduled: { label: 'Scheduled', color: 'default' },
+  in_progress: { label: 'Playing', color: 'warning' },
+  played: { label: 'Played', color: 'success' },
+  cancelled: { label: 'Cancelled', color: 'error' },
 };
 
 function formatDateLabel(date: string): string {
-  return new Date(`${date}T00:00:00`).toLocaleDateString('es-ES', {
+  return new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -45,6 +45,13 @@ function formatRoundLabel(match: PublicMatchRow): string {
     return BRACKET_ROUND_LABELS[match.bracket_round] ?? match.bracket_round;
   }
   return match.round_number != null ? `Jornada ${match.round_number}` : 'Sin jornada';
+}
+
+function formatTimeET(time: string): string {
+  const [h, m] = time.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
 type Props = {
@@ -262,10 +269,11 @@ export default function MatchesView({ events, initialEventId, matchesByEvent }: 
                                 {row.team1_name}
                               </Typography>
                               <Image
-                                src="/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg"
+                                src={row.team1_logo ?? '/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg'}
                                 width={28}
                                 height={28}
                                 alt={row.team1_name}
+                                style={{ objectFit: 'contain' }}
                               />
                             </Stack>
 
@@ -291,10 +299,11 @@ export default function MatchesView({ events, initialEventId, matchesByEvent }: 
                             {/* Team 2 */}
                             <Stack direction="row" alignItems="center" gap={1} flex={1}>
                               <Image
-                                src="/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg"
+                                src={row.team2_logo ?? '/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg'}
                                 width={28}
                                 height={28}
                                 alt={row.team2_name}
+                                style={{ objectFit: 'contain' }}
                               />
                               <Typography fontSize={13} className="font-filson-bold">
                                 {row.team2_name}
@@ -305,6 +314,12 @@ export default function MatchesView({ events, initialEventId, matchesByEvent }: 
                           {row.field_name && (
                             <Typography variant="caption" color="text.secondary" textAlign="center" mt={0.5} className="font-filson-regular">
                               {row.field_name}
+                            </Typography>
+                          )}
+
+                          {row.time && (
+                            <Typography variant="caption" color="text.secondary" textAlign="center" mt={0.25} className="font-filson-regular">
+                              🕐 {formatTimeET(row.time)}
                             </Typography>
                           )}
                         </Stack>

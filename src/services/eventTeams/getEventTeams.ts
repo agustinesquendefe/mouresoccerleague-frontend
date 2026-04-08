@@ -10,7 +10,8 @@ export async function getEventTeams(eventId: number) {
         id,
         name,
         key,
-        code
+        code,
+        logo_url
       )
     `)
     .eq('event_id', eventId)
