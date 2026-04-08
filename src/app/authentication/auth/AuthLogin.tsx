@@ -62,7 +62,7 @@ const AuthLogin = ({ title, subtitle, subtext }: loginType) => {
       setSuccess(true);
       // Redirigir según rol
       if (profile?.role === 'admin') {
-        router.push('/dashboard');
+        router.push('/admin/dashboard');
       } else {
         router.push('/');
       }

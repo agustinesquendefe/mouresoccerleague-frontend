@@ -17,43 +17,43 @@ body {
 }
 
 .font-filson-thin {
-  font-family: "filson-pro", sans-serif;
+  font-family: "filson-pro", sans-serif !important;
   font-weight: 100;
   font-style: normal;
 }
 
 .font-filson-light {
-  font-family: "filson-pro", sans-serif;
+  font-family: "filson-pro", sans-serif !important;
   font-weight: 200;
   font-style: normal;
 }
 
 .font-filson-book {
-  font-family: "filson-pro", sans-serif;
+  font-family: "filson-pro", sans-serif !important;
   font-weight: 100;
   font-style: normal;
 }
 
 .font-filson-regular {
-  font-family: "filson-pro", sans-serif;
+  font-family: "filson-pro", sans-serif !important;
   font-weight: 400;
   font-style: normal;
 }
 
 .font-filson-bold {
-  font-family: "filson-pro", sans-serif;
+  font-family: "filson-pro", sans-serif !important;
   font-weight: 700;
   font-style: normal;
 }
 
 .font-filson-black {
-  font-family: "filson-pro", sans-serif;
+  font-family: "filson-pro", sans-serif !important;
   font-weight: 900;
   font-style: normal;
 }
 
 .banner-green {
-  background-image: url("/banners/Banner-1-desktop.png");
+  font-family: "filson-pro", sans-serif !important;
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;

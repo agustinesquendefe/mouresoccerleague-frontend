@@ -9,12 +9,10 @@ import type { AppSettings } from '@/models/appSettings';
 
 export default function Footer() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getAppSettings().then((data) => {
       setSettings(data);
-      setLoading(false);
     });
   }, []);
 
@@ -27,15 +25,7 @@ export default function Footer() {
   const youtubeUrl = settings?.youtube_url || "#";
   const contactPhone = settings?.contact_phone || "(336) 404-7816";
   const contactEmail = settings?.contact_email || "info@moureleague.com";
-  const address = settings?.address || "508 Arbor Hill Rd, Suite 202, Kernersville, NC";
-
-  if (loading) {
-    return (
-      <footer className="font-filson-regular text-white pt-12 pb-6 px-4 flex items-center justify-center min-h-20" style={{ background: 'var(--color-blue, #023467)' }}>
-        <span className="text-white text-sm">Loading...</span>
-      </footer>
-    );
-  }
+  const address = settings?.address || "1760 S Martin Luther King Jr Dr, Winston-Salem, NC 27107";
 
   return (
     <footer className="font-filson-regular text-white pt-12 pb-6 px-4" style={{ background: 'var(--color-blue, #023467)' }}>
@@ -43,7 +33,7 @@ export default function Footer() {
         {/* Logo and league name */}
         <div className="flex-1 flex flex-col items-center md:items-start mb-8 md:mb-0">
           <img 
-            src={logoUrl}
+            src={"/Imagotipo-Principal-Vertical-Sin-Fondo-Blanco-MPL.svg"}
             alt={leagueName + " Logo"}
             className="w-48 mb-6"
           />
@@ -54,7 +44,7 @@ export default function Footer() {
           <h3 className="text-2xl font-semibold mb-4" style={{ color: 'var(--color-yellow, #ffb304)' }}>Who We Are</h3>
           <ul className="space-y-2 text-lg">
             <li>
-              <Link href="/our-company/about-us" className="hover:underline">
+              <Link href="/about-us" className="hover:underline">
                 About Us
               </Link>
             </li>
@@ -64,18 +54,13 @@ export default function Footer() {
               </Link>
             </li>
             <li>
-              <Link href="/available-homes" className="hover:underline transition">
-                Move-In Ready
-              </Link>
-            </li>
-            <li>
-              <Link href="/our-company/faqs" className="hover:underline">
+              <Link href="/contact-us" className="hover:underline">
                 FAQs
               </Link>
             </li>
             <li>
-              <Link href="/subcontractors" className="hover:underline transition">
-                Subcontractor Opportunities
+              <Link href="/contact-us" className="hover:underline transition">
+                Hiring
               </Link>
             </li>
           </ul>
@@ -96,7 +81,9 @@ export default function Footer() {
             </a>
           </div>
           <div className="mb-2 flex text-sm md:text-base items-center gap-2">
-            <span>{address}</span>
+            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" className="hover:underline">
+              {address}
+            </a>
           </div>
           <div className="flex gap-3 mt-4">
             <a href={facebookUrl} target="_blank" aria-label="Facebook" className="hover:scale-105 hover:text-yellow-400"><FaFacebook size={23} /></a>

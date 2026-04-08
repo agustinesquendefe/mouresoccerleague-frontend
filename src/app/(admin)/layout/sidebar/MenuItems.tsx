@@ -8,7 +8,8 @@ import SportsIcon from '@mui/icons-material/Sports';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import SettingsIcon from '@mui/icons-material/Settings';
-import DashboardIcon from '@mui/icons-material/Dashboard';    
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';    
 
 import { uniqueId } from "lodash";
 
@@ -22,7 +23,7 @@ const Menuitems = [
     id: uniqueId(),
     title: "Dashboard",
     icon: DashboardIcon,
-    href: "/dashboard",
+    href: "/admin/dashboard",
   },
   {
     navlabel: true,
@@ -32,19 +33,19 @@ const Menuitems = [
     id: uniqueId(),
     title: "Events",
     icon: EmojiEventsIcon,
-    href: "/events",
+    href: "/admin/events",
   },
   {
     id: uniqueId(),
     title: "Teams",
     icon: Diversity3Icon,
-    href: "/teams",
+    href: "/admin/teams",
   },
   {
     id: uniqueId(),
     title: "Fields",
     icon: StadiumIcon,
-    href: "/fields",
+    href: "/admin/fields",
   },
   {
     navlabel: true,
@@ -54,7 +55,7 @@ const Menuitems = [
     id: uniqueId(),
     title: "Matches",
     icon: SportsSoccerIcon,
-    href: "/matches",
+    href: "/admin/matches",
   },
   {
     navlabel: true,
@@ -64,19 +65,19 @@ const Menuitems = [
     id: uniqueId(),
     title: "Players",
     icon: GroupsIcon,
-    href: "/players",
+    href: "/admin/players",
   },
   {
     id: uniqueId(),
     title: "Coachs",
     icon: SportsIcon,
-    href: "/coaches",
+    href: "/admin/coaches",
   },
   {
     id: uniqueId(),
     title: "Referees",
     icon: SettingsAccessibilityIcon,
-    href: "/referees",
+    href: "/admin/referees",
   },
   {
     navlabel: true,
@@ -86,13 +87,13 @@ const Menuitems = [
     id: uniqueId(),
     title: "Check-ins",
     icon: AssignmentTurnedInIcon,
-    href: "/check-ins",
+    href: "/admin/check-ins",
   },
   {
     id: uniqueId(),
     title: "Standings",
     icon: FormatListNumberedIcon,
-    href: "/standings",
+    href: "/admin/standings",
   },
   {
     navlabel: true,
@@ -100,9 +101,15 @@ const Menuitems = [
   },
   {
     id: uniqueId(),
+    title: "Users",
+    icon: ManageAccountsIcon,
+    href: "/admin/users",
+  },
+  {
+    id: uniqueId(),
     title: "Settings",
     icon: SettingsIcon,
-    href: "/settings",
+    href: "/admin/settings",
   },
 
 ];

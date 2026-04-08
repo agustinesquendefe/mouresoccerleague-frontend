@@ -18,29 +18,25 @@ export default function AdminRootLayout({ children }: { children: React.ReactNod
   const handleMobileSidebarClose = (event: React.MouseEvent<HTMLElement>) => setMobileSidebarOpen(false);
 
   return (
-    <html lang="en">
-      <body>
-        <ThemeProvider theme={baselightTheme}>
-          <CssBaseline />
-          <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
-            {/* Sidebar */}
-            <Sidebar
-              isSidebarOpen={isSidebarOpen}
-              isMobileSidebarOpen={isMobileSidebarOpen}
-              onSidebarClose={handleMobileSidebarClose}
-            />
-            {/* Main content */}
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-              {/* Header */}
-              <Header toggleMobileSidebar={handleMobileSidebarOpen} />
-              {/* Page content */}
-              <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 4 } }}>
-                {children}
-              </Box>
-            </Box>
+    <ThemeProvider theme={baselightTheme}>
+      <CssBaseline />
+      <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
+        {/* Sidebar */}
+        <Sidebar
+          isSidebarOpen={isSidebarOpen}
+          isMobileSidebarOpen={isMobileSidebarOpen}
+          onSidebarClose={handleMobileSidebarClose}
+        />
+        {/* Main content */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+          {/* Header */}
+          <Header toggleMobileSidebar={handleMobileSidebarOpen} />
+          {/* Page content */}
+          <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 4 } }}>
+            {children}
           </Box>
-        </ThemeProvider>
-      </body>
-    </html>
+        </Box>
+      </Box>
+    </ThemeProvider>
   );
 }

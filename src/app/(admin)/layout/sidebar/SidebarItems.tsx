@@ -79,7 +79,10 @@ const SidebarItems = () => {
 
   useEffect(() => {
     getAppSettings().then((settings) => {
-      setLogoUrl(settings?.logo_url || null);
+      const raw = settings?.logo_url || '/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg';
+      // Ensure the URL is absolute (starts with / or http) to avoid relative path issues
+      const normalized = raw.startsWith('/') || raw.startsWith('http') ? raw : `/${raw}`;
+      setLogoUrl(normalized);
       setLeagueName(settings?.league_name || null);
     });
     supabase.auth.getUser().then(({ data }) => {
@@ -92,7 +95,7 @@ const SidebarItems = () => {
   return (
     <>
       <MUI_Sidebar width={"100%"} showProfile={false} themeColor={"#5D87FF"} themeSecondaryColor={'#49beff'}>
-        <Logo img={logoUrl} component={Link} to="/">
+        <Logo img={logoUrl} component={Link} to="/" style={{ height: 40 }}>
           {leagueName || 'Modernize'}
         </Logo>
         {renderMenuItems(Menuitems, pathDirect)}

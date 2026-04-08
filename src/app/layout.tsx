@@ -11,7 +11,9 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://use.typekit.net/orf2jwd.css" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+      </body>
     </html>
   )
 }

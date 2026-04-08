@@ -14,12 +14,10 @@ import type { AppSettings } from '@/models/appSettings';
 export default function Header() {
   const router = useRouter();
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getAppSettings().then((data) => {
       setSettings(data);
-      setLoading(false);
     });
   }, []);
 
@@ -32,14 +30,6 @@ export default function Header() {
   const youtubeUrl = settings?.youtube_url || "#";
   const contactPhone = settings?.contact_phone || "(336) 404-7816";
   const contactEmail = settings?.contact_email || "info@moureleague.com";
-
-  if (loading) {
-    return (
-      <header className="w-full shadow relative z-999 flex items-center justify-center min-h-20" style={{ background: 'var(--color-blue, #023467)' }}>
-        <span className="text-white text-sm">Loading...</span>
-      </header>
-    );
-  }
 
   return (
     <header className="w-full shadow relative z-999" style={{ background: 'var(--color-blue, #023467)' }}>
@@ -129,31 +119,25 @@ export default function Header() {
           <nav className="hidden xl:flex flex-col xl:flex-row xl:items-center xl:justify-center gap-2 xl:gap-10 relative">
 
             <div className="relative group">
-              <Link href="/building-a-new-home/build-on-your-lot" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
-                Leagues
+              <Link href="/matches" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
+                Matches
               </Link>
             </div>
             
             <div className="relative group">
-              <Link href="/building-a-new-home/build-on-your-lot" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
-                Classes
+              <Link href="/standings" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
+                Standings
               </Link>
             </div>
 
             <div className="relative group">
-              <Link href="/building-a-new-home/build-on-your-lot" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
-                Schedule
-              </Link>
-            </div>
-
-            <div className="relative group">
-              <Link href="/our-company/about-us" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
+              <Link href="/about-us" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
                 About Us
               </Link>
             </div>
 
             <div className="relative group">
-              <Link href="/our-company/about-us" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
+              <Link href="/contact-us" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
                 Contact Us
               </Link>
             </div>

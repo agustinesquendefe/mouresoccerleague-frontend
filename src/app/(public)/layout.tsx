@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "../global.css";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import MuiProvider from "./MuiProvider";
 
 export const dynamic = 'force-dynamic';
 
@@ -26,11 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
+    <MuiProvider>
       <link rel="stylesheet" href="https://use.typekit.net/orf2jwd.css" />
       <Header />
       <div className="min-h-[80vh]">{children}</div>
       <Footer />
-    </>
+    </MuiProvider>
   );
 }

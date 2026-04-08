@@ -4,7 +4,7 @@ import SidebarItems from "./SidebarItems";
 import Profile from "../header/Profile";
 import { useEffect, useState } from "react";
 import { getAppSettings } from '@/services/settings/settings.service';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from "@/lib/supabaseClient";
 
 interface ItemType {
   isMobileSidebarOpen: boolean;
