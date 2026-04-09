@@ -14,6 +14,7 @@ export async function updateTeam(
       club: payload.club,
       national: payload.national,
       logo_url: payload.logo_url ?? null,
+      category_id: payload.category_id ?? null,
     })
     .eq('id', id)
     .select()

@@ -13,6 +13,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -20,6 +21,8 @@ import {
 import type { Team, TeamFormData } from '@/models/team';
 import { checkTeamConflicts } from '@/services/teams/checkTeamConflicts';
 import { uploadImage } from '@/services/storage/uploadImage';
+import type { Category } from '@/models/category';
+import { getCategories } from '@/services/categories';
 
 type TeamDialogProps = {
   open: boolean;
@@ -42,6 +45,7 @@ const initialValues: TeamFormData = {
   club: true,
   national: false,
   logo_url: null,
+  category_id: null,
 };
 
 const initialConflicts: ConflictState = {
@@ -105,6 +109,12 @@ export default function TeamDialog({
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    getCategories().then(setCategories).catch(console.error);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -117,6 +127,7 @@ export default function TeamDialog({
         club: team.club ?? false,
         national: team.national ?? false,
         logo_url: team.logo_url ?? null,
+        category_id: team.category_id ?? null,
       });
       setConflicts(initialConflicts);
       setSubmitError(null);
@@ -240,6 +251,7 @@ export default function TeamDialog({
         club: values.club,
         national: values.national,
         logo_url: logoUrl,
+        category_id: values.category_id ?? null,
       });
     } catch (error) {
       const message =
@@ -304,6 +316,20 @@ export default function TeamDialog({
               }
               label="National Team"
             />
+
+            {/* Logo upload */}
+            <TextField
+              select
+              label="Category"
+              value={values.category_id ?? ''}
+              onChange={(e) => setValues((p) => ({ ...p, category_id: e.target.value === '' ? null : Number(e.target.value) }))}
+              fullWidth
+            >
+              <MenuItem value=""><em>No category</em></MenuItem>
+              {categories.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </TextField>
 
             {/* Logo upload */}
             <Stack spacing={1}>

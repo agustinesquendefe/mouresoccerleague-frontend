@@ -9,18 +9,17 @@ import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import SettingsIcon from '@mui/icons-material/Settings';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';    
-
-import { uniqueId } from "lodash";
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import SportsSoccerOutlinedIcon from '@mui/icons-material/SportsSoccerOutlined';
 
 const Menuitems = [
   {
     navlabel: true,
     subheader: "HOME",
   },
-
   {
-    id: uniqueId(),
+    id: "dashboard",
     title: "Dashboard",
     icon: DashboardIcon,
     href: "/admin/dashboard",
@@ -30,19 +29,19 @@ const Menuitems = [
     subheader: "COMPETITION",
   },
   {
-    id: uniqueId(),
+    id: "events",
     title: "Events",
     icon: EmojiEventsIcon,
     href: "/admin/events",
   },
   {
-    id: uniqueId(),
+    id: "teams",
     title: "Teams",
     icon: Diversity3Icon,
     href: "/admin/teams",
   },
   {
-    id: uniqueId(),
+    id: "fields",
     title: "Fields",
     icon: StadiumIcon,
     href: "/admin/fields",
@@ -52,83 +51,82 @@ const Menuitems = [
     subheader: "MATCHES OPERATIONS",
   },
   {
-    id: uniqueId(),
+    id: "matches",
     title: "Matches",
     icon: SportsSoccerIcon,
     href: "/admin/matches",
   },
   {
     navlabel: true,
-    subheader: " PEOPLE",
+    subheader: "PEOPLE",
   },
   {
-    id: uniqueId(),
+    id: "players",
     title: "Players",
     icon: GroupsIcon,
     href: "/admin/players",
   },
   {
-    id: uniqueId(),
+    id: "coaches",
     title: "Coachs",
     icon: SportsIcon,
     href: "/admin/coaches",
   },
   {
-    id: uniqueId(),
+    id: "referees",
     title: "Referees",
     icon: SettingsAccessibilityIcon,
     href: "/admin/referees",
   },
   {
     navlabel: true,
-    subheader: " CONTROL",
+    subheader: "CONTROL",
   },
   {
-    id: uniqueId(),
+    id: "check-ins",
     title: "Check-ins",
     icon: AssignmentTurnedInIcon,
     href: "/admin/check-ins",
   },
   {
-    id: uniqueId(),
+    id: "standings",
     title: "Standings",
     icon: FormatListNumberedIcon,
     href: "/admin/standings",
   },
   {
     navlabel: true,
-    subheader: " SETTINGS",
+    subheader: "CONFIG",
   },
   {
-    id: uniqueId(),
+    id: "format-types",
+    title: "Format Types",
+    icon: ViewListIcon,
+    href: "/admin/format-types",
+  },
+  {
+    id: "match-formats",
+    title: "Match Formats",
+    icon: SportsSoccerOutlinedIcon,
+    href: "/admin/match-formats",
+  },
+  {
+    navlabel: true,
+    subheader: "SETTINGS",
+  },
+  {
+    id: "users",
     title: "Users",
     icon: ManageAccountsIcon,
     href: "/admin/users",
   },
   {
-    id: uniqueId(),
+    id: "settings",
     title: "Settings",
     icon: SettingsIcon,
     href: "/admin/settings",
   },
-
 ];
 
 export default Menuitems;
-
-/*
-{
-  id: uniqueId(),
-  title: "Login",
-  icon: IconLogin,
-  href: "/authentication/login",
-},
-{
-  id: uniqueId(),
-  title: "Register",
-  icon: IconUserPlus,
-  href: "/authentication/register",
-},
-*/
-
 

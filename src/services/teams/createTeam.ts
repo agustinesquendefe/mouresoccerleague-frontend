@@ -12,6 +12,7 @@ export async function createTeam(payload: TeamFormData): Promise<Team> {
         club: payload.club,
         national: payload.national,
         logo_url: payload.logo_url ?? null,
+        category_id: payload.category_id ?? null,
       },
     ])
     .select()

@@ -13,6 +13,7 @@ export type Player = {
   document_id: string | null;
   is_active: boolean;
   notes: string | null;
+  photo_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -28,4 +29,5 @@ export type PlayerFormData = {
   document_id: string;
   is_active: boolean;
   notes: string;
+  photo_url: string | null;
 };

@@ -9,6 +9,8 @@ export type GetAllMatchesParams = {
 
 export type MatchListRow = Match & {
   event_name?: string | null;
+  event_season_name?: string | null;
+  event_category_name?: string | null;
   team1_name?: string | null;
   team2_name?: string | null;
   field_name?: string | null;
@@ -61,7 +63,7 @@ export async function getAllMatches(
 
   const [{ data: events, error: eventsError }, { data: teams, error: teamsError }] =
     await Promise.all([
-      supabase.from('events').select('id, name').in('id', eventIds),
+      supabase.from('events').select('id, name, season_id, category_id').in('id', eventIds),
       supabase.from('teams').select('id, name').in('id', teamIds),
     ]);
 
@@ -73,6 +75,23 @@ export async function getAllMatches(
     throw new Error(teamsError.message);
   }
 
+  // Load seasons and categories referenced by these events
+  const eventRows = (events ?? []) as { id: number; name: string; season_id: number; category_id: number | null }[];
+  const seasonIds = Array.from(new Set(eventRows.map((e) => e.season_id).filter(Boolean)));
+  const categoryIds = Array.from(new Set(eventRows.map((e) => e.category_id).filter((v): v is number => v !== null)));
+
+  const [seasonsResult, categoriesResult] = await Promise.all([
+    seasonIds.length > 0
+      ? supabase.from('seasons').select('id, name').in('id', seasonIds)
+      : { data: [], error: null },
+    categoryIds.length > 0
+      ? supabase.from('categories').select('id, name').in('id', categoryIds)
+      : { data: [], error: null },
+  ]);
+
+  const seasonMap = new Map((seasonsResult.data ?? []).map((s: any) => [s.id, s.name]));
+  const categoryMap = new Map((categoriesResult.data ?? []).map((c: any) => [c.id, c.name]));
+
   const fieldsResult =
     fieldIds.length > 0
       ? await supabase.from('fields').select('id, name').in('id', fieldIds)
@@ -82,17 +101,22 @@ export async function getAllMatches(
     throw new Error(fieldsResult.error.message);
   }
 
-  const eventMap = new Map((events ?? []).map((item) => [item.id, item.name]));
+  const eventMap = new Map(eventRows.map((item) => [item.id, item]));
   const teamMap = new Map((teams ?? []).map((item) => [item.id, item.name]));
   const fieldMap = new Map(
     (fieldsResult.data ?? []).map((item) => [item.id, item.name])
   );
 
-  return rows.map((row) => ({
-    ...row,
-    event_name: eventMap.get(row.event_id) ?? null,
-    team1_name: teamMap.get(row.team1_id) ?? null,
-    team2_name: teamMap.get(row.team2_id) ?? null,
-    field_name: row.field_id ? fieldMap.get(row.field_id) ?? null : null,
-  }));
+  return rows.map((row) => {
+    const ev = eventMap.get(row.event_id);
+    return {
+      ...row,
+      event_name: ev?.name ?? null,
+      event_season_name: ev ? (seasonMap.get(ev.season_id) ?? null) : null,
+      event_category_name: ev?.category_id ? (categoryMap.get(ev.category_id) ?? null) : null,
+      team1_name: teamMap.get(row.team1_id) ?? null,
+      team2_name: teamMap.get(row.team2_id) ?? null,
+      field_name: row.field_id ? fieldMap.get(row.field_id) ?? null : null,
+    };
+  });
 }

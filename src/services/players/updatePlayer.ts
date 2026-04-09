@@ -18,6 +18,7 @@ export async function updatePlayer(
       document_id: payload.document_id || null,
       is_active: payload.is_active,
       notes: payload.notes || null,
+      photo_url: payload.photo_url || null,
     })
     .eq('id', id)
     .select()

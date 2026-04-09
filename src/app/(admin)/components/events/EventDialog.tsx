@@ -12,12 +12,23 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  IconButton,
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import type { Event, EventFormData } from '@/models/event';
 import { checkEventConflicts } from '@/services/events';
+import type { Category } from '@/models/category';
+import type { Season } from '@/models/season';
+import type { FormatType } from '@/models/formatType';
+import { getCategories, createCategory } from '@/services/categories';
+import { getSeasons, createSeason } from '@/services/seasons';
+import { getFormatTypes } from '@/services/formatTypes';
+import type { MatchFormatRecord } from '@/models/matchFormat';
+import { getMatchFormats, createMatchFormat } from '@/services/matchFormats';
 
 type EventDialogProps = {
   open: boolean;
@@ -36,8 +47,8 @@ type ConflictState = {
 const initialValues: EventFormData = {
   key: '',
   name: '',
-  league_id: 1,
-  season_id: 1,
+  season_id: 0,
+  category_id: null,
   start_date: '',
   end_date: '',
   auto: true,
@@ -54,6 +65,8 @@ const initialValues: EventFormData = {
   has_playoffs: false,
   playoff_teams_count: null,
   playoff_home_away: false,
+
+  group_count: null,
 };
 
 const initialConflicts: ConflictState = {
@@ -87,6 +100,41 @@ export default function EventDialog({
   const [checkingConflicts, setCheckingConflicts] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [formatTypes, setFormatTypes] = useState<FormatType[]>([]);
+  const [matchFormats, setMatchFormats] = useState<MatchFormatRecord[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+
+  // Inline create — Season
+  const [createSeasonOpen, setCreateSeasonOpen] = useState(false);
+  const [newSeasonName, setNewSeasonName] = useState('');
+  const [savingSeason, setSavingSeason] = useState(false);
+
+  // Inline create — Category
+  const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
+
+  // Inline create — Match Format
+  const [createMatchFormatOpen, setCreateMatchFormatOpen] = useState(false);
+  const [newMatchFormatName, setNewMatchFormatName] = useState('');
+  const [savingMatchFormat, setSavingMatchFormat] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoadingOptions(true);
+    Promise.all([getCategories(), getSeasons(), getFormatTypes(), getMatchFormats()])
+      .then(([cats, seas, fmts, mfmts]) => {
+        setCategories(cats);
+        setSeasons(seas);
+        setFormatTypes(fmts);
+        setMatchFormats(mfmts);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingOptions(false));
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -94,8 +142,8 @@ export default function EventDialog({
       setValues({
         key: event.key ?? '',
         name: event.name ?? '',
-        league_id: event.league_id ?? 1,
-        season_id: event.season_id ?? 1,
+        season_id: event.season_id ?? 0,
+        category_id: event.category_id ?? null,
         start_date: event.start_date ?? '',
         end_date: event.end_date ?? '',
         auto: event.auto ?? true,
@@ -112,6 +160,8 @@ export default function EventDialog({
         has_playoffs: event.has_playoffs ?? false,
         playoff_teams_count: event.playoff_teams_count ?? null,
         playoff_home_away: event.playoff_home_away ?? false,
+
+        group_count: event.group_count ?? null,
       });
       setConflicts(initialConflicts);
       setSubmitError(null);
@@ -137,7 +187,7 @@ export default function EventDialog({
   useEffect(() => {
     if (!open) return;
 
-    if (values.format_type !== 'round_robin' && values.round_robin_cycles !== 1) {
+    if (values.format_type !== 'round_robin' && values.format_type !== 'groups' && values.round_robin_cycles !== 1) {
       setValues((prev) => ({
         ...prev,
         round_robin_cycles: 1,
@@ -177,6 +227,55 @@ export default function EventDialog({
     return () => clearTimeout(timeout);
   }, [open, values.name, values.key, mode, event]);
 
+  const handleCreateSeason = async () => {
+    if (!newSeasonName.trim()) return;
+    try {
+      setSavingSeason(true);
+      const created = await createSeason({ name: newSeasonName.trim() });
+      setSeasons((prev) => [...prev, created]);
+      handleChange('season_id', created.id);
+      setCreateSeasonOpen(false);
+      setNewSeasonName('');
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSavingSeason(false);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      setSavingCategory(true);
+      const created = await createCategory({ name: newCategoryName.trim(), description: '' });
+      setCategories((prev) => [...prev, created]);
+      handleChange('category_id', created.id);
+      setCreateCategoryOpen(false);
+      setNewCategoryName('');
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleCreateMatchFormat = async () => {
+    if (!newMatchFormatName.trim()) return;
+    const key = newMatchFormatName.trim().toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+    try {
+      setSavingMatchFormat(true);
+      const created = await createMatchFormat({ key, name: newMatchFormatName.trim() });
+      setMatchFormats((prev) => [...prev, created]);
+      handleChange('match_format', created.key);
+      setCreateMatchFormatOpen(false);
+      setNewMatchFormatName('');
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSavingMatchFormat(false);
+    }
+  };
+
   const handleChange = (
     field: keyof EventFormData,
     value: string | number | boolean | null
@@ -196,7 +295,9 @@ export default function EventDialog({
     !values.key.trim() ||
     !values.start_date ||
     !values.format_type ||
+    !values.season_id ||
     (values.has_playoffs && !values.playoff_teams_count) ||
+    (values.format_type === 'groups' && !values.group_count) ||
     loading ||
     checkingConflicts ||
     hasConflicts;
@@ -226,15 +327,15 @@ export default function EventDialog({
       await onSubmit({
         key: values.key.trim(),
         name: values.name.trim(),
-        league_id: Number(values.league_id),
         season_id: Number(values.season_id),
+        category_id: values.category_id ? Number(values.category_id) : null,
         start_date: values.start_date,
         end_date: values.end_date,
         auto: values.auto,
         status: values.status,
         format_type: values.format_type,
         round_robin_cycles:
-          values.format_type === 'round_robin'
+          values.format_type === 'round_robin' || values.format_type === 'groups'
             ? Number(values.round_robin_cycles)
             : 1,
         match_day_of_week: Number(values.match_day_of_week),
@@ -250,6 +351,7 @@ export default function EventDialog({
         playoff_home_away: values.has_playoffs
           ? values.playoff_home_away
           : false,
+        group_count: values.format_type === 'groups' ? values.group_count : null,
       });
     } catch (error) {
       const message =
@@ -259,6 +361,7 @@ export default function EventDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="sm">
       <DialogTitle>{mode === 'create' ? 'Create Event' : 'Edit Event'}</DialogTitle>
 
@@ -290,21 +393,49 @@ export default function EventDialog({
               }
             />
 
-            <TextField
-              label="League ID"
-              type="number"
-              value={values.league_id}
-              onChange={(e) => handleChange('league_id', Number(e.target.value))}
-              fullWidth
-            />
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <TextField
+                select
+                label="Season"
+                value={values.season_id || ''}
+                onChange={(e) => handleChange('season_id', Number(e.target.value))}
+                fullWidth
+                required
+                disabled={loadingOptions}
+                helperText={seasons.length === 0 && !loadingOptions ? 'No seasons yet. Click + to create one.' : ' '}
+              >
+                {seasons.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+                ))}
+              </TextField>
+              <Tooltip title="Create new season">
+                <IconButton onClick={() => { setNewSeasonName(''); setCreateSeasonOpen(true); }} sx={{ mt: 1 }}>
+                  <AddIcon />
+                </IconButton>
+              </Tooltip>
+            </Stack>
 
-            <TextField
-              label="Season ID"
-              type="number"
-              value={values.season_id}
-              onChange={(e) => handleChange('season_id', Number(e.target.value))}
-              fullWidth
-            />
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <TextField
+                select
+                label="Category"
+                value={values.category_id ?? ''}
+                onChange={(e) => handleChange('category_id', e.target.value === '' ? null : Number(e.target.value))}
+                fullWidth
+                disabled={loadingOptions}
+                helperText=" "
+              >
+                <MenuItem value=""><em>No category</em></MenuItem>
+                {categories.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                ))}
+              </TextField>
+              <Tooltip title="Create new category">
+                <IconButton onClick={() => { setNewCategoryName(''); setCreateCategoryOpen(true); }} sx={{ mt: 1 }}>
+                  <AddIcon />
+                </IconButton>
+              </Tooltip>
+            </Stack>
 
             <TextField
               select
@@ -312,11 +443,12 @@ export default function EventDialog({
               value={values.format_type}
               onChange={(e) => handleChange('format_type', e.target.value)}
               fullWidth
+              disabled={loadingOptions || formatTypes.length === 0}
+              helperText={formatTypes.length === 0 && !loadingOptions ? 'No format types available. Create one in Settings → Format Types first.' : ' '}
             >
-              <MenuItem value="round_robin">Round Robin</MenuItem>
-              <MenuItem value="groups">Groups</MenuItem>
-              <MenuItem value="knockout">Knockout</MenuItem>
-              <MenuItem value="mixed">Mixed</MenuItem>
+              {formatTypes.map((ft) => (
+                <MenuItem key={ft.key} value={ft.key}>{ft.name}</MenuItem>
+              ))}
             </TextField>
 
             {values.format_type === 'round_robin' && (
@@ -336,6 +468,41 @@ export default function EventDialog({
               </TextField>
             )}
 
+            {values.format_type === 'groups' && (
+              <>
+                <TextField
+                  select
+                  label="Number of Groups"
+                  value={values.group_count ?? ''}
+                  onChange={(e) =>
+                    handleChange('group_count', e.target.value === '' ? null : Number(e.target.value))
+                  }
+                  fullWidth
+                  required
+                  helperText="How many groups will the teams be divided into."
+                >
+                  {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <MenuItem key={n} value={n}>{n} groups</MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  label="Round Robin Cycles (per group)"
+                  value={values.round_robin_cycles}
+                  onChange={(e) =>
+                    handleChange('round_robin_cycles', Number(e.target.value))
+                  }
+                  fullWidth
+                  helperText="How many times each team plays the others within its group."
+                >
+                  <MenuItem value={1}>1 cycle</MenuItem>
+                  <MenuItem value={2}>2 cycles</MenuItem>
+                  <MenuItem value={3}>3 cycles</MenuItem>
+                </TextField>
+              </>
+            )}
+
             <TextField
               select
               label="Match Day"
@@ -352,17 +519,26 @@ export default function EventDialog({
               <MenuItem value={7}>Sunday</MenuItem>
             </TextField>
 
-            <TextField
-              select
-              label="Match Format"
-              value={values.match_format}
-              onChange={(e) => handleChange('match_format', e.target.value)}
-              fullWidth
-            >
-              <MenuItem value="5v5">5v5</MenuItem>
-              <MenuItem value="7v7">7v7</MenuItem>
-              <MenuItem value="11v11">11v11</MenuItem>
-            </TextField>
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <TextField
+                select
+                label="Match Format"
+                value={values.match_format}
+                onChange={(e) => handleChange('match_format', e.target.value)}
+                fullWidth
+                disabled={loadingOptions}
+                helperText={matchFormats.length === 0 && !loadingOptions ? 'No match formats yet. Click + to create one.' : ' '}
+              >
+                {matchFormats.map((mf) => (
+                  <MenuItem key={mf.key} value={mf.key}>{mf.name}</MenuItem>
+                ))}
+              </TextField>
+              <Tooltip title="Create new match format">
+                <IconButton onClick={() => { setNewMatchFormatName(''); setCreateMatchFormatOpen(true); }} sx={{ mt: 1 }}>
+                  <AddIcon />
+                </IconButton>
+              </Tooltip>
+            </Stack>
 
             <FormControlLabel
               control={
@@ -510,5 +686,75 @@ export default function EventDialog({
         </Button>
       </DialogActions>
     </Dialog>
+
+    {/* Inline: Create Season */}
+    <Dialog open={createSeasonOpen} onClose={savingSeason ? undefined : () => setCreateSeasonOpen(false)} maxWidth="xs" fullWidth>
+      <DialogTitle>New Season</DialogTitle>
+      <DialogContent>
+        <TextField
+          label="Season Name"
+          placeholder="e.g. Spring 2026, 2025-26"
+          value={newSeasonName}
+          onChange={(e) => setNewSeasonName(e.target.value)}
+          fullWidth
+          autoFocus
+          sx={{ mt: 1 }}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSeason(); }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setCreateSeasonOpen(false)} disabled={savingSeason}>Cancel</Button>
+        <Button variant="contained" onClick={handleCreateSeason} disabled={savingSeason || !newSeasonName.trim()}>
+          {savingSeason ? <CircularProgress size={18} /> : 'Create'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+
+    {/* Inline: Create Category */}
+    <Dialog open={createCategoryOpen} onClose={savingCategory ? undefined : () => setCreateCategoryOpen(false)} maxWidth="xs" fullWidth>
+      <DialogTitle>New Category</DialogTitle>
+      <DialogContent>
+        <TextField
+          label="Category Name"
+          placeholder="e.g. Adult, Youth U15"
+          value={newCategoryName}
+          onChange={(e) => setNewCategoryName(e.target.value)}
+          fullWidth
+          autoFocus
+          sx={{ mt: 1 }}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleCreateCategory(); }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setCreateCategoryOpen(false)} disabled={savingCategory}>Cancel</Button>
+        <Button variant="contained" onClick={handleCreateCategory} disabled={savingCategory || !newCategoryName.trim()}>
+          {savingCategory ? <CircularProgress size={18} /> : 'Create'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+
+    {/* Inline: Create Match Format */}
+    <Dialog open={createMatchFormatOpen} onClose={savingMatchFormat ? undefined : () => setCreateMatchFormatOpen(false)} maxWidth="xs" fullWidth>
+      <DialogTitle>New Match Format</DialogTitle>
+      <DialogContent>
+        <TextField
+          label="Match Format Name"
+          placeholder="e.g. 5v5, 8v8, 11v11"
+          value={newMatchFormatName}
+          onChange={(e) => setNewMatchFormatName(e.target.value)}
+          fullWidth
+          autoFocus
+          sx={{ mt: 1 }}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleCreateMatchFormat(); }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setCreateMatchFormatOpen(false)} disabled={savingMatchFormat}>Cancel</Button>
+        <Button variant="contained" onClick={handleCreateMatchFormat} disabled={savingMatchFormat || !newMatchFormatName.trim()}>
+          {savingMatchFormat ? <CircularProgress size={18} /> : 'Create'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 }

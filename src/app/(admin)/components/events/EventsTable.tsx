@@ -14,8 +14,10 @@ import {
 } from '@mui/material';
 import type { Event } from '@/models/event';
 
+type EventRow = Event & { season_name?: string | null; category_name?: string | null };
+
 type EventsTableProps = {
-  events: Event[];
+  events: EventRow[];
   onEdit: (event: Event) => void;
   onDelete: (event: Event) => void;
   onView: (event: Event) => void;
@@ -33,12 +35,12 @@ export default function EventsTable({
         <TableHead>
           <TableRow>
             <TableCell>ID</TableCell>
-            <TableCell>Key</TableCell>
             <TableCell>Name</TableCell>
-            <TableCell>League ID</TableCell>
-            <TableCell>Season ID</TableCell>
+            <TableCell>Season</TableCell>
+            <TableCell>Category</TableCell>
+            <TableCell>Format</TableCell>
+            <TableCell>Match Type</TableCell>
             <TableCell>Start</TableCell>
-            <TableCell>End</TableCell>
             <TableCell>Status</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
@@ -48,16 +50,18 @@ export default function EventsTable({
           {events.map((event) => (
             <TableRow key={event.id} hover>
               <TableCell>{event.id}</TableCell>
-              <TableCell>{event.key}</TableCell>
               <TableCell>
                 <Button variant="text" onClick={() => onView(event)}>
                   {event.name ?? '-'}
                 </Button>
               </TableCell>
-              <TableCell>{event.league_id}</TableCell>
-              <TableCell>{event.season_id}</TableCell>
+              <TableCell>{event.season_name ?? event.season_id}</TableCell>
+              <TableCell>{event.category_name ?? '-'}</TableCell>
+              <TableCell>
+                <Chip label={event.format_type} size="small" variant="outlined" />
+              </TableCell>
+              <TableCell>{event.match_format ?? '-'}</TableCell>
               <TableCell>{event.start_date}</TableCell>
-              <TableCell>{event.end_date ?? '-'}</TableCell>
               <TableCell>
                 <Chip label={event.status ?? 'draft'} size="small" />
               </TableCell>

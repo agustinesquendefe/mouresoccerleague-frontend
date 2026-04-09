@@ -16,6 +16,7 @@ export async function createPlayer(payload: PlayerFormData): Promise<Player> {
         document_id: payload.document_id || null,
         is_active: payload.is_active,
         notes: payload.notes || null,
+        photo_url: payload.photo_url || null,
       },
     ])
     .select()

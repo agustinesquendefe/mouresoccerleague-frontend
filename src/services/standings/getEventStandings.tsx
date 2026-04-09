@@ -32,24 +32,32 @@ type EventTeamRow = {
 
 export async function getEventStandings(
   eventId: number,
-  mode: StandingMode = 'general'
+  mode: StandingMode = 'general',
+  groupId?: number | null
 ): Promise<StandingRow[]> {
+  // Build matches query
+  let matchesQuery = supabase
+    .from('matches')
+    .select('team1_id, team2_id, score1, score2, status')
+    .eq('event_id', eventId)
+    .eq('stage_type', 'league');
+
+  if (groupId != null) {
+    matchesQuery = matchesQuery.eq('group_id', groupId);
+  }
+
+  // Build event_teams query — when filtering by group, only include teams in that group
+  let teamsQuery = supabase
+    .from('event_teams')
+    .select('team_id, teams(name)')
+    .eq('event_id', eventId);
+
+  if (groupId != null) {
+    teamsQuery = teamsQuery.eq('group_id', groupId);
+  }
+
   const [{ data: matches, error: matchesError }, { data: eventTeams, error: teamsError }] =
-    await Promise.all([
-      supabase
-        .from('matches')
-        .select('team1_id, team2_id, score1, score2, status')
-        .eq('event_id', eventId),
-      supabase
-        .from('event_teams')
-        .select(`
-          team_id,
-          teams (
-            name
-          )
-        `)
-        .eq('event_id', eventId),
-    ]);
+    await Promise.all([matchesQuery, teamsQuery]);
 
   if (matchesError) throw new Error(matchesError.message);
   if (teamsError) throw new Error(teamsError.message);

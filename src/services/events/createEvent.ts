@@ -8,8 +8,9 @@ export async function createEvent(payload: EventFormData): Promise<Event> {
       {
         key: payload.key,
         name: payload.name,
-        league_id: payload.league_id,
+        league_id: 1,
         season_id: payload.season_id,
+        category_id: payload.category_id ?? null,
         start_date: payload.start_date,
         end_date: payload.end_date || null,
         auto: payload.auto,
@@ -26,6 +27,7 @@ export async function createEvent(payload: EventFormData): Promise<Event> {
         has_playoffs: payload.has_playoffs,
         playoff_teams_count: payload.playoff_teams_count,
         playoff_home_away: payload.playoff_home_away,
+        group_count: payload.format_type === 'groups' ? payload.group_count : null,
       },
     ])
     .select()

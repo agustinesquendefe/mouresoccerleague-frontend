@@ -28,6 +28,8 @@ export default function MatchesPageTable({ matches, onEdit }: Props) {
           <TableRow>
             <TableCell>Date</TableCell>
             <TableCell>Event</TableCell>
+            <TableCell>Season</TableCell>
+            <TableCell>Category</TableCell>
             <TableCell>Stage</TableCell>
             <TableCell>Round</TableCell>
             <TableCell>Match</TableCell>
@@ -43,6 +45,8 @@ export default function MatchesPageTable({ matches, onEdit }: Props) {
             <TableRow key={match.id} hover>
               <TableCell>{match.date ?? '-'}{match.time ? ` ${match.time}` : ''}</TableCell>
               <TableCell>{match.event_name ?? '-'}</TableCell>
+              <TableCell>{match.event_season_name ?? '-'}</TableCell>
+              <TableCell>{match.event_category_name ?? '-'}</TableCell>
               <TableCell>
                 <Chip label={match.stage_type ?? '-'} size="small" />
               </TableCell>
@@ -69,15 +73,15 @@ export default function MatchesPageTable({ matches, onEdit }: Props) {
               </TableCell>
               <TableCell align="right">
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
-                  <Link href={`/admin/matches/${match.id}`} passHref legacyBehavior>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      color='success'
-                    >
-                      View
-                    </Button>
-                  </Link>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="success"
+                    component={Link}
+                    href={`/admin/matches/${match.id}`}
+                  >
+                    View
+                  </Button>
                   <Button size="small" variant="outlined" onClick={() => onEdit(match)}>
                     Edit
                   </Button>

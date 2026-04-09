@@ -20,6 +20,8 @@ import {
   getPlayers,
   updatePlayer,
 } from '@/services/players';
+import { setPlayerCategories } from '@/services/playerCategories';
+import { uploadImage } from '@/services/storage/uploadImage';
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -80,16 +82,43 @@ export default function PlayersPage() {
     setSelectedPlayer(null);
   };
 
-  const handleSubmit = async (values: PlayerFormData) => {
+  const handleSubmit = async (values: PlayerFormData, categoryIds: number[], photoFile: File | null) => {
     try {
       setSaving(true);
 
       if (dialogMode === 'create') {
         const created = await createPlayer(values);
-        setPlayers((prev) => [created, ...prev]);
+
+        if (photoFile) {
+          const ext = photoFile.name.split('.').pop() ?? 'jpg';
+          const { publicUrl } = await uploadImage({
+            bucket: 'players',
+            path: `${created.id}.${ext}`,
+            file: photoFile,
+          });
+          await updatePlayer(created.id, { ...values, photo_url: publicUrl });
+          setPlayers((prev) => [{ ...created, photo_url: publicUrl }, ...prev]);
+        } else {
+          setPlayers((prev) => [created, ...prev]);
+        }
+
+        await setPlayerCategories(created.id, categoryIds);
         showToast('Player created successfully', 'success');
       } else if (selectedPlayer) {
-        const updated = await updatePlayer(selectedPlayer.id, values);
+        let photoUrl = values.photo_url;
+
+        if (photoFile) {
+          const ext = photoFile.name.split('.').pop() ?? 'jpg';
+          const { publicUrl } = await uploadImage({
+            bucket: 'players',
+            path: `${selectedPlayer.id}.${ext}`,
+            file: photoFile,
+          });
+          photoUrl = publicUrl;
+        }
+
+        const updated = await updatePlayer(selectedPlayer.id, { ...values, photo_url: photoUrl });
+        await setPlayerCategories(updated.id, categoryIds);
         setPlayers((prev) =>
           prev.map((item) => (item.id === updated.id ? updated : item))
         );
