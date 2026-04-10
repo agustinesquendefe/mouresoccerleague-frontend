@@ -6,6 +6,8 @@ import { FaFacebook, FaInstagram, FaTiktok, FaYoutube } from "react-icons/fa6";
 import { useEffect, useState } from "react";
 import { getAppSettings } from '@/services/settings/settings.service';
 import type { AppSettings } from '@/models/appSettings';
+import { format } from "path";
+import PhoneFormat from "./phoneFormat/PhoneFormat";
 
 export default function Footer() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -24,6 +26,7 @@ export default function Footer() {
   const tiktokUrl = settings?.tiktok_url || "#";
   const youtubeUrl = settings?.youtube_url || "#";
   const contactPhone = settings?.contact_phone || "(336) 404-7816";
+  const contactPhone2 = settings?.contact_phone2 || null;
   const contactEmail = settings?.contact_email || "info@moureleague.com";
   const address = settings?.address || "1760 S Martin Luther King Jr Dr, Winston-Salem, NC 27107";
 
@@ -37,11 +40,13 @@ export default function Footer() {
             alt={leagueName + " Logo"}
             className="w-48 mb-6"
           />
-          <h3 className='text-base font-filson-black' style={{ color: 'var(--color-yellow, #ffb304)' }}>{leagueName}</h3>
+          <h3 className='text-base font-filson-black text-yellow-400'>{leagueName}</h3>
         </div>
         {/* Who We Are */}
         <div className="flex-1 flex flex-col items-center md:items-start mb-8 md:mb-0">
-          <h3 className="text-2xl font-semibold mb-4" style={{ color: 'var(--color-yellow, #ffb304)' }}>Who We Are</h3>
+          <h3 className="text-2xl font-semibold mb-4 text-yellow-400">
+            Who We Are
+          </h3>
           <ul className="space-y-2 text-lg">
             <li>
               <Link href="/about-us" className="hover:underline">
@@ -67,14 +72,21 @@ export default function Footer() {
         </div>
         {/* Contact Info */}
         <div className="flex-1 flex flex-col items-center md:items-start">
-          <h3 className="text-2xl font-semibold mb-4" style={{ color: 'var(--color-yellow, #ffb304)' }}>
+          <h3 className="text-2xl font-semibold mb-4 text-yellow-400">
             Contact Information
           </h3>
           <div className="mb-2 flex items-center gap-2">
             <a href={`tel:${contactPhone}`} className="hover:underline">
-              {contactPhone}
+              <PhoneFormat value={contactPhone} />
             </a>
           </div>
+          {contactPhone2 && (
+            <div className="mb-2 flex items-center gap-2">
+              <a href={`tel:${contactPhone2}`} className="hover:underline">
+                <PhoneFormat value={contactPhone2} />
+              </a>
+            </div>
+          )}
           <div className="mb-2 flex items-center gap-2">
             <a href={`mailto:${contactEmail}`} className="hover:underline">
               {contactEmail}

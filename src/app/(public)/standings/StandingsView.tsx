@@ -57,7 +57,7 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
   const hasPlayoffs = knockoutMatches.length > 0;
 
   return (
-    <div className="flex flex-col min-h-screen bg-[--color-white]">
+    <div className="flex flex-col min-h-screen container mx-auto bg-[--color-white]">
 
       {/* Banner */}
       <div

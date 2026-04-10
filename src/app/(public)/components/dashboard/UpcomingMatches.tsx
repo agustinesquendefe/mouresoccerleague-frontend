@@ -10,6 +10,8 @@ import {
   Box,
   Divider,
 } from '@mui/material';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { getUpcomingMatches, UpcomingMatchRow } from '@/services/dashboard/getUpcomingMatches';
 import type { Event } from '@/models/event';
 import Image from 'next/image';
@@ -35,6 +37,15 @@ const BRACKET_ROUND_LABELS: Record<string, string> = {
 function formatBracketRound(round: string | null): string | null {
   if (!round) return null;
   return BRACKET_ROUND_LABELS[round] ?? round;
+}
+
+function formatTime(time: string | null): string | null {
+  if (!time) return null;
+  const [h, m] = time.split(':');
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${m} ${ampm}`;
 }
 
 function groupByDate(rows: UpcomingMatchRow[]): Record<string, UpcomingMatchRow[]> {
@@ -164,6 +175,27 @@ export default function UpcomingMatches({ event, compact = false }: UpcomingMatc
                       </Typography>
                     </Stack>
                     </Stack>
+                    {/* Time and field info */}
+                    {(row.time || row.field_name) && (
+                      <Stack direction="row" justifyContent="center" alignItems="center" gap={1.5} mt={0.75}>
+                        {row.time && (
+                          <Stack direction="row" alignItems="center" gap={0.4}>
+                            <AccessTimeIcon sx={{ fontSize: 13, color: 'text.secondary' }} />
+                            <Typography fontSize={11} color="text.secondary" className="font-filson-regular">
+                              {formatTime(row.time)}
+                            </Typography>
+                          </Stack>
+                        )}
+                        {row.field_name && (
+                          <Stack direction="row" alignItems="center" gap={0.4}>
+                            <LocationOnIcon sx={{ fontSize: 13, color: 'text.secondary' }} />
+                            <Typography fontSize={11} color="text.secondary" className="font-filson-regular">
+                              {row.field_name}
+                            </Typography>
+                          </Stack>
+                        )}
+                      </Stack>
+                    )}
                   </Stack>
                 ))}
               </Stack>

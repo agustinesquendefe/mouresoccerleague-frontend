@@ -5,6 +5,7 @@ export type UpcomingMatchRow = {
   id: number;
   event_id: number | null;
   date: string | null;
+  time: string | null;
   round_number: number | null;
   status: string | null;
   stage_type: string | null;
@@ -24,6 +25,7 @@ export type UpcomingMatchesWithEvent = {
 type UpcomingMatchQueryRow = {
   id: number;
   date: string | null;
+  time: string | null;
   round_number: number | null;
   status: string | null;
   stage_type: string | null;
@@ -58,6 +60,7 @@ export async function getUpcomingMatches(eventIdOrLimit?: number, eventId?: numb
     .select(`
       id,
       date,
+      time,
       round_number,
       status,
       stage_type,
@@ -127,6 +130,7 @@ export async function getUpcomingMatches(eventIdOrLimit?: number, eventId?: numb
     id: row.id,
     event_id: row.event_id,
     date: row.date,
+    time: row.time,
     round_number: row.round_number,
     status: row.status,
     stage_type: row.stage_type,

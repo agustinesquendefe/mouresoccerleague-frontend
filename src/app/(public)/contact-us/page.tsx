@@ -17,6 +17,7 @@ export default async function ContactUsPage() {
   const tiktokUrl = settings?.tiktok_url || '#';
   const youtubeUrl = settings?.youtube_url || '#';
   const contactPhone = settings?.contact_phone || '(336) 404-7816';
+  const contactPhone2 = settings?.contact_phone2 || null;
   const contactEmail = settings?.contact_email || 'info@moureleague.com';
   const address = settings?.address || '1760 S Martin Luther King Jr Dr, Winston-Salem, NC 27107';
 
@@ -83,6 +84,14 @@ export default async function ContactUsPage() {
                     >
                       {contactPhone}
                     </a>
+                    {contactPhone2 && (
+                      <a
+                        href={`tel:${contactPhone2}`}
+                        className="font-filson-regular text-gray-800 text-sm hover:underline block mt-0.5"
+                      >
+                        {contactPhone2}
+                      </a>
+                    )}
                   </div>
                 </li>
                 <li className="flex items-center gap-4">

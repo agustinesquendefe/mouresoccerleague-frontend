@@ -198,6 +198,16 @@ export default function GeneralSettingsForm() {
           <Grid>
             <TextField
               fullWidth
+              label="Contact Phone 2"
+              placeholder="(000) 000-0000"
+              value={form.contact_phone2 ?? ''}
+              onChange={(e) => handleChange('contact_phone2', e.target.value)}
+            />
+          </Grid>
+
+          <Grid>
+            <TextField
+              fullWidth
               label="Address"
               placeholder="123 Main St"
               value={form.address ?? ''}

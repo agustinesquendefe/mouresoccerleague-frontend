@@ -3,6 +3,7 @@ export type AppSettings = {
   league_name?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
+  contact_phone2?: string | null;
   address?: string | null;
   address_line_2?: string | null;
   city?: string | null;
