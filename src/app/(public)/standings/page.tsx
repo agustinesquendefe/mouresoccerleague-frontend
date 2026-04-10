@@ -38,7 +38,7 @@ export default async function StandingsPage() {
   );
 
   return (
-    <main className="bg-[--color-white] text-[--color-black]">
+    <main className="bg-[--color-white] text-[--color-black] min-h-screen">
       <StandingsView
         events={activeEvents}
         initialEventId={defaultEvent.id}

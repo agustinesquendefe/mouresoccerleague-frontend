@@ -9,33 +9,33 @@ type StandingsCardProps = {
 
 export default function StandingsCard({ event, standings }: StandingsCardProps) {
   return (
-    <div className="flex flex-col bg-white rounded-2xl shadow-md overflow-hidden">
+    <div className="flex flex-col border border-red-600 bg-white rounded-2xl shadow-md overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-3 border-b border-gray-100">
         <p className="text-sm font-filson-bold text-gray-900 truncate">{event.name}</p>
-        <p className="text-xs font-filson-regular text-gray-400 mt-0.5">Tabla de posiciones</p>
+        <p className="text-xs font-filson-regular text-gray-400 mt-0.5">Standings</p>
       </div>
 
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-xs text-gray-400 font-filson-bold uppercase bg-gray-50">
+            <tr className="text-xs text-white font-filson-bold uppercase bg-red-600">
               <th className="px-4 py-2 text-left w-6">#</th>
-              <th className="px-2 py-2 text-left">Equipo</th>
-              <th className="px-2 py-2 text-center">PJ</th>
-              <th className="px-2 py-2 text-center">G</th>
-              <th className="px-2 py-2 text-center">E</th>
-              <th className="px-2 py-2 text-center">P</th>
-              <th className="px-2 py-2 text-center">DG</th>
-              <th className="px-3 py-2 text-center font-filson-black text-gray-600">Pts</th>
+              <th className="px-2 py-2 text-left">Team</th>
+              <th className="px-2 py-2 text-center">MP</th>
+              <th className="px-2 py-2 text-center">W</th>
+              <th className="px-2 py-2 text-center">D</th>
+              <th className="px-2 py-2 text-center">L</th>
+              <th className="px-2 py-2 text-center">GD</th>
+              <th className="px-3 py-2 text-center font-filson-black text-white">Pts</th>
             </tr>
           </thead>
           <tbody>
             {standings.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-6 text-center text-gray-400 font-filson-regular text-xs">
-                  Sin datos de posiciones aún.
+                  No standings data available yet.
                 </td>
               </tr>
             ) : (
@@ -64,12 +64,12 @@ export default function StandingsCard({ event, standings }: StandingsCardProps) 
       </div>
 
       {/* Footer button */}
-      <div className="px-5 py-4 mt-auto border-t border-gray-100">
+      <div className="px-5 py-4  mt-auto border-t border-t-red-100">
         <Link
           href={`/standings`}
           className="block w-full text-center text-sm font-filson-bold text-blue-600 hover:text-blue-800 transition-colors"
         >
-          Ver tabla completa →
+          See full standings →
         </Link>
       </div>
     </div>

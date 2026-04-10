@@ -18,18 +18,18 @@ import type { PublicMatchRow } from '@/services/matches/getPublicMatches';
 const BRACKET_ORDER = ['round_of_16', 'quarterfinal', 'semifinal', 'third_place', 'final'];
 
 const BRACKET_LABELS: Record<string, string> = {
-  round_of_16: 'Octavos de final',
-  quarterfinal: 'Cuartos de final',
+  round_of_16: 'Round of 16',
+  quarterfinal: 'Quarterfinal',
   semifinal: 'Semifinal',
-  third_place: 'Tercer puesto',
+  third_place: 'Third Place',
   final: 'Final',
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: 'default' | 'success' | 'warning' | 'error' }> = {
-  scheduled: { label: 'Programado', color: 'default' },
-  in_progress: { label: 'En curso', color: 'warning' },
-  played: { label: 'Jugado', color: 'success' },
-  cancelled: { label: 'Cancelado', color: 'error' },
+  scheduled: { label: 'Scheduled', color: 'default' },
+  in_progress: { label: 'In Progress', color: 'warning' },
+  played: { label: 'Played', color: 'success' },
+  cancelled: { label: 'Cancelled', color: 'error' },
 };
 
 type Props = {
@@ -57,7 +57,7 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
   const hasPlayoffs = knockoutMatches.length > 0;
 
   return (
-    <div className="flex flex-col min-h-screen container mx-auto bg-[--color-white]">
+    <div className="">
 
       {/* Banner */}
       <div
@@ -77,10 +77,10 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
         <div className="container mx-auto px-4 py-3">
           <Stack direction="row" gap={2} alignItems="center">
             <FormControl size="small" sx={{ minWidth: 220 }}>
-              <InputLabel className="font-filson-regular">Campeonato</InputLabel>
+              <InputLabel className="font-filson-regular">League / Cup</InputLabel>
               <Select
                 value={selectedEventId}
-                label="Campeonato"
+                label="League / Cup"
                 onChange={(e) => setSelectedEventId(Number(e.target.value))}
               >
                 {events.map((ev) => (
@@ -99,7 +99,7 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
         {standings.length === 0 ? (
           <div className="flex items-center justify-center h-full py-24">
             <Typography variant="body1" color="text.secondary" className="font-filson-regular">
-              Sin datos de posiciones para este campeonato.
+              No standings data available yet.
             </Typography>
           </div>
         ) : (
@@ -108,14 +108,14 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
               <thead>
                 <tr className="bg-[--color-blue,#023467] text-white" style={{ background: 'var(--color-blue, #023467)' }}>
                   <th className="px-4 py-3 text-left w-10 font-filson-bold text-xs uppercase tracking-wide">#</th>
-                  <th className="px-4 py-3 text-left font-filson-bold text-xs uppercase tracking-wide">Equipo</th>
-                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">PJ</th>
-                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">G</th>
-                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">E</th>
-                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">P</th>
+                  <th className="px-4 py-3 text-left font-filson-bold text-xs uppercase tracking-wide">Team</th>
+                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">MP</th>
+                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">W</th>
+                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">D</th>
+                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">L</th>
                   <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">GF</th>
-                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">GC</th>
-                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">DG</th>
+                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">GA</th>
+                  <th className="px-4 py-3 text-center font-filson-bold text-xs uppercase tracking-wide">GD</th>
                   <th className="px-5 py-3 text-center font-filson-black text-sm uppercase tracking-wide">Pts</th>
                 </tr>
               </thead>
@@ -149,7 +149,7 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
             {/* Legend */}
             <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex items-center gap-3">
               <div className="w-3 h-3 rounded-sm bg-blue-100 border border-blue-200 shrink-0" />
-              <span className="text-xs text-gray-500 font-filson-regular">Zona de clasificación a playoffs</span>
+              <span className="text-xs text-gray-500 font-filson-regular">Playoffs zone</span>
             </div>
           </div>
         )}

@@ -32,7 +32,9 @@ export default async function MatchesPage() {
 
       {activeEvents.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-gray-400">
-          <p className="text-xl font-filson-regular">No hay campeonatos activos en este momento.</p>
+          <p className="text-xl font-filson-regular">
+            There are no active championships at the moment. Please check back later for updates on matches and events.
+          </p>
         </div>
       ) : (
         <MatchesView
