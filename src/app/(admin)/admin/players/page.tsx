@@ -22,9 +22,17 @@ import {
 } from '@/services/players';
 import { setPlayerCategories } from '@/services/playerCategories';
 import { uploadImage } from '@/services/storage/uploadImage';
+import { getPlayersPaginated } from '@/services/players/getPlayersPaginated';
+import PlayersFilters from '../../components/players/PlayersFilters';
+
+const PAGE_SIZE = 20;
 
 export default function PlayersPage() {
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [rows, setRows] = useState<Player[]>([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -44,7 +52,7 @@ export default function PlayersPage() {
 
   useEffect(() => {
     loadPlayers();
-  }, []);
+  }, [page, submittedSearch]);
 
   const showToast = (message: string, severity: 'success' | 'error') => {
     setToast({ open: true, message, severity });
@@ -53,12 +61,14 @@ export default function PlayersPage() {
   const loadPlayers = async () => {
     try {
       setLoading(true);
-      const data = await getPlayers();
-      setPlayers(data);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to load players';
-      showToast(message, 'error');
+      const result = await getPlayersPaginated({
+        page,
+        pageSize: PAGE_SIZE,
+        search: submittedSearch,
+      });
+
+      setRows(result.rows);
+      setCount(result.count);
     } finally {
       setLoading(false);
     }
@@ -97,9 +107,9 @@ export default function PlayersPage() {
             file: photoFile,
           });
           await updatePlayer(created.id, { ...values, photo_url: publicUrl });
-          setPlayers((prev) => [{ ...created, photo_url: publicUrl }, ...prev]);
+          setRows((prev) => [{ ...created, photo_url: publicUrl }, ...prev]);
         } else {
-          setPlayers((prev) => [created, ...prev]);
+          setRows((prev) => [created, ...prev]);
         }
 
         await setPlayerCategories(created.id, categoryIds);
@@ -119,7 +129,7 @@ export default function PlayersPage() {
 
         const updated = await updatePlayer(selectedPlayer.id, { ...values, photo_url: photoUrl });
         await setPlayerCategories(updated.id, categoryIds);
-        setPlayers((prev) =>
+        setRows((prev) =>
           prev.map((item) => (item.id === updated.id ? updated : item))
         );
         showToast('Player updated successfully', 'success');
@@ -145,7 +155,7 @@ export default function PlayersPage() {
 
     try {
       await deletePlayer(player.id);
-      setPlayers((prev) => prev.filter((item) => item.id !== player.id));
+      setRows((prev) => prev.filter((item) => item.id !== player.id));
       showToast('Player deleted successfully', 'success');
     } catch (error) {
       const message =
@@ -177,15 +187,26 @@ export default function PlayersPage() {
           </Button>
         </Stack>
 
+        <PlayersFilters
+          initialSearch={search}
+          onSearch={(value) => {
+            setSearch(value);
+            setSubmittedSearch(value);
+            setPage(0);
+          }}
+        />
+
         {loading ? (
           <Stack alignItems="center" py={6}>
             <CircularProgress />
           </Stack>
-        ) : players.length === 0 ? (
-          <Alert severity="info">No players found.</Alert>
         ) : (
           <PlayersTable
-            players={players}
+            rows={rows}
+            count={count}
+            page={page}
+            rowsPerPage={PAGE_SIZE}
+            onPageChange={setPage}
             onEdit={handleOpenEdit}
             onDelete={handleDelete}
           />

@@ -1,10 +1,7 @@
 
 import { useMediaQuery, Box, Drawer, Avatar, Typography, Divider } from "@mui/material";
 import SidebarItems from "./SidebarItems";
-import Profile from "../header/Profile";
-import { useEffect, useState } from "react";
-import { getAppSettings } from '@/services/settings/settings.service';
-import { supabase } from "@/lib/supabaseClient";
+import { useState } from "react";
 
 interface ItemType {
   isMobileSidebarOpen: boolean;
@@ -38,7 +35,7 @@ const MSidebar = ({
   const SidebarHeader = (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
       {logoUrl && (
-        <Avatar src={logoUrl} alt="League Logo" sx={{ width: 80, height: 80, mb: 1 }} variant="rounded" />
+        <Avatar src={logoUrl} alt="Moure Premier League Logo" sx={{ width: 25, height: 25, mb: 1 }} variant="rounded" />
       )}
       {leagueName && (
         <Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center', mb: 1 }}>

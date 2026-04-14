@@ -55,6 +55,9 @@ const initialValues: PlayerFormData = {
   is_active: true,
   notes: '',
   photo_url: null,
+  we_have_id: false,
+  paid_membership: 0,
+  registered_at: new Date().toISOString().split('T')[0],
 };
 
 const initialConflicts: ConflictState = {
@@ -120,6 +123,9 @@ export default function PlayerDialog({
         is_active: player.is_active ?? true,
         notes: player.notes ?? '',
         photo_url: player.photo_url ?? null,
+        we_have_id: player.we_have_id ?? false,
+        paid_membership: player.paid_membership ?? 0,
+        registered_at: player.registered_at ?? new Date().toISOString().split('T')[0],
       });
       setPhotoPreview(player.photo_url ?? null);
       setConflicts(initialConflicts);
@@ -260,6 +266,10 @@ export default function PlayerDialog({
           is_active: values.is_active,
           notes: values.notes.trim(),
           photo_url: values.photo_url,
+          we_have_id: values.we_have_id,
+          paid_membership: values.paid_membership,
+          registered_at: values.registered_at,
+
         },
         selectedCategoryIds,
         photoFile
@@ -388,7 +398,26 @@ export default function PlayerDialog({
                 fullWidth
                 InputLabelProps={{ shrink: true }}
               />
+
               <TextField
+                label="Paid Membership"
+                type="number"
+                value={values.paid_membership}
+                onChange={(e) => handleChange('paid_membership', e.target.value)}
+                fullWidth
+                inputProps={{ min: 0, step: '0.01' }}
+              />
+
+              <TextField
+                label="Registered At"
+                type="date"
+                value={values.registered_at}
+                onChange={(e) => handleChange('registered_at', e.target.value)}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+
+              {/* <TextField
                 label="Jersey Number"
                 type="number"
                 value={values.jersey_number ?? ''}
@@ -399,7 +428,7 @@ export default function PlayerDialog({
                   )
                 }
                 fullWidth
-              />
+              /> */}
             </Stack>
 
             <TextField

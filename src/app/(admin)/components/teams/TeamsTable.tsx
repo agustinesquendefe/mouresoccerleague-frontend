@@ -112,6 +112,7 @@ export default function TeamsTable({
                         textDecoration: 'underline',
                       },
                     }}
+                    color='primary'
                   >
                     {team.name}
                   </Typography>

@@ -15,6 +15,7 @@ import { Upgrade } from "./Updrade";
 import Profile from "../header/Profile";
 import { getAppSettings } from '@/services/settings/settings.service';
 import { supabase } from "@/lib/supabaseClient";
+import { width } from "@mui/system";
 
 
 const renderMenuItems = (items: any, pathDirect: any) => {
@@ -95,7 +96,7 @@ const SidebarItems = () => {
   return (
     <>
       <MUI_Sidebar width={"100%"} showProfile={false} themeColor={"#5D87FF"} themeSecondaryColor={'#49beff'}>
-        <Logo img={logoUrl} component={Link} to="/" style={{ height: 40 }}>
+        <Logo img={logoUrl} component={Link} to="/" style={{ width: 20, height: 40 }}>
           {leagueName || 'Modernize'}
         </Logo>
         {renderMenuItems(Menuitems, pathDirect)}

@@ -16,6 +16,9 @@ export type Player = {
   photo_url: string | null;
   created_at: string;
   updated_at: string;
+  we_have_id: boolean;
+  paid_membership: number;
+  registered_at: string;
 };
 
 export type PlayerFormData = {
@@ -30,4 +33,7 @@ export type PlayerFormData = {
   is_active: boolean;
   notes: string;
   photo_url: string | null;
+  we_have_id?: boolean;
+  paid_membership?: number;
+  registered_at?: string;
 };

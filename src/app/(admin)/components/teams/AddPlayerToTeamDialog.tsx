@@ -8,10 +8,10 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  MenuItem,
   Stack,
   TextField,
 } from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete';
 import type { Player } from '@/models/player';
 import { addPlayerToTeam, getAvailablePlayers } from '@/services/teamPlayers';
 
@@ -30,6 +30,7 @@ export default function AddPlayerToTeamDialog({
 }: Props) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | ''>('');
+  const [searchValue, setSearchValue] = useState('');
   const [jerseyNumber, setJerseyNumber] = useState<number | ''>('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -82,6 +83,12 @@ export default function AddPlayerToTeamDialog({
     }
   };
 
+  // Filtrar duplicados por nombre completo (full_name) normalizado
+  const normalizeName = (name: string) => name.trim().toLowerCase();
+  const uniquePlayers = players.filter((player, index, self) =>
+    index === self.findIndex((p) => normalizeName(p.full_name) === normalizeName(player.full_name))
+  );
+
   return (
     <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="sm">
       <DialogTitle>Add Player to Team</DialogTitle>
@@ -90,28 +97,56 @@ export default function AddPlayerToTeamDialog({
         <Stack spacing={2} sx={{ mt: 1 }}>
           {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
 
-          <TextField
-            select
-            label="Player"
-            value={selectedPlayerId}
-            onChange={(e) => setSelectedPlayerId(Number(e.target.value))}
-            fullWidth
-            disabled={loading || players.length === 0}
-            helperText={
-              players.length === 0
-                ? 'All players are already assigned to this team.'
-                : 'Select an available player'
-            }
+          <Autocomplete
+            options={uniquePlayers}
+            getOptionLabel={(option) => `${option.full_name} (${option.document_id || 'Sin documento'})`}
+            value={uniquePlayers.find((p) => p.id === selectedPlayerId) || null}
+            onChange={(_event, newValue) => {
+              setSelectedPlayerId(newValue ? newValue.id : '');
+            }}
+            inputValue={searchValue}
+            onInputChange={(_event, newInputValue) => {
+              setSearchValue(newInputValue);
+            }}
+            renderOption={(props, option) => {
+              const { key, ...rest } = props;
+              return (
+                <li key={key} {...rest} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                  <span>{option.full_name}</span>
+                  <span style={{ color: '#888', fontSize: 13 }}>{option.document_id || 'Sin documento'}</span>
+                </li>
+              );
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Player"
+                fullWidth
+                disabled={loading || uniquePlayers.length === 0}
+                helperText={
+                  uniquePlayers.length === 0
+                    ? 'All players are already assigned to this team.'
+                    : 'Search and select an available player'
+                }
+              />
+            )}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            noOptionsText={searchValue ? 'No players found' : 'Type to search players'}
+          />
+          <Button
+            variant="outlined"
+            onClick={() => {
+              // Aquí podrías agregar lógica para buscar jugadores por nombre si tienes una función para ello
+              // Por ahora solo resetea el valor de búsqueda
+              setSearchValue('');
+            }}
+            disabled={loading}
           >
-            {players.map((player) => (
-              <MenuItem key={player.id} value={player.id}>
-                {player.full_name}
-              </MenuItem>
-            ))}
-          </TextField>
+            Buscar
+          </Button>
 
           <TextField
-            label="Jersey Number"
+            label="Jersey Number (Optional)"
             type="number"
             value={jerseyNumber}
             onChange={(e) =>
