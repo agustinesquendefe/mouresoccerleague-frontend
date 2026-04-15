@@ -173,7 +173,7 @@ export default function AddFieldToEventDialog({
             alert('Formato de partido inválido para crear field.');
             return;
           }
-          const payload = { ...data, supported_formats: [format] };
+          const payload = { ...data, supported_formats: [format as FormatSupported] };
           // @ts-ignore
           const { createField } = await import('@/services/fields/createField');
           const newField = await createField(payload);
