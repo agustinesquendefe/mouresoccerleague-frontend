@@ -25,7 +25,7 @@ import {
 import type { Season, SeasonFormData } from '@/models/season';
 import { getSeasons, createSeason, updateSeason, deleteSeason } from '@/services/seasons';
 
-const emptyForm: SeasonFormData = { name: '' };
+const emptyForm: SeasonFormData = { name: '', key: '' };
 
 export default function SeasonsPage() {
   const [seasons, setSeasons] = useState<Season[]>([]);
