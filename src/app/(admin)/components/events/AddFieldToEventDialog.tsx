@@ -14,7 +14,7 @@ import {
 
 import { supabase } from '@/lib/supabaseClient';
 import { addFieldToEvent, getFieldsByEvent } from '@/services/eventFields';
-import { Field } from '@/models/field';
+import { Field, FormatSupported } from '@/models/field';
 import { getFields } from '@/services/fields/getFields';
 import FieldDialog from '../fields/FieldDialog';
 
