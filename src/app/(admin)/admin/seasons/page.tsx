@@ -125,7 +125,7 @@ export default function SeasonsPage() {
               label="Season Name"
               placeholder="e.g. Spring 2026, 2025-26"
               value={form.name}
-              onChange={(e) => setForm({ name: e.target.value })}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
               fullWidth
               required
             />
