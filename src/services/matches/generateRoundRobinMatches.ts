@@ -13,6 +13,7 @@ type EventConfig = {
   start_date: string;
   match_day_of_week: number | null;
   simultaneous_matches: boolean;
+  match_format?: string | null;
 };
 
 type RoundRobinPair = {
@@ -107,7 +108,8 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
       round_robin_cycles,
       start_date,
       match_day_of_week,
-      simultaneous_matches
+      simultaneous_matches,
+      match_format
     `)
     .eq('id', eventId)
     .single();
@@ -172,7 +174,12 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
 
   const matchesPerRound = baseRounds[0]?.length ?? 0;
 
-  if (eventConfig.simultaneous_matches && fields.length < matchesPerRound) {
+  // Permitir 11v11 con un solo field aunque simultaneous_matches sea true
+  if (
+    eventConfig.simultaneous_matches &&
+    fields.length < matchesPerRound &&
+    eventConfig.match_format !== '11v11'
+  ) {
     throw new Error(
       `This event needs at least ${matchesPerRound} assigned fields to play all matches of a round on the same day.`
     );
@@ -206,7 +213,8 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
       const currentDate = addDays(firstMatchDate, globalRoundIndex * 7);
 
       roundMatches.forEach((pair, index) => {
-        const assignedField = fields[index] ?? null;
+        // Si solo hay un field, usarlo para todos los partidos
+        const assignedField = fields.length === 1 ? fields[0] : fields[index] ?? null;
         const invertHomeAway = cycle % 2 === 0;
 
         matchesToInsert.push({

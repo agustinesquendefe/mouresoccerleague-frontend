@@ -15,12 +15,15 @@ import {
 import { supabase } from '@/lib/supabaseClient';
 import { addFieldToEvent, getFieldsByEvent } from '@/services/eventFields';
 import { Field } from '@/models/field';
+import { getFields } from '@/services/fields/getFields';
+import FieldDialog from '../fields/FieldDialog';
 
 type Props = {
   open: boolean;
   onClose: () => void;
   eventId: number;
   onAdded: () => Promise<void> | void;
+  eventFormat?: string;
 };
 
 export default function AddFieldToEventDialog({
@@ -28,8 +31,10 @@ export default function AddFieldToEventDialog({
   onClose,
   eventId,
   onAdded,
+  eventFormat,
 }: Props) {
   const [fields, setFields] = useState<Field[]>([]);
+  const [createFieldOpen, setCreateFieldOpen] = useState(false);
   const [eventFields, setEventFields] = useState<Field[]>([]);
   const [selectedField, setSelectedField] = useState<number | ''>('');
   const [loading, setLoading] = useState(false);
@@ -43,14 +48,12 @@ export default function AddFieldToEventDialog({
         setLoading(true);
         setErrorMessage(null);
 
-        const [allFieldsRes, assignedFields] = await Promise.all([
-          supabase.from('fields').select('*').order('name'),
+        const [allFields, assignedFields] = await Promise.all([
+          getFields(),
           getFieldsByEvent(eventId),
         ]);
 
-        if (allFieldsRes.error) throw new Error(allFieldsRes.error.message);
-
-        setFields((allFieldsRes.data ?? []) as Field[]);
+        setFields(allFields ?? []);
         setEventFields(assignedFields ?? []);
         setSelectedField('');
       } catch (error) {
@@ -67,8 +70,14 @@ export default function AddFieldToEventDialog({
 
   const availableFields = useMemo(() => {
     const assignedIds = new Set(eventFields.map((field) => field.id));
-    return fields.filter((field) => !assignedIds.has(field.id));
-  }, [fields, eventFields]);
+    let filtered = fields.filter((field) => !assignedIds.has(field.id));
+    if (eventFormat) {
+      filtered = filtered.filter((field) =>
+        (field.field_formats ?? []).some((ff) => ff.format_type === eventFormat)
+      );
+    }
+    return filtered;
+  }, [fields, eventFields, eventFormat]);
 
   const handleAdd = async () => {
     if (!selectedField) return;
@@ -91,50 +100,87 @@ export default function AddFieldToEventDialog({
   };
 
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth>
-      <DialogTitle>Add Field</DialogTitle>
+    <>
+      <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth>
+        <DialogTitle>Add Field</DialogTitle>
 
-      <DialogContent>
-        {errorMessage && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {errorMessage}
-          </Alert>
-        )}
+        <DialogContent>
+          {errorMessage && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
 
-        <TextField
-          select
-          label="Select Field"
-          value={selectedField}
-          onChange={(e) => setSelectedField(Number(e.target.value))}
-          fullWidth
-          sx={{ mt: 2 }}
-          disabled={loading || availableFields.length === 0}
-          helperText={
-            availableFields.length === 0
-              ? 'All available fields are already assigned to this event.'
-              : 'Only unassigned fields are shown.'
+          <TextField
+            select
+            label="Select Field"
+            value={selectedField}
+            onChange={(e) => setSelectedField(Number(e.target.value))}
+            fullWidth
+            sx={{ mt: 2 }}
+            disabled={loading || availableFields.length === 0}
+            helperText={
+              availableFields.length === 0
+                ? eventFormat
+                  ? `No fields available for format ${eventFormat}. Create one below.`
+                  : 'All available fields are already assigned to this event.'
+                : 'Only unassigned fields for this format are shown.'
+            }
+          >
+            {availableFields.map((field) => (
+              <MenuItem key={field.id} value={field.id}>
+                {field.name} — {field.field_type} — {(field.field_formats ?? []).map(ff => ff.format_type).join(', ')}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          {eventFormat && availableFields.length === 0 && (
+            <Button
+              variant="outlined"
+              color="primary"
+              sx={{ mt: 2 }}
+              onClick={() => setCreateFieldOpen(true)}
+            >
+              Create new field for {eventFormat}
+            </Button>
+          )}
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleAdd}
+            disabled={loading || !selectedField || availableFields.length === 0}
+          >
+            Add
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Inline Field Creation Dialog */}
+      <FieldDialog
+        open={createFieldOpen}
+        mode="create"
+        onClose={() => setCreateFieldOpen(false)}
+        onSubmit={async (data) => {
+          // Validar que eventFormat sea uno de los formatos soportados
+          const validFormats = ['5v5', '7v7', '11v11'];
+          const format = validFormats.includes(eventFormat as string) ? eventFormat : undefined;
+          if (!format) {
+            alert('Formato de partido inválido para crear field.');
+            return;
           }
-        >
-          {availableFields.map((field) => (
-            <MenuItem key={field.id} value={field.id}>
-              {field.name} — {field.field_type} — {field.field_formats?.join(', ')}
-            </MenuItem>
-          ))}
-        </TextField>
-      </DialogContent>
-
-      <DialogActions>
-        <Button onClick={onClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button
-          variant="contained"
-          onClick={handleAdd}
-          disabled={loading || !selectedField || availableFields.length === 0}
-        >
-          Add
-        </Button>
-      </DialogActions>
-    </Dialog>
+          const payload = { ...data, supported_formats: [format] };
+          // @ts-ignore
+          const { createField } = await import('@/services/fields/createField');
+          const newField = await createField(payload);
+          setFields((prev) => [...prev, newField]);
+          setCreateFieldOpen(false);
+        }}
+      />
+    </>
   );
 }

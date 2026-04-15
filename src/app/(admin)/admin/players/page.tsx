@@ -187,14 +187,16 @@ export default function PlayersPage() {
           </Button>
         </Stack>
 
-        <PlayersFilters
-          initialSearch={search}
-          onSearch={(value) => {
-            setSearch(value);
-            setSubmittedSearch(value);
-            setPage(0);
-          }}
-        />
+        <Stack mb={3}>
+          <PlayersFilters
+            initialSearch={search}
+            onSearch={(value) => {
+              setSearch(value);
+              setSubmittedSearch(value);
+              setPage(0);
+            }}
+          />
+        </Stack>
 
         {loading ? (
           <Stack alignItems="center" py={6}>

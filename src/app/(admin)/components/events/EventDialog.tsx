@@ -231,7 +231,8 @@ export default function EventDialog({
     if (!newSeasonName.trim()) return;
     try {
       setSavingSeason(true);
-      const created = await createSeason({ name: newSeasonName.trim() });
+      const key = newSeasonName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 50);
+      const created = await createSeason({ name: newSeasonName.trim(), key });
       setSeasons((prev) => [...prev, created]);
       handleChange('season_id', created.id);
       setCreateSeasonOpen(false);
@@ -264,7 +265,14 @@ export default function EventDialog({
     const key = newMatchFormatName.trim().toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
     try {
       setSavingMatchFormat(true);
-      const created = await createMatchFormat({ key, name: newMatchFormatName.trim() });
+      // Use default values for points fields
+      const created = await createMatchFormat({
+        key,
+        name: newMatchFormatName.trim(),
+        points_win: 3,
+        points_draw: 1,
+        points_loss: 0,
+      });
       setMatchFormats((prev) => [...prev, created]);
       handleChange('match_format', created.key);
       setCreateMatchFormatOpen(false);
@@ -281,6 +289,21 @@ export default function EventDialog({
     value: string | number | boolean | null
   ) => {
     setSubmitError(null);
+
+    // Si el campo cambiado es 'match_format', copiar los puntos del formato seleccionado
+    if (field === 'match_format') {
+      const selectedFormat = matchFormats.find((mf) => mf.key === value);
+      if (selectedFormat) {
+        setValues((prev) => ({
+          ...prev,
+          match_format: value as string,
+          points_win: selectedFormat.points_win,
+          points_draw: selectedFormat.points_draw,
+          points_loss: selectedFormat.points_loss,
+        }));
+        return;
+      }
+    }
 
     setValues((prev) => ({
       ...prev,
@@ -352,6 +375,9 @@ export default function EventDialog({
           ? values.playoff_home_away
           : false,
         group_count: values.format_type === 'groups' ? values.group_count : null,
+        points_win: values.points_win,
+        points_draw: values.points_draw,
+        points_loss: values.points_loss,
       });
     } catch (error) {
       const message =
@@ -397,7 +423,11 @@ export default function EventDialog({
               <TextField
                 select
                 label="Season"
-                value={values.season_id || ''}
+                value={
+                  loadingOptions || seasons.length === 0 || !seasons.some((s) => s.id === values.season_id)
+                    ? ''
+                    : values.season_id
+                }
                 onChange={(e) => handleChange('season_id', Number(e.target.value))}
                 fullWidth
                 required
@@ -419,7 +449,11 @@ export default function EventDialog({
               <TextField
                 select
                 label="Category"
-                value={values.category_id ?? ''}
+                value={
+                  loadingOptions || categories.length === 0 || (values.category_id !== null && !categories.some((c) => c.id === values.category_id))
+                    ? ''
+                    : values.category_id ?? ''
+                }
                 onChange={(e) => handleChange('category_id', e.target.value === '' ? null : Number(e.target.value))}
                 fullWidth
                 disabled={loadingOptions}
@@ -440,7 +474,11 @@ export default function EventDialog({
             <TextField
               select
               label="Format Type"
-              value={values.format_type}
+              value={
+                loadingOptions || formatTypes.length === 0 || !formatTypes.some((ft) => ft.key === values.format_type)
+                  ? ''
+                  : values.format_type
+              }
               onChange={(e) => handleChange('format_type', e.target.value)}
               fullWidth
               disabled={loadingOptions || formatTypes.length === 0}
@@ -523,7 +561,11 @@ export default function EventDialog({
               <TextField
                 select
                 label="Match Format"
-                value={values.match_format}
+                value={
+                  loadingOptions || matchFormats.length === 0 || !matchFormats.some((mf) => mf.key === values.match_format)
+                    ? ''
+                    : values.match_format
+                }
                 onChange={(e) => handleChange('match_format', e.target.value)}
                 fullWidth
                 disabled={loadingOptions}
@@ -555,7 +597,11 @@ export default function EventDialog({
                 <TextField
                   select
                   label="Playoff Teams Count"
-                  value={values.playoff_teams_count ?? ''}
+                  value={
+                    [2, 4, 8, 16].includes(values.playoff_teams_count ?? -1)
+                      ? values.playoff_teams_count
+                      : ''
+                  }
                   onChange={(e) =>
                     handleChange(
                       'playoff_teams_count',

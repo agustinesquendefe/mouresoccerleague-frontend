@@ -11,9 +11,11 @@ export async function getSeasons(): Promise<Season[]> {
 }
 
 export async function createSeason(payload: SeasonFormData): Promise<Season> {
+  // Generate key if not provided
+  const key = payload.key || payload.name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 50);
   const { data, error } = await supabase
     .from('seasons')
-    .insert([{ name: payload.name }])
+    .insert([{ name: payload.name, key }])
     .select()
     .single();
   if (error) throw new Error(error.message);

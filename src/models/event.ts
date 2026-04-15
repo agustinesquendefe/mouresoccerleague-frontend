@@ -31,6 +31,10 @@ export type Event = {
 
   group_count: number | null;
 
+
+  points_win: number | null;
+  points_draw: number | null;
+  points_loss: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -58,4 +62,7 @@ export type EventFormData = {
   playoff_home_away: boolean;
 
   group_count: number | null;
+  points_win?: number | null;
+  points_draw?: number | null;
+  points_loss?: number | null;
 };

@@ -17,9 +17,10 @@ import { Field } from '@/models/field';
 
 type Props = {
   eventId: number;
+  eventFormat?: string;
 };
 
-export default function EventFieldsSection({ eventId }: Props) {
+export default function EventFieldsSection({ eventId, eventFormat }: Props) {
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -97,6 +98,7 @@ export default function EventFieldsSection({ eventId }: Props) {
         onClose={() => setOpenDialog(false)}
         eventId={eventId}
         onAdded={loadFields}
+        eventFormat={eventFormat}
       />
     </Stack>
   );

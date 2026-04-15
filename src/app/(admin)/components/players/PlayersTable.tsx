@@ -121,16 +121,17 @@ export default function PlayersTable({
             )}
           </TableBody>
         </Table>
-      </TableContainer>
+        
+        <TablePagination
+          component="div"
+          count={count}
+          page={page}
+          onPageChange={(_, newPage) => onPageChange(newPage)}
+          rowsPerPage={rowsPerPage}
+          rowsPerPageOptions={[20]}
+        />
 
-      <TablePagination
-        component="div"
-        count={count}
-        page={page}
-        onPageChange={(_, newPage) => onPageChange(newPage)}
-        rowsPerPage={rowsPerPage}
-        rowsPerPageOptions={[20]}
-      />
+      </TableContainer>
     </Paper>
   );
 }

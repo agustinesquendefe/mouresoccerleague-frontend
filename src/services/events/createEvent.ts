@@ -28,6 +28,9 @@ export async function createEvent(payload: EventFormData): Promise<Event> {
         playoff_teams_count: payload.playoff_teams_count,
         playoff_home_away: payload.playoff_home_away,
         group_count: payload.format_type === 'groups' ? payload.group_count : null,
+        points_win: payload.points_win ?? null,
+        points_draw: payload.points_draw ?? null,
+        points_loss: payload.points_loss ?? null,
       },
     ])
     .select()

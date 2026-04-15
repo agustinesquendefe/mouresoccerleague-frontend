@@ -30,11 +30,23 @@ type EventTeamRow = {
   } | Array<{ name: string }>;
 };
 
+
 export async function getEventStandings(
   eventId: number,
   mode: StandingMode = 'general',
   groupId?: number | null
 ): Promise<StandingRow[]> {
+  // Get event to fetch points system
+  const { data: event, error: eventError } = await supabase
+    .from('events')
+    .select('points_win, points_draw, points_loss')
+    .eq('id', eventId)
+    .single();
+  if (eventError) throw new Error(eventError.message);
+  const pointsWin = typeof event.points_win === 'number' ? event.points_win : 3;
+  const pointsDraw = typeof event.points_draw === 'number' ? event.points_draw : 1;
+  const pointsLoss = typeof event.points_loss === 'number' ? event.points_loss : 0;
+
   // Build matches query
   let matchesQuery = supabase
     .from('matches')
@@ -107,16 +119,18 @@ export async function getEventStandings(
         if (match.score1 > match.score2) {
           team1.won += 1;
           team2.lost += 1;
-          team1.points += 3;
+          team1.points += pointsWin;
+          team2.points += pointsLoss;
         } else if (match.score1 < match.score2) {
           team2.won += 1;
           team1.lost += 1;
-          team2.points += 3;
+          team2.points += pointsWin;
+          team1.points += pointsLoss;
         } else {
           team1.drawn += 1;
           team2.drawn += 1;
-          team1.points += 1;
-          team2.points += 1;
+          team1.points += pointsDraw;
+          team2.points += pointsDraw;
         }
       } else if (mode === 'home') {
         team1.played += 1;
@@ -125,12 +139,13 @@ export async function getEventStandings(
 
         if (match.score1 > match.score2) {
           team1.won += 1;
-          team1.points += 3;
+          team1.points += pointsWin;
         } else if (match.score1 < match.score2) {
           team1.lost += 1;
+          team1.points += pointsLoss;
         } else {
           team1.drawn += 1;
-          team1.points += 1;
+          team1.points += pointsDraw;
         }
       }
     }
@@ -142,12 +157,13 @@ export async function getEventStandings(
 
       if (match.score2 > match.score1) {
         team2.won += 1;
-        team2.points += 3;
+        team2.points += pointsWin;
       } else if (match.score2 < match.score1) {
         team2.lost += 1;
+        team2.points += pointsLoss;
       } else {
         team2.drawn += 1;
-        team2.points += 1;
+        team2.points += pointsDraw;
       }
     }
   });

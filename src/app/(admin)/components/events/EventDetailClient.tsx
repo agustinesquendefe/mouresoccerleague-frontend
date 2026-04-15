@@ -15,14 +15,18 @@ type Props = {
 export default function EventDetailClient({ eventId }: Props) {
   const [standingsRefreshKey, setStandingsRefreshKey] = useState(0);
   const [formatType, setFormatType] = useState<string | null>(null);
+  const [matchFormat, setMatchFormat] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
       .from('events')
-      .select('format_type')
+      .select('format_type, match_format')
       .eq('id', eventId)
       .single()
-      .then(({ data }) => setFormatType(data?.format_type ?? null));
+      .then(({ data }) => {
+        setFormatType(data?.format_type ?? null);
+        setMatchFormat(data?.match_format ?? null);
+      });
   }, [eventId]);
 
   const handleMatchUpdated = () => {
@@ -34,7 +38,7 @@ export default function EventDetailClient({ eventId }: Props) {
       <h2>Event Detail</h2>
 
       <EventTeamsSection eventId={eventId} />
-      <EventFieldsSection eventId={eventId} />
+      <EventFieldsSection eventId={eventId} eventFormat={matchFormat ?? undefined} />
 
       {formatType === 'groups' && <EventGroupsSection eventId={eventId} />}
 

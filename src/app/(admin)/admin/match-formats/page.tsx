@@ -25,7 +25,13 @@ import {
 import type { MatchFormatRecord, MatchFormatFormData } from '@/models/matchFormat';
 import { getMatchFormats, createMatchFormat, updateMatchFormat, deleteMatchFormat } from '@/services/matchFormats';
 
-const emptyForm: MatchFormatFormData = { key: '', name: '' };
+const emptyForm: MatchFormatFormData = {
+  key: '',
+  name: '',
+  points_win: 3,
+  points_draw: 1,
+  points_loss: 0,
+};
 
 function toKey(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
@@ -48,7 +54,16 @@ export default function MatchFormatsPage() {
 
   const handleOpen = (item?: MatchFormatRecord) => {
     setSelected(item ?? null);
-    setForm(item ? { key: item.key, name: item.name } : emptyForm);
+    setForm(item
+      ? {
+          key: item.key,
+          name: item.name,
+          points_win: item.points_win,
+          points_draw: item.points_draw,
+          points_loss: item.points_loss,
+        }
+      : emptyForm
+    );
     setDialogOpen(true);
   };
 
@@ -105,6 +120,9 @@ export default function MatchFormatsPage() {
                 <TableCell>ID</TableCell>
                 <TableCell>Key</TableCell>
                 <TableCell>Name</TableCell>
+                <TableCell align="center">Points for win</TableCell>
+                <TableCell align="center">Points for draw</TableCell>
+                <TableCell align="center">Points for loss</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -114,6 +132,9 @@ export default function MatchFormatsPage() {
                   <TableCell>{item.id}</TableCell>
                   <TableCell><Typography fontFamily="monospace" fontSize={13}>{item.key}</Typography></TableCell>
                   <TableCell><Typography fontWeight={600}>{item.name}</Typography></TableCell>
+                  <TableCell align="center">{item.points_win}</TableCell>
+                  <TableCell align="center">{item.points_draw}</TableCell>
+                  <TableCell align="center">{item.points_loss}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                       <Button size="small" variant="outlined" onClick={() => handleOpen(item)}>Edit</Button>
@@ -147,6 +168,33 @@ export default function MatchFormatsPage() {
               fullWidth
               required
               helperText="Auto-generated from name. Used internally."
+            />
+            <TextField
+              label="Puntos por victoria"
+              type="number"
+              value={form.points_win}
+              onChange={e => setForm(p => ({ ...p, points_win: Number(e.target.value) }))}
+              fullWidth
+              required
+              inputProps={{ min: 0 }}
+            />
+            <TextField
+              label="Puntos por empate"
+              type="number"
+              value={form.points_draw}
+              onChange={e => setForm(p => ({ ...p, points_draw: Number(e.target.value) }))}
+              fullWidth
+              required
+              inputProps={{ min: 0 }}
+            />
+            <TextField
+              label="Puntos por derrota"
+              type="number"
+              value={form.points_loss}
+              onChange={e => setForm(p => ({ ...p, points_loss: Number(e.target.value) }))}
+              fullWidth
+              required
+              inputProps={{ min: 0 }}
             />
           </Stack>
         </DialogContent>
