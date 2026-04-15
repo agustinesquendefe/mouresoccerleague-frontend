@@ -44,7 +44,7 @@ export default function SeasonsPage() {
 
   const handleOpen = (season?: Season) => {
     setSelected(season ?? null);
-    setForm(season ? { name: season.name } : emptyForm);
+    setForm(season ? { name: season.name, key: season.key } : emptyForm);
     setDialogOpen(true);
   };
 
