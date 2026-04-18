@@ -19,6 +19,9 @@ export async function updatePlayer(
       is_active: payload.is_active,
       notes: payload.notes || null,
       photo_url: payload.photo_url || null,
+      registered_at: payload.registered_at || null,
+      signature: payload.signature || null,
+      we_have_id: typeof payload.we_have_id === 'boolean' ? payload.we_have_id : false,
     })
     .eq('id', id)
     .select()

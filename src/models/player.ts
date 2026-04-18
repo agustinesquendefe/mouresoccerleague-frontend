@@ -19,6 +19,7 @@ export type Player = {
   we_have_id: boolean;
   paid_membership: number;
   registered_at: string;
+  signature: string | null;
 };
 
 export type PlayerFormData = {
@@ -36,4 +37,5 @@ export type PlayerFormData = {
   we_have_id?: boolean;
   paid_membership?: number;
   registered_at?: string;
+  signature?: string;
 };

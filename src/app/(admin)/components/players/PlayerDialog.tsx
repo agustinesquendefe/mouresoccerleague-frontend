@@ -58,6 +58,7 @@ const initialValues: PlayerFormData = {
   we_have_id: false,
   paid_membership: 0,
   registered_at: new Date().toISOString().split('T')[0],
+  signature: '',
 };
 
 const initialConflicts: ConflictState = {
@@ -126,6 +127,7 @@ export default function PlayerDialog({
         we_have_id: player.we_have_id ?? false,
         paid_membership: player.paid_membership ?? 0,
         registered_at: player.registered_at ?? new Date().toISOString().split('T')[0],
+        signature: player.signature ?? '',
       });
       setPhotoPreview(player.photo_url ?? null);
       setConflicts(initialConflicts);
@@ -269,7 +271,7 @@ export default function PlayerDialog({
           we_have_id: values.we_have_id,
           paid_membership: values.paid_membership,
           registered_at: values.registered_at,
-
+          signature: values.signature,
         },
         selectedCategoryIds,
         photoFile
@@ -494,6 +496,7 @@ export default function PlayerDialog({
               </Box>
             )}
 
+
             <FormControlLabel
               control={
                 <Checkbox
@@ -502,6 +505,25 @@ export default function PlayerDialog({
                 />
               }
               label="Active"
+            />
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={!!values.we_have_id}
+                  onChange={(e) => handleChange('we_have_id', e.target.checked)}
+                />
+              }
+              label="We have ID"
+            />
+
+            <TextField
+              label="Signature Date"
+              type="date"
+              value={values.signature}
+              onChange={(e) => handleChange('signature', e.target.value)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
             />
 
             {checkingConflicts && (
