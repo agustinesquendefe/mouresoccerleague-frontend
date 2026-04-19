@@ -20,6 +20,8 @@ export type Player = {
   paid_membership: number;
   registered_at: string;
   signature: string | null;
+  tutor_document_url: string | null;
+  participant_document_url: string | null;
 };
 
 export type PlayerFormData = {
@@ -38,4 +40,6 @@ export type PlayerFormData = {
   paid_membership?: number;
   registered_at?: string;
   signature?: string;
+  tutor_document_url?: string | null;
+  participant_document_url?: string | null;
 };

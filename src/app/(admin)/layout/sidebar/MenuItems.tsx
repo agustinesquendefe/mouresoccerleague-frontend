@@ -1,4 +1,5 @@
 import GroupsIcon from '@mui/icons-material/Groups';
+import GavelIcon from '@mui/icons-material/Gavel';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StadiumIcon from '@mui/icons-material/Stadium';
 import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
@@ -109,6 +110,16 @@ const Menuitems = [
     title: "Match Formats",
     icon: SportsSoccerOutlinedIcon,
     href: "/admin/match-formats",
+  },
+  {
+    navlabel: true,
+    subheader: "LEGAL",
+  },
+  {
+    id: "legal-documents",
+    title: "Rules & Permissions",
+    icon: GavelIcon,
+    href: "/admin/legal-documents",
   },
   {
     navlabel: true,

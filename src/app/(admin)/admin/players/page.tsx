@@ -95,9 +95,11 @@ export default function PlayersPage() {
   const handleSubmit = async (values: PlayerFormData, categoryIds: number[], photoFile: File | null) => {
     try {
       setSaving(true);
+      let resultPlayer: Player | { id: number } | undefined;
 
       if (dialogMode === 'create') {
         const created = await createPlayer(values);
+        let finalPlayer = created;
 
         if (photoFile) {
           const ext = photoFile.name.split('.').pop() ?? 'jpg';
@@ -107,13 +109,15 @@ export default function PlayersPage() {
             file: photoFile,
           });
           await updatePlayer(created.id, { ...values, photo_url: publicUrl });
-          setRows((prev) => [{ ...created, photo_url: publicUrl }, ...prev]);
+          finalPlayer = { ...created, photo_url: publicUrl };
+          setRows((prev) => [finalPlayer, ...prev]);
         } else {
           setRows((prev) => [created, ...prev]);
         }
 
         await setPlayerCategories(created.id, categoryIds);
         showToast('Player created successfully', 'success');
+        resultPlayer = finalPlayer;
       } else if (selectedPlayer) {
         let photoUrl = values.photo_url;
 
@@ -133,14 +137,17 @@ export default function PlayersPage() {
           prev.map((item) => (item.id === updated.id ? updated : item))
         );
         showToast('Player updated successfully', 'success');
+        resultPlayer = updated;
       }
 
       setDialogOpen(false);
       setSelectedPlayer(null);
+      return resultPlayer!;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to save player';
       showToast(message, 'error');
+      throw error;
     } finally {
       setSaving(false);
     }
