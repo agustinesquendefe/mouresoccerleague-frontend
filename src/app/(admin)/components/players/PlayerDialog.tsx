@@ -495,23 +495,25 @@ export default function PlayerDialog({
   };
 
   const handleDownload = async (url: string, filename: string) => {
-        const response = await fetch(url);
-        const blob = await response.blob();
+    const response = await fetch(url);
+    const blob = await response.blob();
 
-        const link = document.createElement('a');
-        link.href = window.URL.createObjectURL(blob);
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const initials =
     `${values.first_name.charAt(0)}${values.last_name.charAt(0)}`.toUpperCase() || '?';
 
   return (
     <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{mode === 'create' ? 'Create Player' : 'Edit Player'}</DialogTitle>
+      <DialogTitle>
+        {mode === 'create' ? 'Create Player' : 'Edit Player'}
+      </DialogTitle>
 
       <DialogContent>
         <Box mt={1}>
@@ -641,19 +643,6 @@ export default function PlayerDialog({
                 fullWidth
                 InputLabelProps={{ shrink: true }}
               />
-
-              {/* <TextField
-                label="Jersey Number"
-                type="number"
-                value={values.jersey_number ?? ''}
-                onChange={(e) =>
-                  handleChange(
-                    'jersey_number',
-                    e.target.value === '' ? null : Number(e.target.value)
-                  )
-                }
-                fullWidth
-              /> */}
             </Stack>
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
