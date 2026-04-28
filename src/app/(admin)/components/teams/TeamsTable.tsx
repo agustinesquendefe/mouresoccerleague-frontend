@@ -16,9 +16,10 @@ import {
   Box,
 } from '@mui/material';
 import type { Team } from '@/models/team';
+import type { Category } from '@/models/category';
 
 type TeamsTableProps = {
-  teams: Team[];
+  teams: (Team & { categories?: Category[] })[];
   onEdit: (team: Team) => void;
   onDelete: (team: Team) => void;
 };
@@ -59,10 +60,10 @@ export default function TeamsTable({
               ID
             </TableCell>
             <TableCell>
-              Key
+              Name
             </TableCell>
             <TableCell>
-              Name
+              Categories
             </TableCell>
             <TableCell>
               Code
@@ -93,8 +94,6 @@ export default function TeamsTable({
             >
               <TableCell>{team.id}</TableCell>
 
-              <TableCell>{team.key || '-'}</TableCell>
-
               <TableCell>
                 <Link
                   href={`/admin/teams/${team.id}`}
@@ -117,6 +116,12 @@ export default function TeamsTable({
                     {team.name}
                   </Typography>
                 </Link>
+              </TableCell>
+
+              <TableCell>
+                {Array.isArray(team.categories) && team.categories.length > 0
+                  ? team.categories.map((cat) => cat.name).join(', ')
+                  : '-'}
               </TableCell>
 
               <TableCell>{team.code ?? '-'}</TableCell>

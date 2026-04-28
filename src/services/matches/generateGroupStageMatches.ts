@@ -72,71 +72,113 @@ function generateRoundRobinRounds(teamIds: number[]): RoundRobinPair[][] {
 export async function generateGroupStageMatches(eventId: number): Promise<void> {
   if (!Number.isFinite(eventId)) throw new Error('Invalid event id');
 
+  // 1. Obtener configuración del evento
   const { data: event, error: eventError } = await supabase
     .from('events')
     .select('id, format_type, round_robin_cycles, start_date, match_day_of_week, simultaneous_matches')
     .eq('id', eventId)
     .single();
-
   if (eventError) throw new Error(eventError.message);
-
-  if (event.format_type !== 'groups') {
-    throw new Error('This service is only for events with format type "groups".');
-  }
-
+  if (event.format_type !== 'groups') throw new Error('This service is only for events with format type "groups".');
   if (!event.start_date) throw new Error('The event must have a start date.');
   if (!event.match_day_of_week) throw new Error('The event must have a match day configured.');
 
-  const { data: existingMatches, error: existingError } = await supabase
+
+  // 2. Obtener todos los partidos existentes del evento (solo league)
+  const { data: allMatches, error: allMatchesError } = await supabase
     .from('matches')
-    .select('id')
+    .select('*')
     .eq('event_id', eventId)
     .eq('stage_type', 'league')
-    .limit(1);
+    .order('round_number', { ascending: true });
+  if (allMatchesError) throw new Error(allMatchesError.message);
 
-  if (existingError) throw new Error(existingError.message);
-  if (existingMatches && existingMatches.length > 0) {
-    throw new Error('Group stage matches have already been generated for this event.');
+  // 3. Obtener equipos actuales y anteriores
+  const { data: eventTeams, error: eventTeamsError } = await supabase
+    .from('event_teams')
+    .select('id, team_id, group_id')
+    .eq('event_id', eventId);
+  if (eventTeamsError) throw new Error(eventTeamsError.message);
+  const currentTeamIds = new Set((eventTeams ?? []).map((row: any) => row.team_id));
+  // Equipos que aparecen en partidos futuros pero no están en event_teams
+  const futureMatches = (allMatches ?? []).filter(m => m.status !== 'played');
+  const futureTeamIds = new Set();
+  for (const m of futureMatches) {
+    if (!currentTeamIds.has(m.team1_id)) futureTeamIds.add(m.team1_id);
+    if (!currentTeamIds.has(m.team2_id)) futureTeamIds.add(m.team2_id);
+  }
+  // Equipos eliminados
+  const eliminatedTeamIds = Array.from(futureTeamIds);
+  // Equipos agregados
+  const allPastTeamIds = new Set((allMatches ?? []).flatMap(m => [m.team1_id, m.team2_id]));
+  const addedTeamIds = Array.from(currentTeamIds).filter(id => !allPastTeamIds.has(id));
+
+  // 4. Determinar el round actual (el último con algún partido jugado)
+  let lastPlayedRound = 0;
+  for (const match of allMatches ?? []) {
+    if ((match.status === 'played' || match.status === 'in_progress') && match.round_number && match.round_number > lastPlayedRound) {
+      lastPlayedRound = match.round_number;
+    }
   }
 
-  // Load groups
+  // 5. Reemplazar equipos eliminados por agregados en partidos futuros
+  if (eliminatedTeamIds.length > 0 && addedTeamIds.length > 0) {
+    // Reemplazo 1 a 1 en orden
+    const updates = [];
+    for (let i = 0; i < Math.min(eliminatedTeamIds.length, addedTeamIds.length); i++) {
+      const elimId = eliminatedTeamIds[i];
+      const addId = addedTeamIds[i];
+      for (const match of futureMatches) {
+        if (match.team1_id === elimId) {
+          updates.push({ id: match.id, field: 'team1_id', value: addId });
+        }
+        if (match.team2_id === elimId) {
+          updates.push({ id: match.id, field: 'team2_id', value: addId });
+        }
+      }
+    }
+    // Ejecutar updates
+    for (const up of updates) {
+      await supabase.from('matches').update({ [up.field]: up.value }).eq('id', up.id);
+    }
+  }
+
+  // 6. Eliminar partidos futuros (round_number > lastPlayedRound y status !== 'played')
+  const futureMatchIds = (allMatches ?? [])
+    .filter(m => m.round_number && m.round_number > lastPlayedRound && m.status !== 'played')
+    .map(m => m.id);
+  if (futureMatchIds.length > 0) {
+    const { error: delError } = await supabase.from('matches').delete().in('id', futureMatchIds);
+    if (delError) throw new Error(delError.message);
+  }
+
+
+  // 7. Cargar grupos
   const { data: groups, error: groupsError } = await supabase
     .from('event_groups')
     .select('id, name, order_index')
     .eq('event_id', eventId)
     .order('order_index', { ascending: true });
-
   if (groupsError) throw new Error(groupsError.message);
   if (!groups?.length) throw new Error('No groups found. Create and assign groups first.');
 
-  // Load event teams per group
-  const { data: eventTeams, error: teamsError } = await supabase
-    .from('event_teams')
-    .select('id, team_id, group_id')
-    .eq('event_id', eventId);
-
-  if (teamsError) throw new Error(teamsError.message);
-
+  // 8. Cargar equipos por grupo
   const teamsByGroup = new Map<number, number[]>();
   (eventTeams ?? []).forEach((et: any) => {
     if (!et.group_id) return;
     if (!teamsByGroup.has(et.group_id)) teamsByGroup.set(et.group_id, []);
     teamsByGroup.get(et.group_id)!.push(et.team_id);
   });
-
   for (const group of groups as any[]) {
     const tids = teamsByGroup.get(group.id) ?? [];
-    if (tids.length < 2) {
-      throw new Error(`${group.name} has fewer than 2 teams assigned.`);
-    }
+    if (tids.length < 2) throw new Error(`${group.name} has fewer than 2 teams assigned.`);
   }
 
+  // 7. Configuración de fields y rounds
   const fields = await getFieldsByEvent(eventId);
   if (fields.length === 0) throw new Error('This event has no fields assigned.');
-
   const cycles = event.round_robin_cycles || 1;
   const firstMatchDate = getFirstValidMatchDate(event.start_date, event.match_day_of_week);
-
   type MatchInsert = {
     event_id: number;
     pos: number;
@@ -152,11 +194,9 @@ export async function generateGroupStageMatches(eventId: number): Promise<void> 
     stage_type: string;
     group_id: number;
   };
-
   const matchesToInsert: MatchInsert[] = [];
   let posCounter = 1;
   let numCounter = 1;
-
   // Build all rounds across all groups first so we can interleave them by round date
   const groupRounds: Array<{ groupId: number; rounds: RoundRobinPair[][] }> = (groups as any[]).map(
     (group) => ({
@@ -164,49 +204,45 @@ export async function generateGroupStageMatches(eventId: number): Promise<void> 
       rounds: generateRoundRobinRounds(teamsByGroup.get(group.id)!),
     })
   );
-
   const maxRoundsPerCycle = Math.max(...groupRounds.map((gr) => gr.rounds.length));
-
   let globalRoundIndex = 0;
-
   for (let cycle = 1; cycle <= cycles; cycle++) {
     for (let roundIdx = 0; roundIdx < maxRoundsPerCycle; roundIdx++) {
-      const currentDate = addDays(firstMatchDate, globalRoundIndex * 7);
-      let fieldIndex = 0;
-
-      for (const { groupId, rounds } of groupRounds) {
-        const roundMatches = rounds[roundIdx] ?? [];
-        const invertHomeAway = cycle % 2 === 0;
-
-        roundMatches.forEach((pair) => {
-          const assignedField = fields[fieldIndex % fields.length] ?? null;
-
-          matchesToInsert.push({
-            event_id: eventId,
-            pos: posCounter,
-            num: numCounter,
-            team1_id: invertHomeAway ? pair.team2_id : pair.team1_id,
-            team2_id: invertHomeAway ? pair.team1_id : pair.team2_id,
-            status: 'scheduled',
-            date: formatDateToYYYYMMDD(currentDate),
-            field_number: fieldIndex + 1,
-            field_id: assignedField?.id ?? null,
-            round_id: null,
-            round_number: globalRoundIndex + 1,
-            stage_type: 'league',
-            group_id: groupId,
+      const roundNumber = globalRoundIndex + 1;
+      if (roundNumber > lastPlayedRound) {
+        const currentDate = addDays(firstMatchDate, globalRoundIndex * 7);
+        let fieldIndex = 0;
+        for (const { groupId, rounds } of groupRounds) {
+          const roundMatches = rounds[roundIdx] ?? [];
+          const invertHomeAway = cycle % 2 === 0;
+          roundMatches.forEach((pair) => {
+            const assignedField = fields[fieldIndex % fields.length] ?? null;
+            matchesToInsert.push({
+              event_id: eventId,
+              pos: posCounter,
+              num: numCounter,
+              team1_id: invertHomeAway ? pair.team2_id : pair.team1_id,
+              team2_id: invertHomeAway ? pair.team1_id : pair.team2_id,
+              status: 'scheduled',
+              date: formatDateToYYYYMMDD(currentDate),
+              field_number: fieldIndex + 1,
+              field_id: assignedField?.id ?? null,
+              round_id: null,
+              round_number: roundNumber,
+              stage_type: 'league',
+              group_id: groupId,
+            });
+            posCounter += 1;
+            numCounter += 1;
+            fieldIndex += 1;
           });
-
-          posCounter += 1;
-          numCounter += 1;
-          fieldIndex += 1;
-        });
+        }
       }
-
       globalRoundIndex += 1;
     }
   }
-
-  const { error: insertError } = await supabase.from('matches').insert(matchesToInsert);
-  if (insertError) throw new Error(insertError.message);
+  if (matchesToInsert.length > 0) {
+    const { error: insertError } = await supabase.from('matches').insert(matchesToInsert);
+    if (insertError) throw new Error(insertError.message);
+  }
 }

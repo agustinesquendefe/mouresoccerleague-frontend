@@ -44,4 +44,6 @@ export type MatchFormData = {
   time: string | null;
   field_id: number | null;
   field_number: number | null;
+  team1_id: number | null;
+  team2_id: number | null;
 };

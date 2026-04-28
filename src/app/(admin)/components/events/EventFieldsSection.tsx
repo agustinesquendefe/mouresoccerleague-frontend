@@ -75,7 +75,23 @@ export default function EventFieldsSection({ eventId, eventFormat }: Props) {
             >
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography fontWeight={600}>{field.name}</Typography>
-                <Chip label={field.field_type} size="small" />
+                <Chip
+                  label={field.field_type}
+                  size="small"
+                  className='capitalize'
+                  sx={(() => {
+                    switch (field.field_type) {
+                      case 'outside':
+                        return { backgroundColor: '#43a047', color: '#fff' }; // green
+                      case 'inside':
+                        return { backgroundColor: '#ffa726', color: '#fff' }; // orange
+                      case 'inside':
+                      default:
+                        return { backgroundColor: '#1976d2', color: '#fff' }; // blue
+                    }
+                  })()}
+                />
+                {/* <Chip label={field.field_type} size="small" /> */}
                 {(field.field_formats ?? []).map((format) => (
                   <Chip
                     key={`${field.id}-${format.id}`}

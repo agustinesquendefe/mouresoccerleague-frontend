@@ -23,6 +23,8 @@ import { checkTeamConflicts } from '@/services/teams/checkTeamConflicts';
 import { uploadImage } from '@/services/storage/uploadImage';
 import type { Category } from '@/models/category';
 import { getCategories } from '@/services/categories';
+import Autocomplete from '@mui/material/Autocomplete';
+import Chip from '@mui/material/Chip';
 
 type TeamDialogProps = {
   open: boolean;
@@ -45,7 +47,7 @@ const initialValues: TeamFormData = {
   club: true,
   national: false,
   logo_url: null,
-  category_id: null,
+  category_ids: [],
 };
 
 const initialConflicts: ConflictState = {
@@ -127,7 +129,7 @@ export default function TeamDialog({
         club: team.club ?? false,
         national: team.national ?? false,
         logo_url: team.logo_url ?? null,
-        category_id: team.category_id ?? null,
+        category_ids: team.category_ids ?? [],
       });
       setConflicts(initialConflicts);
       setSubmitError(null);
@@ -251,7 +253,7 @@ export default function TeamDialog({
         club: values.club,
         national: values.national,
         logo_url: logoUrl,
-        category_id: values.category_id ?? null,
+        category_ids: values.category_ids ?? [],
       });
     } catch (error) {
       const message =
@@ -269,70 +271,8 @@ export default function TeamDialog({
           <Stack spacing={2}>
             {submitError && <Alert severity="error">{submitError}</Alert>}
 
-            <TextField
-              label="Name"
-              value={values.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              fullWidth
-              required
-              error={conflicts.nameExists}
-              helperText={conflicts.nameExists ? 'A team with this name already exists.' : ' '}
-              autoCapitalize='words'
-            />
-
-            <TextField
-              label="Key"
-              value={values.key}
-              fullWidth
-              InputProps={{ readOnly: true }}
-              error={conflicts.keyExists}
-              helperText={conflicts.keyExists ? 'This key is already in use.' : 'Generated automatically from the name.'}
-            />
-
-            <TextField
-              label="Code"
-              value={values.code}
-              fullWidth
-              InputProps={{ readOnly: true }}
-              helperText="Generated automatically from the name."
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={values.club}
-                  onChange={(e) => handleChange('club', e.target.checked)}
-                />
-              }
-              label="Club"
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={values.national}
-                  onChange={(e) => handleChange('national', e.target.checked)}
-                />
-              }
-              label="National Team"
-            />
-
             {/* Logo upload */}
-            <TextField
-              select
-              label="Category"
-              value={values.category_id ?? ''}
-              onChange={(e) => setValues((p) => ({ ...p, category_id: e.target.value === '' ? null : Number(e.target.value) }))}
-              fullWidth
-            >
-              <MenuItem value=""><em>No category</em></MenuItem>
-              {categories.map((c) => (
-                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-              ))}
-            </TextField>
-
-            {/* Logo upload */}
-            <Stack spacing={1}>
+            <Stack spacing={1} paddingBottom={2}>
               <Typography variant="body2" fontWeight={600}>Logo (PNG, WebP, SVG)</Typography>
               <Stack direction="row" alignItems="center" spacing={2}>
                 <Avatar
@@ -377,12 +317,104 @@ export default function TeamDialog({
               />
             </Stack>
 
+            <TextField
+              label="Name"
+              value={values.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              fullWidth
+              required
+              error={conflicts.nameExists}
+              helperText={conflicts.nameExists ? 'A team with this name already exists.' : ' '}
+              autoCapitalize='words'
+            />
+
+            <TextField
+              label="Key"
+              value={values.key}
+              fullWidth
+              InputProps={{ readOnly: true }}
+              error={conflicts.keyExists}
+              helperText={conflicts.keyExists ? 'This key is already in use.' : 'Generated automatically from the name.'}
+            />
+
+            <TextField
+              label="Code"
+              value={values.code}
+              fullWidth
+              InputProps={{ readOnly: true }}
+              helperText="Generated automatically from the name."
+            />
+
+            {/* Logo upload */}
+            {/* <TextField
+              select
+              label="Category"
+              value={values.category_id ?? ''}
+              onChange={(e) => setValues((p) => ({ ...p, category_id: e.target.value === '' ? null : Number(e.target.value) }))}
+              fullWidth
+            >
+              <MenuItem value=""><em>No category</em></MenuItem>
+              {categories.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </TextField> */}
+
+            {/* Categorías (multiple) */}
+            <Autocomplete
+              multiple
+              options={categories}
+              getOptionLabel={(option) => option.name}
+              value={categories.filter((cat) => values.category_ids?.includes(cat.id))}
+              onChange={(_, newValue) =>
+                setValues((prev) => ({
+                  ...prev,
+                  category_ids: newValue.map((cat) => cat.id),
+                }))
+              }
+              className='cursor-pointer'
+              renderInput={(params) => (
+                <TextField {...params} label="Categories" placeholder="Select categories" fullWidth />
+              )}
+              renderTags={(tagValue, getTagProps) =>
+                tagValue.map((option, index) => (
+                  <Chip
+                    label={option.name}
+                    {...getTagProps({ index })}
+                    key={option.id}
+                  />
+                ))
+              }
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              disabled={loading}
+            />
+
             {checkingConflicts && (
               <Stack direction="row" spacing={1} alignItems="center">
                 <CircularProgress size={16} />
                 <Box component="span">Checking duplicates...</Box>
               </Stack>
             )}
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={values.club}
+                  onChange={(e) => handleChange('club', e.target.checked)}
+                />
+              }
+              label="Club"
+            />
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={values.national}
+                  onChange={(e) => handleChange('national', e.target.checked)}
+                />
+              }
+              label="National Team"
+            />
+
           </Stack>
         </Box>
       </DialogContent>

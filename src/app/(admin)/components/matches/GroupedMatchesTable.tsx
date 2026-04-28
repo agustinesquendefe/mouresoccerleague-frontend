@@ -56,7 +56,7 @@ export default function GroupedMatchesTable({
           <Stack spacing={2}>
             {groupByDate && groupKey !== 'all' && (
               <Typography variant="h6" fontWeight={700}>
-                Fecha {index + 1} — {groupKey}
+                Round {index + 1} — {groupKey}
               </Typography>
             )}
 
@@ -119,7 +119,24 @@ export default function GroupedMatchesTable({
                   </Stack>
 
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip label={match.status ?? 'scheduled'} size="small" />
+                    <Chip
+                      label={match.status ?? 'scheduled'}
+                      size="small"
+                      className='capitalize'
+                      sx={(() => {
+                        switch (match.status) {
+                          case 'played':
+                            return { backgroundColor: '#43a047', color: '#fff' }; // green
+                          case 'in_progress':
+                            return { backgroundColor: '#ffa726', color: '#fff' }; // orange
+                          case 'cancelled':
+                            return { backgroundColor: '#e53935', color: '#fff' }; // red
+                          case 'scheduled':
+                          default:
+                            return { backgroundColor: '#1976d2', color: '#fff' }; // blue
+                        }
+                      })()}
+                    />
                     <Button
                       variant="outlined"
                       size="small"

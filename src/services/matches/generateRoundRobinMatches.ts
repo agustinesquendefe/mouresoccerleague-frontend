@@ -100,6 +100,7 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
     throw new Error('Invalid event id');
   }
 
+  // 1. Obtener configuración del evento
   const { data: event, error: eventError } = await supabase
     .from('events')
     .select(`
@@ -113,68 +114,90 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
     `)
     .eq('id', eventId)
     .single();
-
-  if (eventError) {
-    throw new Error(eventError.message);
-  }
-
+  if (eventError) throw new Error(eventError.message);
   const eventConfig = event as EventConfig;
+  if (eventConfig.format_type !== 'round_robin') throw new Error('Fixture generation is only available for round robin events.');
+  if (!eventConfig.start_date) throw new Error('The event must have a start date.');
+  if (!eventConfig.match_day_of_week) throw new Error('The event must have a match day configured.');
 
-  if (eventConfig.format_type !== 'round_robin') {
-    throw new Error('Fixture generation is only available for round robin events.');
-  }
 
-  if (!eventConfig.start_date) {
-    throw new Error('The event must have a start date.');
-  }
-
-  if (!eventConfig.match_day_of_week) {
-    throw new Error('The event must have a match day configured.');
-  }
-
-  const { data: existingMatches, error: existingMatchesError } = await supabase
+  // 2. Obtener todos los partidos existentes del evento
+  const { data: allMatches, error: allMatchesError } = await supabase
     .from('matches')
-    .select('id')
+    .select('*')
     .eq('event_id', eventId)
-    .limit(1);
+    .order('round_number', { ascending: true });
+  if (allMatchesError) throw new Error(allMatchesError.message);
 
-  if (existingMatchesError) {
-    throw new Error(existingMatchesError.message);
-  }
-
-  if (existingMatches && existingMatches.length > 0) {
-    throw new Error('This event already has generated matches.');
-  }
-
+  // 3. Obtener equipos actuales y anteriores
   const { data: eventTeams, error: eventTeamsError } = await supabase
     .from('event_teams')
     .select('id, team_id')
     .eq('event_id', eventId)
     .order('team_id', { ascending: true });
+  if (eventTeamsError) throw new Error(eventTeamsError.message);
+  const currentTeamIds = new Set((eventTeams ?? []).map((row: any) => row.team_id));
+  // Equipos que aparecen en partidos futuros pero no están en event_teams
+  const futureMatches = (allMatches ?? []).filter(m => m.status !== 'played');
+  const futureTeamIds = new Set();
+  for (const m of futureMatches) {
+    if (!currentTeamIds.has(m.team1_id)) futureTeamIds.add(m.team1_id);
+    if (!currentTeamIds.has(m.team2_id)) futureTeamIds.add(m.team2_id);
+  }
+  // Equipos eliminados
+  const eliminatedTeamIds = Array.from(futureTeamIds);
+  // Equipos agregados
+  const allPastTeamIds = new Set((allMatches ?? []).flatMap(m => [m.team1_id, m.team2_id]));
+  const addedTeamIds = Array.from(currentTeamIds).filter(id => !allPastTeamIds.has(id));
 
-  if (eventTeamsError) {
-    throw new Error(eventTeamsError.message);
+  // 4. Determinar el round actual (el último con algún partido jugado)
+  let lastPlayedRound = 0;
+  for (const match of allMatches ?? []) {
+    if ((match.status === 'played' || match.status === 'in_progress') && match.round_number && match.round_number > lastPlayedRound) {
+      lastPlayedRound = match.round_number;
+    }
   }
 
+  // 5. Reemplazar equipos eliminados por agregados en partidos futuros
+  if (eliminatedTeamIds.length > 0 && addedTeamIds.length > 0) {
+    // Reemplazo 1 a 1 en orden
+    const updates = [];
+    for (let i = 0; i < Math.min(eliminatedTeamIds.length, addedTeamIds.length); i++) {
+      const elimId = eliminatedTeamIds[i];
+      const addId = addedTeamIds[i];
+      for (const match of futureMatches) {
+        if (match.team1_id === elimId) {
+          updates.push({ id: match.id, field: 'team1_id', value: addId });
+        }
+        if (match.team2_id === elimId) {
+          updates.push({ id: match.id, field: 'team2_id', value: addId });
+        }
+      }
+    }
+    // Ejecutar updates
+    for (const up of updates) {
+      await supabase.from('matches').update({ [up.field]: up.value }).eq('id', up.id);
+    }
+  }
+
+  // 6. Eliminar partidos futuros (round_number > lastPlayedRound y status !== 'played')
+  const futureMatchIds = (allMatches ?? [])
+    .filter(m => m.round_number && m.round_number > lastPlayedRound && m.status !== 'played')
+    .map(m => m.id);
+  if (futureMatchIds.length > 0) {
+    const { error: delError } = await supabase.from('matches').delete().in('id', futureMatchIds);
+    if (delError) throw new Error(delError.message);
+  }
+
+  // 7. Obtener equipos actuales para rounds futuros
   const rows = (eventTeams ?? []) as EventTeamRow[];
-
-  if (rows.length < 2) {
-    throw new Error('At least 2 teams are required to generate a fixture.');
-  }
-
+  if (rows.length < 2) throw new Error('At least 2 teams are required to generate a fixture.');
   const fields = await getFieldsByEvent(eventId);
-
-  if (fields.length === 0) {
-    throw new Error('This event has no fields assigned.');
-  }
-
+  if (fields.length === 0) throw new Error('This event has no fields assigned.');
   const teamIds = rows.map((row) => row.team_id);
   const baseRounds = generateRoundRobinRounds(teamIds);
   const cycles = eventConfig.round_robin_cycles || 1;
-
   const matchesPerRound = baseRounds[0]?.length ?? 0;
-
-  // Permitir 11v11 con un solo field aunque simultaneous_matches sea true
   if (
     eventConfig.simultaneous_matches &&
     fields.length < matchesPerRound &&
@@ -184,12 +207,12 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
       `This event needs at least ${matchesPerRound} assigned fields to play all matches of a round on the same day.`
     );
   }
-
   const firstMatchDate = getFirstValidMatchDate(
     eventConfig.start_date,
     eventConfig.match_day_of_week
   );
 
+  // 8. Generar solo los rounds futuros
   const matchesToInsert: Array<{
     event_id: number;
     pos: number;
@@ -203,47 +226,41 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
     round_id: number | null;
     round_number: number | null;
   }> = [];
-
   let posCounter = 1;
   let numCounter = 1;
   let globalRoundIndex = 0;
-
   for (let cycle = 1; cycle <= cycles; cycle++) {
     for (const roundMatches of baseRounds) {
-      const currentDate = addDays(firstMatchDate, globalRoundIndex * 7);
-
-      roundMatches.forEach((pair, index) => {
-        // Si solo hay un field, usarlo para todos los partidos
-        const assignedField = fields.length === 1 ? fields[0] : fields[index] ?? null;
-        const invertHomeAway = cycle % 2 === 0;
-
-        matchesToInsert.push({
-          event_id: eventId,
-          pos: posCounter,
-          num: numCounter,
-          team1_id: invertHomeAway ? pair.team2_id : pair.team1_id,
-          team2_id: invertHomeAway ? pair.team1_id : pair.team2_id,
-          status: 'scheduled',
-          date: formatDateToYYYYMMDD(currentDate),
-          field_number: index + 1,
-          field_id: assignedField?.id ?? null,
-          round_id: null,
-          round_number: globalRoundIndex + 1, 
+      const roundNumber = globalRoundIndex + 1;
+      if (roundNumber > lastPlayedRound) {
+        const currentDate = addDays(firstMatchDate, globalRoundIndex * 7);
+        roundMatches.forEach((pair, index) => {
+          const assignedField = fields.length === 1 ? fields[0] : fields[index] ?? null;
+          const invertHomeAway = cycle % 2 === 0;
+          matchesToInsert.push({
+            event_id: eventId,
+            pos: posCounter,
+            num: numCounter,
+            team1_id: invertHomeAway ? pair.team2_id : pair.team1_id,
+            team2_id: invertHomeAway ? pair.team1_id : pair.team2_id,
+            status: 'scheduled',
+            date: formatDateToYYYYMMDD(currentDate),
+            field_number: index + 1,
+            field_id: assignedField?.id ?? null,
+            round_id: null,
+            round_number: roundNumber, 
+          });
+          posCounter += 1;
+          numCounter += 1;
         });
-
-        posCounter += 1;
-        numCounter += 1;
-      });
-
+      }
       globalRoundIndex += 1;
     }
   }
-
-  const { error: insertError } = await supabase
-    .from('matches')
-    .insert(matchesToInsert);
-
-  if (insertError) {
-    throw new Error(insertError.message);
+  if (matchesToInsert.length > 0) {
+    const { error: insertError } = await supabase
+      .from('matches')
+      .insert(matchesToInsert);
+    if (insertError) throw new Error(insertError.message);
   }
 }

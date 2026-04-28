@@ -66,7 +66,23 @@ export default function MatchesTable({
                 {match.field_id ? fieldMap[match.field_id] ?? `#${match.field_id}` : '-'}
               </TableCell>
               <TableCell>
-                <Chip label={match.status ?? 'scheduled'} size="small" />
+                <Chip
+                  label={match.status ?? 'scheduled'}
+                  size="small"
+                  sx={(() => {
+                    switch (match.status) {
+                      case 'played':
+                        return { backgroundColor: '#43a047', color: '#fff' }; // green
+                      case 'in_progress':
+                        return { backgroundColor: '#ffa726', color: '#fff' }; // orange
+                      case 'cancelled':
+                        return { backgroundColor: '#e53935', color: '#fff' }; // red
+                      case 'scheduled':
+                      default:
+                        return { backgroundColor: '#1976d2', color: '#fff' }; // blue
+                    }
+                  })()}
+                />
               </TableCell>
               <TableCell align="right">
                 

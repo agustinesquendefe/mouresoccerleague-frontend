@@ -37,6 +37,8 @@ const initialValues: MatchFormData = {
   time: null,
   field_id: null,
   field_number: null,
+  team1_id: null,
+  team2_id: null,
 };
 
 export default function MatchDialog({
@@ -65,6 +67,8 @@ export default function MatchDialog({
       time: match.time,
       field_id: match.field_id,
       field_number: match.field_number,
+      team1_id: match.team1_id,
+      team2_id: match.team2_id,
     });
     setErrorMessage(null);
   }, [open, match]);
@@ -138,6 +142,8 @@ export default function MatchDialog({
 
       await onSubmit({
         ...values,
+        team1_id: values.team1_id !== undefined ? values.team1_id : match?.team1_id ?? null,
+        team2_id: values.team2_id !== undefined ? values.team2_id : match?.team2_id ?? null,
         winner_team_id: values.status === 'played' ? resolvedWinnerTeamId : null,
         field_number: selectedFieldNumber,
       });
@@ -157,18 +163,44 @@ export default function MatchDialog({
           {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
 
           <TextField
+            select
             label="Team 1"
-            value={match ? teamMap[match.team1_id] ?? `#${match.team1_id}` : ''}
+            value={values.team1_id ?? match?.team1_id ?? ''}
+            onChange={e => setValues(prev => ({ ...prev, team1_id: Number(e.target.value) }))}
             fullWidth
-            InputProps={{ readOnly: true }}
-          />
+            disabled={loading}
+          >
+            {Object.entries(teamMap).map(([id, name]) => (
+              <MenuItem key={id} value={Number(id)}>
+                {name} (#{id})
+              </MenuItem>
+            ))}
+            {match && match.team1_id && !teamMap[match.team1_id] && (
+              <MenuItem key={match.team1_id} value={match.team1_id}>
+                Equipo eliminado (#{match.team1_id})
+              </MenuItem>
+            )}
+          </TextField>
 
           <TextField
+            select
             label="Team 2"
-            value={match ? teamMap[match.team2_id] ?? `#${match.team2_id}` : ''}
+            value={values.team2_id ?? match?.team2_id ?? ''}
+            onChange={e => setValues(prev => ({ ...prev, team2_id: Number(e.target.value) }))}
             fullWidth
-            InputProps={{ readOnly: true }}
-          />
+            disabled={loading}
+          >
+            {Object.entries(teamMap).map(([id, name]) => (
+              <MenuItem key={id} value={Number(id)}>
+                {name} (#{id})
+              </MenuItem>
+            ))}
+            {match && match.team2_id && !teamMap[match.team2_id] && (
+              <MenuItem key={match.team2_id} value={match.team2_id}>
+                Equipo eliminado (#{match.team2_id})
+              </MenuItem>
+            )}
+          </TextField>
 
           <TextField
             select

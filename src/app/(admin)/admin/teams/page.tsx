@@ -13,7 +13,7 @@ import {
 import TeamDialog from '@/app/(admin)/components/teams/TeamDialog';
 import TeamsTable from '@/app/(admin)/components/teams/TeamsTable';
 import type { Team, TeamFormData } from '@/models/team';
-import { getTeams, createTeam, updateTeam, deleteTeam } from '@/services/teams';
+import { getTeamsWithCategories, createTeam, updateTeam, deleteTeam } from '@/services/teams';
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -45,7 +45,7 @@ export default function TeamsPage() {
   const loadTeams = async () => {
     try {
       setLoading(true);
-      const data = await getTeams();
+      const data = await getTeamsWithCategories();
       setTeams(data);
     } catch (error) {
       const message =
@@ -62,9 +62,13 @@ export default function TeamsPage() {
     setDialogOpen(true);
   };
 
-  const handleOpenEdit = (team: Team) => {
+  const handleOpenEdit = (team: any) => {
+    // Si el equipo tiene 'categories', mapear a category_ids para el diálogo
+    const category_ids = Array.isArray(team.categories)
+      ? team.categories.map((cat: any) => cat.id)
+      : team.category_ids || [];
     setDialogMode('edit');
-    setSelectedTeam(team);
+    setSelectedTeam({ ...team, category_ids });
     setDialogOpen(true);
   };
 
@@ -77,19 +81,17 @@ export default function TeamsPage() {
   const handleSubmit = async (values: TeamFormData) => {
     try {
       setSaving(true);
-
       if (dialogMode === 'create') {
-        const created = await createTeam(values);
-        setTeams((prev) => [created, ...prev]);
+        await createTeam(values);
         showToast('Team created successfully', 'success');
       } else if (selectedTeam) {
-        const updated = await updateTeam(selectedTeam.id, values);
-        setTeams((prev) =>
-          prev.map((team) => (team.id === updated.id ? updated : team))
-        );
+        await updateTeam(selectedTeam.id, values);
         showToast('Team updated successfully', 'success');
       }
 
+      // Esperar 500ms para asegurar que la relación en la base de datos esté actualizada
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await loadTeams();
       setDialogOpen(false);
       setSelectedTeam(null);
     } catch (error) {
@@ -102,20 +104,21 @@ export default function TeamsPage() {
   };
 
   const handleDelete = async (team: Team) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${team.name}"?`
-    );
-
-    if (!confirmed) return;
+    if (!confirm(`Are you sure you want to delete team "${team.name}"?`)) {
+      return;
+    }
 
     try {
+      setSaving(true);
       await deleteTeam(team.id);
-      setTeams((prev) => prev.filter((item) => item.id !== team.id));
+      setTeams((prev) => prev.filter((t) => t.id !== team.id));
       showToast('Team deleted successfully', 'success');
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to delete team';
       showToast(message, 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -145,8 +148,6 @@ export default function TeamsPage() {
         <Stack alignItems="center" py={6}>
           <CircularProgress />
         </Stack>
-      ) : teams.length === 0 ? (
-        <Alert severity="info">No teams found.</Alert>
       ) : (
         <TeamsTable
           teams={teams}
@@ -180,4 +181,5 @@ export default function TeamsPage() {
       </Snackbar>
     </Box>
   );
+
 }
