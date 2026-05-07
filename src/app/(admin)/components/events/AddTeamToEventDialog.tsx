@@ -19,6 +19,7 @@ import { addTeamToEvent } from '@/services/eventTeams/addTeamToEvent';
 type TeamOption = {
   id: number;
   name: string;
+  team_categories?: { category_id: number }[];
 };
 
 type EventTeamRow = {
@@ -65,11 +66,17 @@ export default function AddTeamToEventDialog({
         const catId: number | null = eventResponse.data?.category_id ?? null;
         setEventCategoryId(catId);
 
-        // Build teams query — filter by category if the event has one
-        let teamsQuery = supabase.from('teams').select('id, name').order('name');
-        if (catId !== null) {
-          teamsQuery = teamsQuery.eq('category_id', catId);
-        }
+        // Filter through team_categories because teams no longer stores category_id directly.
+        const teamsQuery = catId !== null
+          ? supabase
+              .from('teams')
+              .select('id, name, team_categories!inner(category_id)')
+              .eq('team_categories.category_id', catId)
+              .order('name')
+          : supabase
+              .from('teams')
+              .select('id, name')
+              .order('name');
 
         const [teamsResponse, eventTeamsResponse] = await Promise.all([
           teamsQuery,
@@ -79,7 +86,9 @@ export default function AddTeamToEventDialog({
         if (teamsResponse.error) throw new Error(teamsResponse.error.message);
         if (eventTeamsResponse.error) throw new Error(eventTeamsResponse.error.message);
 
-        setTeams((teamsResponse.data ?? []) as TeamOption[]);
+        setTeams(
+          ((teamsResponse.data ?? []) as TeamOption[]).map(({ id, name }) => ({ id, name }))
+        );
         setExistingEventTeams((eventTeamsResponse.data ?? []) as EventTeamRow[]);
         setSelectedTeam('');
       } catch (error) {
