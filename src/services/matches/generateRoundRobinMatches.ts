@@ -197,16 +197,6 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
   const teamIds = rows.map((row) => row.team_id);
   const baseRounds = generateRoundRobinRounds(teamIds);
   const cycles = eventConfig.round_robin_cycles || 1;
-  const matchesPerRound = baseRounds[0]?.length ?? 0;
-  if (
-    eventConfig.simultaneous_matches &&
-    fields.length < matchesPerRound &&
-    eventConfig.match_format !== '11v11'
-  ) {
-    throw new Error(
-      `This event needs at least ${matchesPerRound} assigned fields to play all matches of a round on the same day.`
-    );
-  }
   const firstMatchDate = getFirstValidMatchDate(
     eventConfig.start_date,
     eventConfig.match_day_of_week
@@ -235,7 +225,8 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
       if (roundNumber > lastPlayedRound) {
         const currentDate = addDays(firstMatchDate, globalRoundIndex * 7);
         roundMatches.forEach((pair, index) => {
-          const assignedField = fields.length === 1 ? fields[0] : fields[index] ?? null;
+          const fieldIndex = index % fields.length;
+          const assignedField = fields[fieldIndex] ?? null;
           const invertHomeAway = cycle % 2 === 0;
           matchesToInsert.push({
             event_id: eventId,
@@ -245,7 +236,7 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
             team2_id: invertHomeAway ? pair.team1_id : pair.team2_id,
             status: 'scheduled',
             date: formatDateToYYYYMMDD(currentDate),
-            field_number: index + 1,
+            field_number: fieldIndex + 1,
             field_id: assignedField?.id ?? null,
             round_id: null,
             round_number: roundNumber, 
