@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -304,7 +304,7 @@ export default function RoundSchedulePlanner({
                 ))}
 
                 {timeSlots.map((time) => (
-                  <>
+                  <Fragment key={time}>
                     <Paper key={`${time}:label`} variant="outlined" sx={{ p: 1.5 }}>
                       <Typography fontWeight={600}>{time}</Typography>
                     </Paper>
@@ -325,7 +325,7 @@ export default function RoundSchedulePlanner({
                         </Paper>
                       );
                     })}
-                  </>
+                  </Fragment>
                 ))}
               </Box>
             </Box>
