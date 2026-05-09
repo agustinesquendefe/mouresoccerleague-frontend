@@ -29,11 +29,35 @@ export async function updateEventTeamsOrder(eventId: number, teams: EventTeamOrd
     throw new Error('You cannot reorder teams after a league match has started or been played.');
   }
 
-  const { error } = await supabase
-    .from('event_teams')
-    .upsert(teams, { onConflict: 'id' });
+  const temporaryUpdates = await Promise.all(
+    teams.map((team, index) =>
+      supabase
+        .from('event_teams')
+        .update({ order_index: -(index + 1) })
+        .eq('id', team.id)
+        .eq('event_id', eventId)
+    )
+  );
 
-  if (error) {
-    throw new Error(error.message);
+  const failedTemporaryUpdate = temporaryUpdates.find((result) => result.error);
+
+  if (failedTemporaryUpdate?.error) {
+    throw new Error(failedTemporaryUpdate.error.message);
+  }
+
+  const finalUpdates = await Promise.all(
+    teams.map((team) =>
+      supabase
+        .from('event_teams')
+        .update({ order_index: team.order_index })
+        .eq('id', team.id)
+        .eq('event_id', eventId)
+    )
+  );
+
+  const failedFinalUpdate = finalUpdates.find((result) => result.error);
+
+  if (failedFinalUpdate?.error) {
+    throw new Error(failedFinalUpdate.error.message);
   }
 }
