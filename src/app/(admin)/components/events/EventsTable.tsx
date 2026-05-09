@@ -40,6 +40,7 @@ export default function EventsTable({
             <TableCell>Category</TableCell>
             <TableCell>Format</TableCell>
             <TableCell>Match Type</TableCell>
+            <TableCell>Price</TableCell>
             <TableCell>Start</TableCell>
             <TableCell>Status</TableCell>
             <TableCell align="right">Actions</TableCell>
@@ -61,6 +62,7 @@ export default function EventsTable({
                 <Chip label={event.format_type} size="small" variant="outlined" />
               </TableCell>
               <TableCell>{event.match_format ?? '-'}</TableCell>
+              <TableCell>${Number(event.event_price ?? event.membership_price ?? 0).toFixed(2)}</TableCell>
               <TableCell>{event.start_date}</TableCell>
               <TableCell>
                 <Chip label={event.status ?? 'draft'} size="small" />

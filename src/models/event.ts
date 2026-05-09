@@ -24,6 +24,10 @@ export type Event = {
   field_count: number | null;
   match_duration_minutes: number | null;
   simultaneous_matches: boolean;
+  membership_price: number;
+  event_price: number;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
 
   has_playoffs: boolean;
   playoff_teams_count: number | null;
@@ -56,6 +60,10 @@ export type EventFormData = {
   field_count: number;
   match_duration_minutes: number;
   simultaneous_matches: boolean;
+  membership_price: number;
+  event_price: number;
+  stripe_product_id?: string | null;
+  stripe_price_id?: string | null;
 
   has_playoffs: boolean;
   playoff_teams_count: number | null;

@@ -7,6 +7,7 @@ import EventFieldsSection from './EventFieldsSection';
 import EventMatchesSection from '../matches/EventMatchesSection';
 import EventStandingsSection from '../standings/EventStandingsSection';
 import EventGroupsSection from './EventGroupsSection';
+import EventMembershipsSection from './EventMembershipsSection';
 import { supabase } from '@/lib/supabaseClient';
 
 type Props = {
@@ -48,6 +49,7 @@ export default function EventDetailClient({ eventId }: Props) {
       <h2>Event Detail</h2>
 
       <EventTeamsSection eventId={eventId} />
+      <EventMembershipsSection eventId={eventId} />
       <EventFieldsSection eventId={eventId} eventFormat={matchFormat ?? undefined} />
 
       {formatType === 'groups' && <EventGroupsSection eventId={eventId} />}

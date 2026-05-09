@@ -1,7 +1,11 @@
 import { supabase } from '@/lib/supabaseClient';
 import type { Event, EventFormData } from '@/models/event';
+import { syncEventStripePrice } from './syncEventStripePrice';
 
 export async function createEvent(payload: EventFormData): Promise<Event> {
+  const stripePrice = await syncEventStripePrice({ payload });
+  const eventPrice = Number(payload.event_price) || 0;
+
   const { data, error } = await supabase
     .from('events')
     .insert([
@@ -23,6 +27,10 @@ export async function createEvent(payload: EventFormData): Promise<Event> {
         field_count: payload.field_count,
         match_duration_minutes: payload.match_duration_minutes,
         simultaneous_matches: payload.simultaneous_matches,
+        membership_price: eventPrice,
+        event_price: eventPrice,
+        stripe_product_id: stripePrice.stripe_product_id || null,
+        stripe_price_id: stripePrice.stripe_price_id || null,
 
         has_playoffs: payload.has_playoffs,
         playoff_teams_count: payload.playoff_teams_count,

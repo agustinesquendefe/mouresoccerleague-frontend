@@ -90,7 +90,7 @@ export default function EventsPage() {
             setEvents((prev) => [created, ...prev]);
             showToast('Event created successfully', 'success');
         } else if (selectedEvent) {
-            const updated = await updateEvent(selectedEvent.id, values);
+            const updated = await updateEvent(selectedEvent.id, values, selectedEvent);
             setEvents((prev) =>
             prev.map((item) => (item.id === updated.id ? updated : item))
             );
