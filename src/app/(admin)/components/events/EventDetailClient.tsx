@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Box } from '@mui/material';
 import EventTeamsSection from './EventTeamsSection';
 import EventFieldsSection from './EventFieldsSection';
 import EventMatchesSection from '../matches/EventMatchesSection';
@@ -34,7 +35,16 @@ export default function EventDetailClient({ eventId }: Props) {
   };
 
   return (
-    <div style={{ padding: 20, display: 'grid', gap: 24 }}>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        display: 'grid',
+        gap: 3,
+        overflowX: 'hidden',
+      }}
+    >
       <h2>Event Detail</h2>
 
       <EventTeamsSection eventId={eventId} />
@@ -50,6 +60,6 @@ export default function EventDetailClient({ eventId }: Props) {
         eventId={eventId}
         refreshKey={standingsRefreshKey}
       />
-    </div>
+    </Box>
   );
 }

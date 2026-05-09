@@ -4,6 +4,8 @@ import { getFieldsByEvent } from '@/services/eventFields/getFieldsByEvent';
 type EventTeamRow = {
   id: number;
   team_id: number;
+  order_index?: number | null;
+  group_id?: number | null;
 };
 
 type EventConfig = {
@@ -20,6 +22,31 @@ type RoundRobinPair = {
   team1_id: number;
   team2_id: number;
 };
+
+function getOrderedTeamIds(rows: EventTeamRow[]): number[] {
+  const sortedRows = [...rows].sort((left, right) => {
+    const leftIndex = left.order_index ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = right.order_index ?? Number.MAX_SAFE_INTEGER;
+
+    if (leftIndex !== rightIndex) {
+      return leftIndex - rightIndex;
+    }
+
+    return left.id - right.id;
+  });
+
+  const orderedTeamIds: number[] = [];
+  const seen = new Set<number>();
+
+  sortedRows.forEach((row) => {
+    if (!seen.has(row.team_id)) {
+      orderedTeamIds.push(row.team_id);
+      seen.add(row.team_id);
+    }
+  });
+
+  return orderedTeamIds;
+}
 
 function mapEventDayToJsDay(matchDayOfWeek: number): number {
   return matchDayOfWeek === 7 ? 0 : matchDayOfWeek;
@@ -95,7 +122,9 @@ function generateRoundRobinRounds(teamIds: number[]): RoundRobinPair[][] {
   return rounds;
 }
 
-export async function generateRoundRobinMatches(eventId: number): Promise<void> {
+export async function generateRoundRobinMatches(
+  eventId: number
+): Promise<void> {
   if (!Number.isFinite(eventId)) {
     throw new Error('Invalid event id');
   }
@@ -132,9 +161,10 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
   // 3. Obtener equipos actuales y anteriores
   const { data: eventTeams, error: eventTeamsError } = await supabase
     .from('event_teams')
-    .select('id, team_id')
+    .select('id, team_id, order_index')
     .eq('event_id', eventId)
-    .order('team_id', { ascending: true });
+    .order('order_index', { ascending: true })
+    .order('id', { ascending: true });
   if (eventTeamsError) throw new Error(eventTeamsError.message);
   const currentTeamIds = new Set((eventTeams ?? []).map((row: any) => row.team_id));
   // Equipos que aparecen en partidos futuros pero no están en event_teams
@@ -194,7 +224,7 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
   if (rows.length < 2) throw new Error('At least 2 teams are required to generate a fixture.');
   const fields = await getFieldsByEvent(eventId);
   if (fields.length === 0) throw new Error('This event has no fields assigned.');
-  const teamIds = rows.map((row) => row.team_id);
+  const teamIds = getOrderedTeamIds(rows);
   const baseRounds = generateRoundRobinRounds(teamIds);
   const cycles = eventConfig.round_robin_cycles || 1;
   const firstMatchDate = getFirstValidMatchDate(

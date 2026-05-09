@@ -96,8 +96,10 @@ export async function generateGroupStageMatches(eventId: number): Promise<void> 
   // 3. Obtener equipos actuales y anteriores
   const { data: eventTeams, error: eventTeamsError } = await supabase
     .from('event_teams')
-    .select('id, team_id, group_id')
-    .eq('event_id', eventId);
+    .select('id, team_id, group_id, order_index')
+    .eq('event_id', eventId)
+    .order('order_index', { ascending: true })
+    .order('id', { ascending: true });
   if (eventTeamsError) throw new Error(eventTeamsError.message);
   const currentTeamIds = new Set((eventTeams ?? []).map((row: any) => row.team_id));
   // Equipos que aparecen en partidos futuros pero no están en event_teams

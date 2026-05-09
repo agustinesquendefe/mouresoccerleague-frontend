@@ -19,9 +19,27 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
         isMobileSidebarOpen={isMobileSidebarOpen}
         onSidebarClose={handleMobileSidebarClose}
       />
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <Box
+        sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '100vh',
+          minWidth: 0,
+          maxWidth: '100%',
+        }}
+      >
         <Header toggleMobileSidebar={handleMobileSidebarOpen} />
-        <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 4 } }}>
+        <Box
+          component="main"
+          sx={{
+            flex: 1,
+            p: { xs: 2, md: 4 },
+            minWidth: 0,
+            maxWidth: '100%',
+            overflowX: 'hidden',
+          }}
+        >
           {children}
         </Box>
       </Box>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Snackbar, Stack, Tab, Tabs, Typography } from '@mui/material';
-import { getMatchesByEvent, updateMatch } from '@/services/matches';
+import { getMatchesByEvent, updateMatch, updateMatchesSchedule, type MatchScheduleUpdate } from '@/services/matches';
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
 import { getFieldsByEvent } from '@/services/eventFields/getFieldsByEvent';
 import type { Match, MatchFormData } from '@/models/match';
@@ -11,13 +11,17 @@ import GenerateFixtureButton from './GenerateFixtureButton';
 import GeneratePlayoffsButton from './GeneratePlayoffsButton';
 import GroupedMatchesTable from './GroupedMatchesTable';
 import MatchDialog from './MatchDialog';
-import { Team } from '@/models/team';
 import AdvanceKnockoutRoundButton from './AdvanceKnockoutRoundButton';
+import RoundSchedulePlanner from './RoundSchedulePlanner';
 
 type EventTeamRow = {
   id: number;
   team_id: number;
-  teams?: Team[];
+  teams?: Array<{
+    id: number;
+    name: string;
+    logo_url?: string | null;
+  }>;
 };
 
 type Props = {
@@ -34,6 +38,7 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
 
   const [selectedLeagueTab, setSelectedLeagueTab] = useState('all');
 
@@ -178,6 +183,33 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
     }
   };
 
+  const handleSaveRoundSchedule = async (updates: MatchScheduleUpdate[]) => {
+    try {
+      setScheduleSaving(true);
+      const updatedMatches = await updateMatchesSchedule(updates);
+
+      setMatches((prev) => {
+        const updatedById = new Map(updatedMatches.map((match) => [match.id, match]));
+        return prev.map((match) => updatedById.get(match.id) ?? match);
+      });
+
+      onMatchUpdated?.();
+      setToast({
+        open: true,
+        message: 'Round schedule updated successfully',
+        severity: 'success',
+      });
+    } catch (error) {
+      setToast({
+        open: true,
+        message: error instanceof Error ? error.message : 'Failed to update round schedule',
+        severity: 'error',
+      });
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
   const formatBracketTitle = (value: string) => {
     switch (value) {
       case 'round_of_16':
@@ -196,9 +228,9 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
   };
 
   return (
-    <Stack spacing={4}>
+    <Stack spacing={4} sx={{ width: '100%', minWidth: 0 }}>
       <Stack spacing={2}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
           <Typography variant="h6">League Matches</Typography>
           <GenerateFixtureButton eventId={eventId} onGenerated={loadData} />
         </Stack>
@@ -223,6 +255,17 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
           <Alert severity="info">No league matches generated yet.</Alert>
         )}
 
+        {!loading && selectedLeagueTab !== 'all' && visibleLeagueMatches.length > 0 && (
+          <RoundSchedulePlanner
+            roundLabel={`Round ${selectedLeagueTab}`}
+            matches={visibleLeagueMatches}
+            teamMap={teamMap}
+            fields={fields}
+            loading={scheduleSaving}
+            onSave={handleSaveRoundSchedule}
+          />
+        )}
+
         {!loading && leagueMatches.length > 0 && (
           <GroupedMatchesTable
             matches={visibleLeagueMatches}
@@ -235,10 +278,10 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
       </Stack>
 
       <Stack spacing={2}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
           <Typography variant="h6">Playoffs</Typography>
 
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <GeneratePlayoffsButton eventId={eventId} onGenerated={loadData} />
             <AdvanceKnockoutRoundButton eventId={eventId} onGenerated={loadData} />
           </Stack>

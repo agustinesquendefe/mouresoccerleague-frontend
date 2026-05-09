@@ -6,6 +6,7 @@ export async function getEventTeams(eventId: number) {
     .select(`
       id,
       team_id,
+      order_index,
       teams (
         id,
         name,
@@ -15,6 +16,7 @@ export async function getEventTeams(eventId: number) {
       )
     `)
     .eq('event_id', eventId)
+    .order('order_index', { ascending: true })
     .order('id', { ascending: true });
 
   if (error) {

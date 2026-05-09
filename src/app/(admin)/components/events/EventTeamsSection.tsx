@@ -1,15 +1,31 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, Button, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import { Alert, Avatar, Button, CircularProgress, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import UploadIcon from '@mui/icons-material/Upload';
 
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
 import { removeTeamFromEvent } from '@/services/eventTeams/removeTeamFromEvent';
+import {
+  hasStartedLeagueMatches,
+  updateEventTeamsOrder,
+} from '@/services/eventTeams/updateEventTeamsOrder';
 import { uploadImage } from '@/services/storage/uploadImage';
 import { supabase } from '@/lib/supabaseClient';
 import AddTeamToEventDialog from './AddTeamToEventDialog';
+
+type EventTeamRow = {
+  id: number;
+  team_id: number;
+  order_index: number;
+  teams?: {
+    id: number;
+    name: string;
+    logo_url?: string | null;
+  } | null;
+};
 
 type Props = {
   eventId: number;
@@ -18,18 +34,33 @@ type Props = {
 const ACCEPTED = 'image/png,image/webp,image/svg+xml';
 
 export default function EventTeamsSection({ eventId }: Props) {
-  const [teams, setTeams] = useState<any[]>([]);
+  const [teams, setTeams] = useState<EventTeamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
+  const [draggingTeamId, setDraggingTeamId] = useState<number | null>(null);
+  const [reordering, setReordering] = useState(false);
+  const [reorderLocked, setReorderLocked] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingTeamRef = useRef<{ teamId: number } | null>(null);
 
   const loadTeams = async () => {
     try {
       setLoading(true);
-      const data = await getEventTeams(eventId);
-      setTeams(data || []);
+      const [data, locked] = await Promise.all([
+        getEventTeams(eventId),
+        hasStartedLeagueMatches(eventId),
+      ]);
+
+      setReorderLocked(locked);
+      setTeams(
+        ((data ?? []) as any[]).map((eventTeam) => ({
+          ...eventTeam,
+          teams: Array.isArray(eventTeam.teams)
+            ? (eventTeam.teams[0] ?? null)
+            : (eventTeam.teams ?? null),
+        })) as EventTeamRow[]
+      );
     } catch (err) {
       console.error(err);
     } finally {
@@ -53,6 +84,52 @@ export default function EventTeamsSection({ eventId }: Props) {
   const handleUploadClick = (teamId: number) => {
     pendingTeamRef.current = { teamId };
     fileInputRef.current?.click();
+  };
+
+  const moveTeam = async (draggedTeamId: number, targetTeamId: number) => {
+    if (reorderLocked) {
+      return;
+    }
+
+    if (draggedTeamId === targetTeamId) {
+      return;
+    }
+
+    const currentTeams = [...teams];
+    const fromIndex = currentTeams.findIndex((team) => team.team_id === draggedTeamId);
+    const toIndex = currentTeams.findIndex((team) => team.team_id === targetTeamId);
+
+    if (fromIndex === -1 || toIndex === -1) {
+      return;
+    }
+
+    const nextTeams = [...currentTeams];
+    const [movedTeam] = nextTeams.splice(fromIndex, 1);
+    nextTeams.splice(toIndex, 0, movedTeam);
+
+    const reorderedTeams = nextTeams.map((team, index) => ({
+      ...team,
+      order_index: index,
+    }));
+
+    setTeams(reorderedTeams);
+
+    try {
+      setReordering(true);
+      await updateEventTeamsOrder(
+        eventId,
+        reorderedTeams.map((team) => ({
+          id: team.id,
+          order_index: team.order_index,
+        }))
+      );
+      setReorderLocked(await hasStartedLeagueMatches(eventId));
+    } catch (error) {
+      setTeams(currentTeams);
+      alert(error instanceof Error ? error.message : 'Failed to save team order');
+    } finally {
+      setReordering(false);
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,6 +169,16 @@ export default function EventTeamsSection({ eventId }: Props) {
         </Button>
       </Stack>
 
+      <Alert severity="info">
+        Drag teams from the handle to define fixture order. The first team faces the last, the second faces the second-to-last, and so on.
+      </Alert>
+
+      {reorderLocked && (
+        <Alert severity="warning">
+          Team order is locked because this event already has a league match in progress or played.
+        </Alert>
+      )}
+
       {loading && <Typography>Loading...</Typography>}
 
       {!loading && teams.length === 0 && (
@@ -99,37 +186,96 @@ export default function EventTeamsSection({ eventId }: Props) {
       )}
 
       {teams.map((et) => (
-        <Stack
+        <Paper
           key={et.id}
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
+          variant="outlined"
+          draggable={!reorderLocked && !reordering}
+          onDragStart={(event) => {
+            if (reorderLocked || reordering) {
+              event.preventDefault();
+              return;
+            }
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', String(et.team_id));
+            setDraggingTeamId(et.team_id);
+          }}
+          onDragOver={(event) => {
+            if (reorderLocked || reordering) {
+              return;
+            }
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+          }}
+          onDrop={(event) => {
+            if (reorderLocked || reordering) {
+              return;
+            }
+            event.preventDefault();
+            const draggedId = Number(event.dataTransfer.getData('text/plain'));
+            void moveTeam(draggedId, et.team_id);
+            setDraggingTeamId(null);
+          }}
+          onDragEnd={() => setDraggingTeamId(null)}
+          sx={{
+            borderColor: draggingTeamId === et.team_id ? 'primary.main' : undefined,
+            bgcolor: draggingTeamId === et.team_id ? 'action.hover' : undefined,
+          }}
         >
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Avatar
-              src={et.teams?.logo_url ?? undefined}
-              alt={et.teams?.name}
-              variant="rounded"
-              sx={{ width: 36, height: 36 }}
-            />
-            <Typography>{et.teams?.name}</Typography>
-          </Stack>
-
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            {uploadingId === et.teams?.id ? (
-              <CircularProgress size={20} />
-            ) : (
-              <Tooltip title="Upload logo (PNG, WebP, SVG)">
-                <IconButton size="small" onClick={() => handleUploadClick(et.teams?.id)}>
-                  <UploadIcon fontSize="small" />
-                </IconButton>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            sx={{ px: 1.5, py: 1 }}
+          >
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Tooltip
+                title={
+                  reorderLocked
+                    ? 'Team order is locked after the first league match starts.'
+                    : 'Drag to reorder teams'
+                }
+              >
+                <span>
+                  <IconButton
+                    size="small"
+                    sx={{ cursor: reordering ? 'progress' : reorderLocked ? 'not-allowed' : 'grab' }}
+                    disabled={reordering || reorderLocked}
+                  >
+                    <DragIndicatorIcon fontSize="small" />
+                  </IconButton>
+                </span>
               </Tooltip>
-            )}
-            <IconButton onClick={() => handleRemove(et.id)}>
-              <DeleteIcon />
-            </IconButton>
+
+              <Avatar
+                src={et.teams?.logo_url ?? undefined}
+                alt={et.teams?.name}
+                variant="rounded"
+                sx={{ width: 36, height: 36 }}
+              />
+              <Stack spacing={0.25}>
+                <Typography>{et.teams?.name}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Position {et.order_index + 1}
+                </Typography>
+              </Stack>
+            </Stack>
+
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              {uploadingId === et.teams?.id ? (
+                <CircularProgress size={20} />
+              ) : (
+                <Tooltip title="Upload logo (PNG, WebP, SVG)">
+                  <IconButton size="small" onClick={() => handleUploadClick(et.team_id)}>
+                    <UploadIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+              <IconButton onClick={() => handleRemove(et.id)}>
+                <DeleteIcon />
+              </IconButton>
+            </Stack>
           </Stack>
-        </Stack>
+        </Paper>
       ))}
 
       <input

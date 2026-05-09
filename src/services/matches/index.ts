@@ -4,5 +4,6 @@ export * from './generateRoundRobinMatches';
 export * from './generateKnockoutMatches';
 export * from './advanceKnockoutRound';
 export * from './updateMatch';
+export * from './updateMatchesSchedule';
 export * from './deleteMatch';
 export * from './getAllMatches';

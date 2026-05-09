@@ -50,9 +50,9 @@ export default function GroupedMatchesTable({
   });
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} sx={{ width: '100%', minWidth: 0 }}>
       {sortedGroups.map((groupKey, index) => (
-        <Paper key={groupKey} sx={{ p: 2 }}>
+        <Paper key={groupKey} sx={{ p: 2, width: '100%', minWidth: 0 }}>
           <Stack spacing={2}>
             {groupByDate && groupKey !== 'all' && (
               <Typography variant="h6" fontWeight={700}>
@@ -61,15 +61,16 @@ export default function GroupedMatchesTable({
             )}
 
             {grouped[groupKey].map((match) => (
-              <Paper key={match.id} variant="outlined" sx={{ p: 2 }}>
+              <Paper key={match.id} variant="outlined" sx={{ p: 2, width: '100%', minWidth: 0 }}>
                 <Stack
                   direction="row"
                   justifyContent="space-between"
                   alignItems="center"
                   spacing={2}
                   flexWrap="wrap"
+                  sx={{ width: '100%', minWidth: 0 }}
                 >
-                  <Stack spacing={0.5}>
+                  <Stack spacing={0.5} sx={{ minWidth: 0, flex: '1 1 320px' }}>
                     <Typography fontWeight={600}>
                       {teamMap[match.team1_id] ?? `#${match.team1_id}`} vs{' '}
                       {teamMap[match.team2_id] ?? `#${match.team2_id}`}
@@ -118,7 +119,7 @@ export default function GroupedMatchesTable({
                     )}
                   </Stack>
 
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                     <Chip
                       label={match.status ?? 'scheduled'}
                       size="small"
