@@ -3,6 +3,7 @@ import Link from 'next/link';
 import TeamPlayersSection from '@/app/(admin)/components/teams/TeamPlayersSection';
 import TeamCoachesSection from '@/app/(admin)/components/teams/TeamCoachesSection';
 import { IconChevronLeft } from '@tabler/icons-react';
+import { supabase } from '@/lib/supabaseClient';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -20,6 +21,14 @@ export default async function TeamDetailPage({ params }: Props) {
     );
   }
 
+  const { data: team } = await supabase
+    .from('teams')
+    .select('name, code')
+    .eq('id', teamId)
+    .maybeSingle();
+
+  const teamName = team?.name ?? 'Team not found';
+
   return (
     <Stack spacing={3} sx={{ p: 3 }}>
       <Box>
@@ -30,18 +39,18 @@ export default async function TeamDetailPage({ params }: Props) {
         </Link>
 
         <Typography variant="h4" fontWeight={700}>
-          Team Detail
+          {teamName}
         </Typography>
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Team ID: {teamId}
+          {team?.code ? `Code: ${team.code}` : `Team ID: ${teamId}`}
         </Typography>
       </Box>
 
       <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
+        {/* <Typography variant="h6" sx={{ mb: 2 }}>
           Players
-        </Typography>
+        </Typography> */}
         <TeamPlayersSection teamId={teamId} />
       </Paper>
 

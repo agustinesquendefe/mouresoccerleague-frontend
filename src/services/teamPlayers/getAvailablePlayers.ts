@@ -1,15 +1,25 @@
 import { supabase } from '@/lib/supabaseClient';
 import type { Player } from '@/models/player';
 
-export async function getAvailablePlayers(teamId: number): Promise<Player[]> {
+export async function getAvailablePlayers(teamId: number, search = ''): Promise<Player[]> {
+  const trimmedSearch = search.trim();
+  let playersQuery = supabase
+    .from('players')
+    .select('*')
+    .eq('is_active', true)
+    .order('last_name', { ascending: true })
+    .order('first_name', { ascending: true })
+    .limit(50);
+
+  if (trimmedSearch) {
+    playersQuery = playersQuery.or(
+      `document_id.ilike.%${trimmedSearch}%,first_name.ilike.%${trimmedSearch}%,last_name.ilike.%${trimmedSearch}%,full_name.ilike.%${trimmedSearch}%,email.ilike.%${trimmedSearch}%`
+    );
+  }
+
   const [{ data: players, error: playersError }, { data: teamPlayers, error: teamPlayersError }] =
     await Promise.all([
-      supabase
-        .from('players')
-        .select('*')
-        .eq('is_active', true)
-        .order('last_name', { ascending: true })
-        .order('first_name', { ascending: true }),
+      playersQuery,
       supabase
         .from('team_players')
         .select('player_id')

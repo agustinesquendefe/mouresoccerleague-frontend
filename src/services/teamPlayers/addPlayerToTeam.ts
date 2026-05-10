@@ -13,13 +13,19 @@ export async function addPlayerToTeam({
   eventId = null,
   jerseyNumber = null,
 }: AddPlayerToTeamInput): Promise<void> {
-  const { error } = await supabase.from('team_players').insert({
+  const insertPayload = {
     player_id: playerId,
     team_id: teamId,
     event_id: eventId,
     jersey_number: jerseyNumber,
     is_active: true,
-  });
+  };
+
+  const { error } = await supabase
+    .from('team_players')
+    .insert(insertPayload)
+    .select('id')
+    .single();
 
   if (error) {
     if (error.code === '23505') {

@@ -141,6 +141,12 @@ export default function Header() {
                 Contact Us
               </Link>
             </div>
+
+            <div className="relative group">
+              <Link href="/player-portal" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
+                Player Portal
+              </Link>
+            </div>
           </nav>
 
           {/* Schedule button - positioned to the right */}
