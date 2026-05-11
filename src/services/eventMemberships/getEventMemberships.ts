@@ -2,6 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import type { EventMembershipSummary } from '@/models/eventMembership';
 
+type GetEventMembershipsOptions = {
+  ensureMembershipRows?: boolean;
+};
+
 const FREE_APPEARANCES_LIMIT = 4;
 
 function buildStatus(
@@ -40,8 +44,11 @@ function buildStatus(
 
 export async function getEventMemberships(
   eventId: number,
-  client: SupabaseClient = supabase
+  client: SupabaseClient = supabase,
+  options: GetEventMembershipsOptions = {}
 ): Promise<EventMembershipSummary[]> {
+  const { ensureMembershipRows = true } = options;
+
   const [{ data: event, error: eventError }, { data: eventTeams, error: eventTeamsError }] =
     await Promise.all([
       client
@@ -116,22 +123,25 @@ export async function getEventMemberships(
   if (existingMembershipsError) throw new Error(existingMembershipsError.message);
 
   const existingPlayerIds = new Set((existingMemberships ?? []).map((row) => Number(row.player_id)));
-  const missingMembershipRows = playerIds
-    .filter((playerId) => !existingPlayerIds.has(playerId))
-    .map((playerId) => ({
-      event_id: eventId,
-      player_id: playerId,
-      amount_paid: 0,
-      appearances_count: 0,
-      updated_at: new Date().toISOString(),
-    }));
 
-  if (missingMembershipRows.length > 0) {
-    const { error: upsertError } = await client
-      .from('event_memberships')
-      .upsert(missingMembershipRows, { onConflict: 'event_id,player_id' });
+  if (ensureMembershipRows) {
+    const missingMembershipRows = playerIds
+      .filter((playerId) => !existingPlayerIds.has(playerId))
+      .map((playerId) => ({
+        event_id: eventId,
+        player_id: playerId,
+        amount_paid: 0,
+        appearances_count: 0,
+        updated_at: new Date().toISOString(),
+      }));
 
-    if (upsertError) throw new Error(upsertError.message);
+    if (missingMembershipRows.length > 0) {
+      const { error: upsertError } = await client
+        .from('event_memberships')
+        .upsert(missingMembershipRows, { onConflict: 'event_id,player_id' });
+
+      if (upsertError) throw new Error(upsertError.message);
+    }
   }
 
   const { data: memberships, error: membershipsError } = await client
@@ -156,7 +166,32 @@ export async function getEventMemberships(
   const playerMap = new Map((players ?? []).map((player) => [player.id, player]));
   const membershipPrice = Number(event?.event_price ?? event?.membership_price ?? 0);
 
-  return rows.map((row) => {
+  const missingMembershipSummaries = ensureMembershipRows
+    ? []
+    : playerIds
+        .filter((playerId) => !existingPlayerIds.has(playerId))
+        .map((playerId) => {
+          const player = playerMap.get(playerId);
+          const amountPaid = 0;
+          const appearancesCount = 0;
+
+          return {
+            id: -playerId,
+            event_id: eventId,
+            player_id: playerId,
+            amount_paid: amountPaid,
+            appearances_count: appearancesCount,
+            created_at: '',
+            updated_at: '',
+            player_name: player?.full_name ?? null,
+            player_document_id: player?.document_id ?? null,
+            team_name: playerTeamNames.get(playerId) ?? null,
+            membership_price: membershipPrice,
+            ...buildStatus(amountPaid, membershipPrice, appearancesCount),
+          } as EventMembershipSummary;
+        });
+
+  return [...rows, ...missingMembershipSummaries].map((row) => {
     const amountPaid = Number(row.amount_paid ?? 0);
     const appearancesCount = Number(row.appearances_count ?? 0);
     const player = playerMap.get(row.player_id);

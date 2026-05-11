@@ -13,6 +13,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import SportsSoccerOutlinedIcon from '@mui/icons-material/SportsSoccerOutlined';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 
 const Menuitems = [
   {
@@ -24,6 +25,12 @@ const Menuitems = [
     title: "Dashboard",
     icon: DashboardIcon,
     href: "/admin/dashboard",
+  },
+  {
+    id: "financials",
+    title: "Financials",
+    icon: ReceiptLongIcon,
+    href: "/admin/financials",
   },
   {
     navlabel: true,
