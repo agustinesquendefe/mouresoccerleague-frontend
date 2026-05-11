@@ -356,6 +356,7 @@ export default function AdminScannerClient({
                 fullWidth
                 disabled={initialContext.events.length === 0 || loading || loadingMatches}
                 helperText="Choose the event that should be used for payment and eligibility validation."
+                InputLabelProps={{ shrink: true }}
                 SelectProps={{ displayEmpty: true }}
               >
                 <MenuItem value="">
@@ -406,6 +407,7 @@ export default function AdminScannerClient({
                       ? 'No matches available for the selected event.'
                       : 'Validation uses the selected match to define the allowed teams.'
                 }
+                InputLabelProps={{ shrink: true }}
                 SelectProps={{ displayEmpty: true }}
               >
                 <MenuItem value="">
@@ -441,6 +443,7 @@ export default function AdminScannerClient({
                       ? 'Choose a match first.'
                       : 'The scanned player must belong to this team for the selected event.'
                 }
+                InputLabelProps={{ shrink: true }}
                 SelectProps={{ displayEmpty: true }}
               >
                 <MenuItem value="">
