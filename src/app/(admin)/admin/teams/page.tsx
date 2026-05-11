@@ -11,12 +11,19 @@ import {
   Typography,
 } from '@mui/material';
 import TeamDialog from '@/app/(admin)/components/teams/TeamDialog';
+import TeamsFilters from '@/app/(admin)/components/teams/TeamsFilters';
 import TeamsTable from '@/app/(admin)/components/teams/TeamsTable';
 import type { Team, TeamFormData } from '@/models/team';
-import { getTeamsWithCategories, createTeam, updateTeam, deleteTeam } from '@/services/teams';
+import { createTeam, updateTeam, deleteTeam, getTeamsPaginated } from '@/services/teams';
+
+const PAGE_SIZE = 25;
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [count, setCount] = useState(0);
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -36,7 +43,7 @@ export default function TeamsPage() {
 
   useEffect(() => {
     loadTeams();
-  }, []);
+  }, [page, submittedSearch]);
 
   const showToast = (message: string, severity: 'success' | 'error') => {
     setToast({ open: true, message, severity });
@@ -45,8 +52,13 @@ export default function TeamsPage() {
   const loadTeams = async () => {
     try {
       setLoading(true);
-      const data = await getTeamsWithCategories();
-      setTeams(data);
+      const result = await getTeamsPaginated({
+        page,
+        pageSize: PAGE_SIZE,
+        search: submittedSearch,
+      });
+      setTeams(result.rows);
+      setCount(result.count);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to load teams';
@@ -111,7 +123,11 @@ export default function TeamsPage() {
     try {
       setSaving(true);
       await deleteTeam(team.id);
-      setTeams((prev) => prev.filter((t) => t.id !== team.id));
+      if (teams.length === 1 && page > 0) {
+        setPage((currentPage) => Math.max(currentPage - 1, 0));
+      } else {
+        await loadTeams();
+      }
       showToast('Team deleted successfully', 'success');
     } catch (error) {
       const message =
@@ -144,6 +160,17 @@ export default function TeamsPage() {
         </Button>
       </Stack>
 
+      <Stack mb={3}>
+        <TeamsFilters
+          initialSearch={search}
+          onSearch={(value) => {
+            setSearch(value);
+            setSubmittedSearch(value);
+            setPage(0);
+          }}
+        />
+      </Stack>
+
       {loading ? (
         <Stack alignItems="center" py={6}>
           <CircularProgress />
@@ -151,6 +178,10 @@ export default function TeamsPage() {
       ) : (
         <TeamsTable
           teams={teams}
+          count={count}
+          page={page}
+          rowsPerPage={PAGE_SIZE}
+          onPageChange={setPage}
           onEdit={handleOpenEdit}
           onDelete={handleDelete}
         />

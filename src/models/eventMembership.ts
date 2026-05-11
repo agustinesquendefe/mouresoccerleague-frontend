@@ -15,6 +15,7 @@ export type EventMembership = {
 export type EventMembershipSummary = EventMembership & {
   player_name: string | null;
   player_document_id: string | null;
+  team_name: string | null;
   membership_price: number;
   balance_due: number;
   free_appearances_remaining: number;

@@ -57,7 +57,7 @@ import {
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import DeleteIcon from '@mui/icons-material/Delete';
 import type { Player, PlayerFormData } from '@/models/player';
-import { checkPlayerConflicts } from '@/services/players';
+import { checkPlayerConflicts, getLatestPlayerDocumentId } from '@/services/players';
 import type { Category } from '@/models/category';
 import { getCategories } from '@/services/categories';
 import { getPlayerCategories } from '@/services/playerCategories';
@@ -126,6 +126,7 @@ export default function PlayerDialog({
   const [conflicts, setConflicts] = useState(initialConflicts);
   const [checkingConflicts, setCheckingConflicts] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [latestDocumentId, setLatestDocumentId] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
@@ -174,6 +175,29 @@ export default function PlayerDialog({
         })
         .finally(() => setLoadingLegalDocs(false));
     }, [open, mode, player, legalDocs]);
+
+  useEffect(() => {
+    if (!open || mode !== 'create') return;
+
+    let isCurrent = true;
+
+    getLatestPlayerDocumentId()
+      .then((documentId) => {
+        if (isCurrent) {
+          setLatestDocumentId(documentId);
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+        if (isCurrent) {
+          setLatestDocumentId(null);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [open, mode]);
     // Eliminar documento legal del jugador
     const handleDeletePlayerLegalDoc = async (type: 'tutor' | 'participant') => {
       const doc = playerLegalDocs[type];
@@ -832,7 +856,11 @@ export default function PlayerDialog({
               fullWidth
               error={conflicts.documentExists}
               helperText={
-                conflicts.documentExists ? 'This document ID is already in use.' : ' '
+                conflicts.documentExists
+                  ? 'This document ID is already in use.'
+                  : mode === 'create' && latestDocumentId
+                    ? `Last registered document ID: ${latestDocumentId}`
+                    : ' '
               }
             />
 

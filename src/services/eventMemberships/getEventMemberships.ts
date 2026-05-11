@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import type { EventMembershipSummary } from '@/models/eventMembership';
 
@@ -37,29 +38,114 @@ function buildStatus(
   };
 }
 
-export async function getEventMemberships(eventId: number): Promise<EventMembershipSummary[]> {
-  const [{ data: event, error: eventError }, { data: memberships, error: membershipsError }] =
+export async function getEventMemberships(
+  eventId: number,
+  client: SupabaseClient = supabase
+): Promise<EventMembershipSummary[]> {
+  const [{ data: event, error: eventError }, { data: eventTeams, error: eventTeamsError }] =
     await Promise.all([
-      supabase
+      client
         .from('events')
         .select('id, event_price, membership_price')
         .eq('id', eventId)
         .single(),
-      supabase
-        .from('event_memberships')
-        .select('*')
+      client
+        .from('event_teams')
+        .select('team_id, teams(name)')
         .eq('event_id', eventId)
-        .order('updated_at', { ascending: false }),
     ]);
 
   if (eventError) throw new Error(eventError.message);
-  if (membershipsError) throw new Error(membershipsError.message);
+  if (eventTeamsError) throw new Error(eventTeamsError.message);
+
+  const eventTeamRows = eventTeams ?? [];
+  const teamIds = Array.from(new Set(eventTeamRows.map((row: any) => Number(row.team_id))));
+
+  if (teamIds.length === 0) {
+    return [];
+  }
+
+  const teamNameMap = new Map(
+    eventTeamRows.map((row: any) => [
+      Number(row.team_id),
+      Array.isArray(row.teams) ? row.teams[0]?.name ?? null : row.teams?.name ?? null,
+    ])
+  );
+
+  const { data: teamPlayers, error: teamPlayersError } = await client
+    .from('team_players')
+    .select('player_id, team_id, event_id, is_active')
+    .in('team_id', teamIds)
+    .eq('is_active', true);
+
+  if (teamPlayersError) throw new Error(teamPlayersError.message);
+
+  const rosterRows = (teamPlayers ?? []).filter(
+    (row: any) => row.event_id == null || Number(row.event_id) === eventId
+  );
+
+  const playerIds = Array.from(new Set(rosterRows.map((row: any) => Number(row.player_id))));
+
+  if (playerIds.length === 0) {
+    return [];
+  }
+
+  const playerTeamNames = new Map<number, string>();
+
+  rosterRows.forEach((row: any) => {
+    const playerId = Number(row.player_id);
+    const teamName = teamNameMap.get(Number(row.team_id));
+    if (!teamName) return;
+
+    const current = playerTeamNames.get(playerId);
+    if (!current) {
+      playerTeamNames.set(playerId, teamName);
+      return;
+    }
+
+    if (!current.split(', ').includes(teamName)) {
+      playerTeamNames.set(playerId, `${current}, ${teamName}`);
+    }
+  });
+
+  const { data: existingMemberships, error: existingMembershipsError } = await client
+    .from('event_memberships')
+    .select('*')
+    .eq('event_id', eventId);
+
+  if (existingMembershipsError) throw new Error(existingMembershipsError.message);
+
+  const existingPlayerIds = new Set((existingMemberships ?? []).map((row) => Number(row.player_id)));
+  const missingMembershipRows = playerIds
+    .filter((playerId) => !existingPlayerIds.has(playerId))
+    .map((playerId) => ({
+      event_id: eventId,
+      player_id: playerId,
+      amount_paid: 0,
+      appearances_count: 0,
+      updated_at: new Date().toISOString(),
+    }));
+
+  if (missingMembershipRows.length > 0) {
+    const { error: upsertError } = await client
+      .from('event_memberships')
+      .upsert(missingMembershipRows, { onConflict: 'event_id,player_id' });
+
+    if (upsertError) throw new Error(upsertError.message);
+  }
+
+  const { data: memberships, error: membershipsError } = await client
+    .from('event_memberships')
+    .select('*')
+    .eq('event_id', eventId)
+    .in('player_id', playerIds)
+    .order('updated_at', { ascending: false });
 
   const rows = memberships ?? [];
-  const playerIds = Array.from(new Set(rows.map((row) => row.player_id)));
+  if (membershipsError) throw new Error(membershipsError.message);
 
   const { data: players, error: playersError } = playerIds.length
-    ? await supabase
+      ? await client
         .from('players')
         .select('id, full_name, document_id')
         .in('id', playerIds)
@@ -81,8 +167,13 @@ export async function getEventMemberships(eventId: number): Promise<EventMembers
       appearances_count: appearancesCount,
       player_name: player?.full_name ?? null,
       player_document_id: player?.document_id ?? null,
+      team_name: playerTeamNames.get(row.player_id) ?? null,
       membership_price: membershipPrice,
       ...buildStatus(amountPaid, membershipPrice, appearancesCount),
     } as EventMembershipSummary;
+  }).sort((left, right) => {
+    const byTeam = (left.team_name ?? '').localeCompare(right.team_name ?? '');
+    if (byTeam !== 0) return byTeam;
+    return (left.player_name ?? '').localeCompare(right.player_name ?? '');
   });
 }

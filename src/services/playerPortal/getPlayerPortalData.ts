@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import type { Player } from '@/models/player';
 
@@ -15,11 +16,14 @@ export type PlayerPortalMatch = {
 export type PlayerPortalEvent = {
   event_id: number;
   event_name: string;
+  event_price: number;
+  stripe_price_id: string | null;
   team_id: number;
   team_name: string;
   jersey_number: number | null;
   payment_status: 'paid' | 'pending';
   paid_amount: number;
+  balance_due: number;
   free_appearances_remaining: number;
   upcoming_matches: PlayerPortalMatch[];
 };
@@ -27,10 +31,6 @@ export type PlayerPortalEvent = {
 export type PlayerPortalData = {
   player: Pick<Player, 'id' | 'first_name' | 'last_name' | 'full_name' | 'email'>;
   events: PlayerPortalEvent[];
-};
-
-type PortalPlayer = Pick<Player, 'id' | 'first_name' | 'last_name' | 'full_name' | 'email'> & {
-  paid_membership: number | null;
 };
 
 type TeamPlayerRow = {
@@ -42,6 +42,23 @@ type TeamPlayerRow = {
 type EventTeamRow = {
   event_id: number;
   team_id: number;
+};
+
+type PortalEventRow = {
+  id: number;
+  name: string | null;
+  start_date: string | null;
+  status: string | null;
+  event_price: number | null;
+  membership_price: number | null;
+  stripe_price_id: string | null;
+};
+
+type MembershipRow = {
+  event_id: number;
+  player_id: number;
+  amount_paid: number | null;
+  appearances_count: number | null;
 };
 
 type MatchRow = {
@@ -59,12 +76,15 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-export async function getPlayerPortalData(email: string): Promise<PlayerPortalData | null> {
+export async function getPlayerPortalData(
+  email: string,
+  client: SupabaseClient = supabase
+): Promise<PlayerPortalData | null> {
   const normalizedEmail = normalizeEmail(email);
 
-  const { data: player, error: playerError } = await supabase
+  const { data: player, error: playerError } = await client
     .from('players')
-    .select('id, first_name, last_name, full_name, email, paid_membership')
+    .select('id, first_name, last_name, full_name, email')
     .ilike('email', normalizedEmail)
     .eq('is_active', true)
     .maybeSingle();
@@ -77,7 +97,7 @@ export async function getPlayerPortalData(email: string): Promise<PlayerPortalDa
     return null;
   }
 
-  const { data: teamPlayers, error: teamPlayersError } = await supabase
+  const { data: teamPlayers, error: teamPlayersError } = await client
     .from('team_players')
     .select('team_id, event_id, jersey_number')
     .eq('player_id', player.id)
@@ -101,7 +121,7 @@ export async function getPlayerPortalData(email: string): Promise<PlayerPortalDa
     .map((row) => row.event_id)
     .filter((eventId): eventId is number => eventId != null);
 
-  const { data: eventTeams, error: eventTeamsError } = await supabase
+  const { data: eventTeams, error: eventTeamsError } = await client
     .from('event_teams')
     .select('event_id, team_id')
     .in('team_id', teamIds);
@@ -127,12 +147,12 @@ export async function getPlayerPortalData(email: string): Promise<PlayerPortalDa
   }
 
   const [eventsResult, matchesResult] = await Promise.all([
-    supabase
+    client
       .from('events')
-      .select('id, name, start_date, status')
+      .select('id, name, start_date, status, event_price, membership_price, stripe_price_id')
       .in('id', eventIds)
       .order('start_date', { ascending: true }),
-    supabase
+    client
       .from('matches')
       .select('id, event_id, team1_id, team2_id, date, time, status, field_id')
       .in('event_id', eventIds)
@@ -157,20 +177,35 @@ export async function getPlayerPortalData(email: string): Promise<PlayerPortalDa
 
   const [teamsResult, fieldsResult] = await Promise.all([
     allTeamIds.length
-      ? supabase.from('teams').select('id, name').in('id', allTeamIds)
+      ? client.from('teams').select('id, name').in('id', allTeamIds)
       : Promise.resolve({ data: [], error: null }),
     fieldIds.length
-      ? supabase.from('fields').select('id, name').in('id', fieldIds)
+      ? client.from('fields').select('id, name').in('id', fieldIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (teamsResult.error) throw new Error(teamsResult.error.message);
   if (fieldsResult.error) throw new Error(fieldsResult.error.message);
 
-  const eventMap = new Map((eventsResult.data ?? []).map((event) => [event.id, event]));
+  const { data: memberships, error: membershipsError } = await client
+    .from('event_memberships')
+    .select('event_id, player_id, amount_paid, appearances_count')
+    .eq('player_id', player.id)
+    .in('event_id', eventIds);
+
+  if (membershipsError) throw new Error(membershipsError.message);
+
+  const eventMap = new Map(
+    ((eventsResult.data ?? []) as PortalEventRow[]).map((event) => [event.id, event])
+  );
   const teamMap = new Map((teamsResult.data ?? []).map((team) => [team.id, team]));
   const fieldMap = new Map((fieldsResult.data ?? []).map((field) => [field.id, field]));
-  const paidAmount = Number((player as PortalPlayer).paid_membership ?? 0);
+  const membershipMap = new Map(
+    ((memberships ?? []) as MembershipRow[]).map((membership) => [
+      membership.event_id,
+      membership,
+    ])
+  );
 
   const eventTeamPairs = eventTeamRows.length
     ? eventTeamRows
@@ -188,6 +223,11 @@ export async function getPlayerPortalData(email: string): Promise<PlayerPortalDa
       .map((row) => {
         const event = eventMap.get(row.event_id);
         const team = teamMap.get(row.team_id);
+        const membership = membershipMap.get(row.event_id);
+        const eventPrice = Number(event?.event_price ?? event?.membership_price ?? 0);
+        const paidAmount = Number(membership?.amount_paid ?? 0);
+        const appearancesCount = Number(membership?.appearances_count ?? 0);
+        const balanceDue = Math.max(eventPrice - paidAmount, 0);
         const teamPlayer = playerTeamRows.find(
           (item) =>
             item.team_id === row.team_id &&
@@ -221,12 +261,15 @@ export async function getPlayerPortalData(email: string): Promise<PlayerPortalDa
         return {
           event_id: row.event_id,
           event_name: event?.name ?? `Event #${row.event_id}`,
+          event_price: eventPrice,
+          stripe_price_id: event?.stripe_price_id ?? null,
           team_id: row.team_id,
           team_name: team?.name ?? `Team #${row.team_id}`,
           jersey_number: teamPlayer?.jersey_number ?? null,
-          payment_status: paidAmount > 0 ? 'paid' as const : 'pending' as const,
+          payment_status: balanceDue <= 0 && eventPrice > 0 ? 'paid' as const : 'pending' as const,
           paid_amount: paidAmount,
-          free_appearances_remaining: 4,
+          balance_due: balanceDue,
+          free_appearances_remaining: Math.max(4 - appearancesCount, 0),
           upcoming_matches: upcomingMatches,
         };
       })

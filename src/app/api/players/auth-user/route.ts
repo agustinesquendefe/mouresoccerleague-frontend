@@ -39,8 +39,9 @@ export async function POST(request: Request) {
       email,
       email_confirm: true,
       user_metadata: {
+        name: fullName,
         full_name: fullName,
-        user_type: 'player',
+        role: 'user',
       },
     });
 
@@ -57,7 +58,14 @@ export async function POST(request: Request) {
         });
       }
 
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: error.message,
+          step: 'create_auth_user',
+          status: error.status,
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -66,7 +74,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unable to create auth user.' },
+      {
+        error: error instanceof Error ? error.message : 'Unable to create auth user.',
+        step: 'auth_user_route',
+      },
       { status: 500 }
     );
   }
