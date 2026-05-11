@@ -34,6 +34,9 @@ import {
 } from '@/services/dashboard';
 
 const PAYMENT_ROWS_PER_PAGE = 10;
+const PAYMENT_TABS = ['all', 'paid', 'partial', 'pending'] as const;
+
+type PaymentTab = (typeof PAYMENT_TABS)[number];
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat(undefined, {
@@ -56,6 +59,15 @@ function getPaymentChipColor(status: FinancialPaymentRow['status']) {
   if (status === 'paid') return 'success';
   if (status === 'partial') return 'warning';
   return 'default';
+}
+
+function isPaymentTab(value: unknown): value is PaymentTab {
+  return typeof value === 'string' && PAYMENT_TABS.includes(value as PaymentTab);
+}
+
+function matchesPaymentTab(row: FinancialPaymentRow, tab: PaymentTab) {
+  if (tab === 'all') return true;
+  return row.status === tab;
 }
 
 function SummaryMetricCard({
@@ -115,7 +127,7 @@ export default function FinancialsPage() {
   const [overview, setOverview] = useState<FinancialOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [statusTab, setStatusTab] = useState<'all' | 'paid' | 'pending'>('all');
+  const [statusTab, setStatusTab] = useState<PaymentTab>('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
 
@@ -124,8 +136,14 @@ export default function FinancialsPage() {
       try {
         setLoading(true);
         setErrorMessage(null);
-        const data = await getFinancialOverview();
-        setOverview(data);
+        const response = await fetch('/api/admin/financial-overview');
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.error ?? 'Failed to load financial overview');
+        }
+
+        setOverview(result.data ?? null);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to load financial overview');
       } finally {
@@ -142,8 +160,7 @@ export default function FinancialsPage() {
     const rows = overview?.paymentRows ?? [];
 
     return rows.filter((row) => {
-      const matchesTab =
-        statusTab === 'all' ? true : statusTab === 'paid' ? row.status === 'paid' : row.balanceDue > 0;
+      const matchesTab = matchesPaymentTab(row, statusTab);
 
       if (!matchesTab) return false;
       if (!query) return true;
@@ -335,10 +352,15 @@ export default function FinancialsPage() {
                   >
                     <Tabs
                       value={statusTab}
-                      onChange={(_, nextValue: 'all' | 'paid' | 'pending') => setStatusTab(nextValue)}
+                      onChange={(_, nextValue) => {
+                        if (isPaymentTab(nextValue)) {
+                          setStatusTab(nextValue);
+                        }
+                      }}
                     >
                       <Tab label="All" value="all" />
                       <Tab label="Paid" value="paid" />
+                      <Tab label="Partial" value="partial" />
                       <Tab label="Pending" value="pending" />
                     </Tabs>
 

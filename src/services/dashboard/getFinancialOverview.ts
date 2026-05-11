@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import type { EventStatus } from '@/models/event';
 import { getEventMemberships } from '@/services/eventMemberships/getEventMemberships';
@@ -99,8 +100,10 @@ function getPaymentStatus(amountPaid: number, balanceDue: number): PaymentStatus
   return 'pending';
 }
 
-export async function getFinancialOverview(): Promise<FinancialOverview> {
-  const { data: events, error } = await supabase
+export async function getFinancialOverview(
+  client: SupabaseClient = supabase
+): Promise<FinancialOverview> {
+  const { data: events, error } = await client
     .from('events')
     .select('id, name, status, start_date, end_date, event_price, membership_price')
     .order('start_date', { ascending: false });
@@ -111,7 +114,7 @@ export async function getFinancialOverview(): Promise<FinancialOverview> {
 
   const eventRows = await Promise.all(
     (events ?? []).map(async (event) => {
-      const memberships = await getEventMemberships(Number(event.id), supabase, {
+      const memberships = await getEventMemberships(Number(event.id), client, {
         ensureMembershipRows: false,
       });
       const eventName = normalizeEventName(Number(event.id), event.name ?? null);
