@@ -61,6 +61,17 @@ function getPaymentProgress(event: PlayerPortalEvent) {
   return Math.min((event.paid_amount / event.event_price) * 100, 100);
 }
 
+function getMagicLinkErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  const normalizedMessage = message.toLowerCase();
+
+  if (normalizedMessage.includes("rate limit")) {
+    return "Too many verification emails were requested. Please wait a few minutes before trying again.";
+  }
+
+  return message || "Unable to send verification email.";
+}
+
 export default function PlayerPortalPage() {
   const [email, setEmail] = useState("");
   const [loadingSession, setLoadingSession] = useState(true);
@@ -220,9 +231,7 @@ export default function PlayerPortalPage() {
 
       setMagicLinkSent(true);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to send verification email."
-      );
+      setErrorMessage(getMagicLinkErrorMessage(error));
     } finally {
       setSendingLink(false);
     }

@@ -14,6 +14,7 @@ import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import SportsSoccerOutlinedIcon from '@mui/icons-material/SportsSoccerOutlined';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 
 const Menuitems = [
   {
@@ -95,6 +96,12 @@ const Menuitems = [
     title: "Check-ins",
     icon: AssignmentTurnedInIcon,
     href: "/admin/check-ins",
+  },
+  {
+    id: "scanner",
+    title: "Scanner",
+    icon: QrCodeScannerIcon,
+    href: "/admin/scanner",
   },
   {
     id: "standings",

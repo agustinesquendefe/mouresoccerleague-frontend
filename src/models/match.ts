@@ -46,4 +46,5 @@ export type MatchFormData = {
   field_number: number | null;
   team1_id: number | null;
   team2_id: number | null;
+  referee_id?: number | null;
 };

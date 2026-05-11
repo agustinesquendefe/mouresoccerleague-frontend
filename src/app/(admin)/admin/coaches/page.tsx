@@ -15,6 +15,35 @@ type CoachFormValues = {
   status: string;
 };
 
+async function ensurePortalAuthUser(values: CoachFormValues, role: 'coach' | 'referee') {
+  const email = values.email.trim().toLowerCase();
+  if (!email) return { ok: true };
+
+  const response = await fetch('/api/portal/auth-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      firstName: values.first_name,
+      lastName: values.last_name,
+      role,
+    }),
+  });
+
+  const payload = await response.json();
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: payload?.error ?? 'Unable to create portal auth user.',
+    };
+  }
+
+  return { ok: true };
+}
+
 export default function CoachesPage() {
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,29 +89,40 @@ export default function CoachesPage() {
   };
 
   const handleSubmit = async (values: CoachFormValues) => {
-    setSaving(true);
+    try {
+      setSaving(true);
 
-    if (selectedCoach) {
-      const { error } = await supabase
-        .from('coaches')
-        .update(values)
-        .eq('id', selectedCoach.id);
+      if (selectedCoach) {
+        const { error } = await supabase
+          .from('coaches')
+          .update(values)
+          .eq('id', selectedCoach.id);
 
-      if (!error) {
+        if (error) throw new Error(error.message);
+
         setDialogOpen(false);
         setSelectedCoach(null);
         await loadCoaches();
-      }
-    } else {
-      const { error } = await supabase.from('coaches').insert(values);
+      } else {
+        const { error } = await supabase.from('coaches').insert(values);
 
-      if (!error) {
+        if (error) throw new Error(error.message);
+
         setDialogOpen(false);
         await loadCoaches();
       }
-    }
 
-    setSaving(false);
+      const authResult = await ensurePortalAuthUser(values, 'coach');
+      if (!authResult.ok) {
+        window.alert(
+          `Coach saved, but the Auth user could not be created yet: ${authResult.message}`
+        );
+      }
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to save coach.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

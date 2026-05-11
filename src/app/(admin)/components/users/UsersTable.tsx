@@ -15,9 +15,10 @@ import {
 } from '@mui/material';
 import type { Profile } from '@/models/profile';
 
-const ROLE_COLOR: Record<string, 'error' | 'warning' | 'default'> = {
+const ROLE_COLOR: Record<string, 'error' | 'warning' | 'info' | 'default'> = {
   admin: 'error',
   editor: 'warning',
+  referee: 'info',
   viewer: 'default',
 };
 

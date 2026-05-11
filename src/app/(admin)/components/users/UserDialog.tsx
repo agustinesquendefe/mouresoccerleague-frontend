@@ -80,6 +80,7 @@ export default function UserDialog({ open, profile, loading, onClose, onSubmit }
               >
                 <MenuItem value="admin">Admin</MenuItem>
                 <MenuItem value="editor">Editor</MenuItem>
+                <MenuItem value="referee">Referee</MenuItem>
                 <MenuItem value="viewer">Viewer</MenuItem>
               </Select>
             </FormControl>
