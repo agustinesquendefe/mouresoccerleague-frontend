@@ -1,7 +1,10 @@
 import { supabase } from '@/lib/supabaseClient';
 import type { Player, PlayerFormData } from '@/models/player';
+import { createPlayerAuthUser } from './createPlayerAuthUser';
 
 export async function createPlayer(payload: PlayerFormData): Promise<Player> {
+  const authUser = await createPlayerAuthUser(payload);
+
   const { data, error } = await supabase
     .from('players')
     .insert([
@@ -17,6 +20,7 @@ export async function createPlayer(payload: PlayerFormData): Promise<Player> {
         is_active: payload.is_active,
         notes: payload.notes || null,
         photo_url: payload.photo_url || null,
+        auth_user_id: authUser.auth_user_id,
         registered_at: payload.registered_at || null,
         signature: payload.signature || null,
         we_have_id: typeof payload.we_have_id === 'boolean' ? payload.we_have_id : false,

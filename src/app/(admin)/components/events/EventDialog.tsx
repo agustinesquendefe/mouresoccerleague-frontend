@@ -61,6 +61,10 @@ const initialValues: EventFormData = {
   field_count: 4,
   match_duration_minutes: 80,
   simultaneous_matches: true,
+  membership_price: 0,
+  event_price: 0,
+  stripe_product_id: null,
+  stripe_price_id: null,
 
   has_playoffs: false,
   playoff_teams_count: null,
@@ -156,6 +160,10 @@ export default function EventDialog({
         field_count: event.field_count ?? 4,
         match_duration_minutes: event.match_duration_minutes ?? 80,
         simultaneous_matches: event.simultaneous_matches ?? true,
+        membership_price: event.event_price ?? event.membership_price ?? 0,
+        event_price: event.event_price ?? event.membership_price ?? 0,
+        stripe_product_id: event.stripe_product_id ?? null,
+        stripe_price_id: event.stripe_price_id ?? null,
 
         has_playoffs: event.has_playoffs ?? false,
         playoff_teams_count: event.playoff_teams_count ?? null,
@@ -367,6 +375,10 @@ export default function EventDialog({
         field_count: Number(values.field_count),
         match_duration_minutes: Number(values.match_duration_minutes),
         simultaneous_matches: values.simultaneous_matches,
+        membership_price: Number(values.event_price) || 0,
+        event_price: Number(values.event_price) || 0,
+        stripe_product_id: values.stripe_product_id ?? null,
+        stripe_price_id: values.stripe_price_id ?? null,
         has_playoffs: values.has_playoffs,
         playoff_teams_count: values.has_playoffs
           ? values.playoff_teams_count
@@ -657,6 +669,18 @@ export default function EventDialog({
                 handleChange('match_duration_minutes', Number(e.target.value))
               }
               fullWidth
+            />
+
+            <TextField
+              label="Event Price"
+              type="number"
+              value={values.event_price}
+              onChange={(e) =>
+                handleChange('event_price', Number(e.target.value))
+              }
+              fullWidth
+              inputProps={{ min: 0, step: '0.01' }}
+              helperText="Fixed price that will be created in Stripe for player payments."
             />
 
             <FormControlLabel

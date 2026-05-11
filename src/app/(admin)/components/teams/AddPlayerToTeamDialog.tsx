@@ -29,45 +29,57 @@ export default function AddPlayerToTeamDialog({
   onAdded,
 }: Props) {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [selectedPlayerId, setSelectedPlayerId] = useState<number | ''>('');
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [searchValue, setSearchValue] = useState('');
   const [jerseyNumber, setJerseyNumber] = useState<number | ''>('');
-  const [loading, setLoading] = useState(false);
+  const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [addingPlayer, setAddingPlayer] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
 
     const loadPlayers = async () => {
+      if (selectedPlayer) {
+        return;
+      }
+
       try {
-        setLoading(true);
+        setLoadingPlayers(true);
         setErrorMessage(null);
 
-        const data = await getAvailablePlayers(teamId);
+        const data = await getAvailablePlayers(teamId, searchValue);
         setPlayers(data);
-        setSelectedPlayerId('');
-        setJerseyNumber('');
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : 'Failed to load players'
         );
       } finally {
-        setLoading(false);
+        setLoadingPlayers(false);
       }
     };
 
-    loadPlayers();
+    const timeout = setTimeout(loadPlayers, searchValue ? 300 : 0);
+
+    return () => clearTimeout(timeout);
+  }, [open, teamId, searchValue, selectedPlayer]);
+
+  useEffect(() => {
+    if (!open) return;
+    setSelectedPlayer(null);
+    setSearchValue('');
+    setJerseyNumber('');
   }, [open, teamId]);
 
   const handleAdd = async () => {
-    if (!selectedPlayerId) return;
+    if (!selectedPlayer) return;
 
     try {
-      setLoading(true);
+      setAddingPlayer(true);
       setErrorMessage(null);
 
       await addPlayerToTeam({
-        playerId: Number(selectedPlayerId),
+        playerId: selectedPlayer.id,
         teamId,
         jerseyNumber: jerseyNumber === '' ? null : Number(jerseyNumber),
       });
@@ -78,19 +90,16 @@ export default function AddPlayerToTeamDialog({
       setErrorMessage(
         error instanceof Error ? error.message : 'Failed to add player'
       );
-    } finally {
-      setLoading(false);
+  } finally {
+      setAddingPlayer(false);
     }
   };
 
-  // Filtrar duplicados por nombre completo (full_name) normalizado
-  const normalizeName = (name: string) => name.trim().toLowerCase();
-  const uniquePlayers = players.filter((player, index, self) =>
-    index === self.findIndex((p) => normalizeName(p.full_name) === normalizeName(player.full_name))
-  );
+  const getPlayerName = (player: Player) =>
+    player.full_name || `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim() || `Player #${player.id}`;
 
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={addingPlayer ? undefined : onClose} fullWidth maxWidth="sm">
       <DialogTitle>Add Player to Team</DialogTitle>
 
       <DialogContent>
@@ -98,21 +107,31 @@ export default function AddPlayerToTeamDialog({
           {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
 
           <Autocomplete
-            options={uniquePlayers}
-            getOptionLabel={(option) => `${option.full_name} (${option.document_id || 'Sin documento'})`}
-            value={uniquePlayers.find((p) => p.id === selectedPlayerId) || null}
+            options={players}
+            disabled={addingPlayer}
+            getOptionLabel={(option) => `${getPlayerName(option)} (${option.document_id || 'Sin documento'})`}
+            value={selectedPlayer}
             onChange={(_event, newValue) => {
-              setSelectedPlayerId(newValue ? newValue.id : '');
+              setSelectedPlayer(newValue);
+              setSearchValue(newValue ? `${getPlayerName(newValue)} (${newValue.document_id || 'Sin documento'})` : '');
             }}
             inputValue={searchValue}
-            onInputChange={(_event, newInputValue) => {
+            onInputChange={(_event, newInputValue, reason) => {
+              if (reason === 'reset') {
+                return;
+              }
+
+              if (reason === 'input') {
+                setSelectedPlayer(null);
+              }
+
               setSearchValue(newInputValue);
             }}
             renderOption={(props, option) => {
               const { key, ...rest } = props;
               return (
                 <li key={key} {...rest} style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                  <span>{option.full_name}</span>
+                  <span>{getPlayerName(option)}</span>
                   <span style={{ color: '#888', fontSize: 13 }}>{option.document_id || 'Sin documento'}</span>
                 </li>
               );
@@ -122,10 +141,11 @@ export default function AddPlayerToTeamDialog({
                 {...params}
                 label="Player"
                 fullWidth
-                disabled={loading || uniquePlayers.length === 0}
                 helperText={
-                  uniquePlayers.length === 0
-                    ? 'All players are already assigned to this team.'
+                  loadingPlayers
+                    ? 'Searching available players...'
+                    : players.length === 0
+                    ? 'Type a name, email, or document ID to search available players.'
                     : 'Search and select an available player'
                 }
               />
@@ -133,17 +153,13 @@ export default function AddPlayerToTeamDialog({
             isOptionEqualToValue={(option, value) => option.id === value.id}
             noOptionsText={searchValue ? 'No players found' : 'Type to search players'}
           />
-          <Button
-            variant="outlined"
-            onClick={() => {
-              // Aquí podrías agregar lógica para buscar jugadores por nombre si tienes una función para ello
-              // Por ahora solo resetea el valor de búsqueda
-              setSearchValue('');
-            }}
-            disabled={loading}
-          >
-            Buscar
-          </Button>
+
+          {selectedPlayer && (
+            <Alert severity="info">
+              Selected player: {getPlayerName(selectedPlayer)}
+              {selectedPlayer.document_id ? ` (${selectedPlayer.document_id})` : ''}
+            </Alert>
+          )}
 
           <TextField
             label="Jersey Number (Optional)"
@@ -158,15 +174,15 @@ export default function AddPlayerToTeamDialog({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose} disabled={loading}>
+        <Button onClick={onClose} disabled={addingPlayer}>
           Cancel
         </Button>
         <Button
           variant="contained"
           onClick={handleAdd}
-          disabled={loading || !selectedPlayerId || players.length === 0}
+          disabled={addingPlayer || !selectedPlayer}
         >
-          Add
+          {addingPlayer ? 'Adding...' : 'Add'}
         </Button>
       </DialogActions>
     </Dialog>

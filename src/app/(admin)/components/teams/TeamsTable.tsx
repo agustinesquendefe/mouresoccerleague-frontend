@@ -10,16 +10,20 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   Stack,
   Typography,
-  Box,
 } from '@mui/material';
 import type { Team } from '@/models/team';
 import type { Category } from '@/models/category';
 
 type TeamsTableProps = {
   teams: (Team & { categories?: Category[] })[];
+  count: number;
+  page: number;
+  rowsPerPage: number;
+  onPageChange: (page: number) => void;
   onEdit: (team: Team) => void;
   onDelete: (team: Team) => void;
 };
@@ -35,64 +39,68 @@ function formatDate(value?: string | null) {
 
 export default function TeamsTable({
   teams,
+  count,
+  page,
+  rowsPerPage,
+  onPageChange,
   onEdit,
   onDelete,
 }: TeamsTableProps) {
-  if (!teams.length) {
-    return (
-      <Paper sx={{ p: 4 }}>
-        <Typography variant="h6" fontWeight={600}>
-          No teams found
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          There are no teams to display yet.
-        </Typography>
-      </Paper>
-    );
-  }
-
   return (
-    <TableContainer component={Paper}>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>
-              ID
-            </TableCell>
-            <TableCell>
-              Name
-            </TableCell>
-            <TableCell>
-              Categories
-            </TableCell>
-            <TableCell>
-              Code
-            </TableCell>
-            <TableCell>
-              Type
-            </TableCell>
-            <TableCell>
-              Players
-            </TableCell>
-            <TableCell>
-              Last Updated
-            </TableCell>
-            <TableCell align="right">
-              Actions
-            </TableCell>
-          </TableRow>
-        </TableHead>
+    <Paper>
+      <TableContainer>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>
+                ID
+              </TableCell>
+              <TableCell>
+                Name
+              </TableCell>
+              <TableCell>
+                Categories
+              </TableCell>
+              <TableCell>
+                Code
+              </TableCell>
+              <TableCell>
+                Type
+              </TableCell>
+              <TableCell>
+                Players
+              </TableCell>
+              <TableCell>
+                Last Updated
+              </TableCell>
+              <TableCell align="right">
+                Actions
+              </TableCell>
+            </TableRow>
+          </TableHead>
 
-        <TableBody>
-          {teams.map((team) => (
-            <TableRow
-              key={team.id}
-              hover
-              sx={{
-                '&:last-child td, &:last-child th': { borderBottom: 0 },
-              }}
-            >
-              <TableCell>{team.id}</TableCell>
+          <TableBody>
+            {teams.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8}>
+                  <Typography variant="h6" fontWeight={600}>
+                    No teams found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Try adjusting your search or create a new team.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              teams.map((team) => (
+                <TableRow
+                  key={team.id}
+                  hover
+                  sx={{
+                    '&:last-child td, &:last-child th': { borderBottom: 0 },
+                  }}
+                >
+                  <TableCell>{team.id}</TableCell>
 
               <TableCell>
                 <Link
@@ -152,40 +160,51 @@ export default function TeamsTable({
                 )}
               </TableCell>
 
-              <TableCell align="right">
-                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                  <Button
-                    component={Link}
-                    href={`/admin/teams/${team.id}`}
-                    variant="contained"
-                    size="small"
-                    color='success'
-                  >
-                    View
-                  </Button>
+                  <TableCell align="right">
+                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                      <Button
+                        component={Link}
+                        href={`/admin/teams/${team.id}`}
+                        variant="contained"
+                        size="small"
+                        color='success'
+                      >
+                        View
+                      </Button>
 
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={() => onEdit(team)}
-                  >
-                    Edit
-                  </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => onEdit(team)}
+                      >
+                        Edit
+                      </Button>
 
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    size="small"
-                    onClick={() => onDelete(team)}
-                  >
-                    Delete
-                  </Button>
-                </Stack>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        onClick={() => onDelete(team)}
+                      >
+                        Delete
+                      </Button>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <TablePagination
+        component="div"
+        count={count}
+        page={page}
+        onPageChange={(_, newPage) => onPageChange(newPage)}
+        rowsPerPage={rowsPerPage}
+        rowsPerPageOptions={[25]}
+      />
+    </Paper>
   );
 }

@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { label: "Standings", href: "/standings" },
   { label: "About Us", href: "/about-us" },
   { label: "Contact Us", href: "/contact-us" },
+  { label: "Player Portal", href: "/player-portal" },
 ];
 
 export default function MobileNav() {

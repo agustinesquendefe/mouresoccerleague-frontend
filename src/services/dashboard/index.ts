@@ -4,3 +4,4 @@ export * from './getRecentResults';
 export * from './getUpcomingMatches';
 export * from './getStandingsSnapshot';
 export * from './getCompetitionOverview';
+export * from './getFinancialOverview';
