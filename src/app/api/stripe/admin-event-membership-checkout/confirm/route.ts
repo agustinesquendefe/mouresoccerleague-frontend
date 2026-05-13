@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     const membershipId = Number(session.metadata?.membership_id);
-    const amountPaid = Number(session.amount_total ?? 0) / 100;
+    const amountPaid = Number(session.metadata?.payment_amount ?? Number(session.amount_total ?? 0) / 100);
     const eventPrice = Number(session.metadata?.event_price);
     const balanceDueBeforePayment = Number(session.metadata?.balance_due_before_payment);
 

@@ -7,8 +7,10 @@ import {
   Button,
   CircularProgress,
   Divider,
+  FormControlLabel,
   Paper,
   Stack,
+  Switch,
   TextField,
   Typography,
   Grid,
@@ -71,6 +73,20 @@ export default function GeneralSettingsForm() {
     }));
   };
 
+  const handleNumberChange = (field: keyof AppSettings, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: value === '' ? null : Number(value),
+    }));
+  };
+
+  const handleBooleanChange = (field: keyof AppSettings, value: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
   const loadSettings = async () => {
     try {
       setLoading(true);
@@ -90,7 +106,18 @@ export default function GeneralSettingsForm() {
       setErrorMessage('');
       setSuccess(false);
 
-      await upsertAppSettings(form);
+      const payload: Partial<AppSettings> = {
+        ...form,
+        operating_state: form.operating_state || form.state || 'NC',
+        pass_payment_fees_to_customer: form.pass_payment_fees_to_customer ?? true,
+        stripe_fee_percentage: form.stripe_fee_percentage ?? 2.9,
+        stripe_fee_fixed_amount: form.stripe_fee_fixed_amount ?? 0.3,
+        state_fee_percentage: form.state_fee_percentage ?? 0,
+        state_fee_label: form.state_fee_label || 'State fee',
+      };
+
+      await upsertAppSettings(payload);
+      setForm(payload);
 
       setSuccess(true);
     } catch (error) {
@@ -255,6 +282,83 @@ export default function GeneralSettingsForm() {
             />
           </Grid>
         </Grid>
+      </SectionCard>
+
+      <SectionCard
+        title="Payment Fees"
+        description="Configure Stripe and operating-state fees that are added to online checkout payments."
+      >
+        <Stack spacing={2.5}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={form.pass_payment_fees_to_customer ?? true}
+                onChange={(e) =>
+                  handleBooleanChange('pass_payment_fees_to_customer', e.target.checked)
+                }
+              />
+            }
+            label="Pass payment fees to customer"
+          />
+
+          <Grid container spacing={2} direction={"column"}>
+            <Grid>
+              <TextField
+                fullWidth
+                label="Operating State"
+                placeholder="NC"
+                value={form.operating_state ?? form.state ?? 'NC'}
+                onChange={(e) => handleChange('operating_state', e.target.value)}
+              />
+            </Grid>
+
+            <Grid>
+              <TextField
+                fullWidth
+                label="Stripe Fee Percentage"
+                type="number"
+                inputProps={{ min: 0, step: 0.001 }}
+                value={form.stripe_fee_percentage ?? 2.9}
+                onChange={(e) => handleNumberChange('stripe_fee_percentage', e.target.value)}
+                helperText="Example: 2.9 for 2.9%"
+              />
+            </Grid>
+
+            <Grid>
+              <TextField
+                fullWidth
+                label="Stripe Fixed Fee"
+                type="number"
+                inputProps={{ min: 0, step: 0.01 }}
+                value={form.stripe_fee_fixed_amount ?? 0.3}
+                onChange={(e) => handleNumberChange('stripe_fee_fixed_amount', e.target.value)}
+                helperText="Flat dollar amount added per checkout"
+              />
+            </Grid>
+
+            <Grid>
+              <TextField
+                fullWidth
+                label="State Fee Percentage"
+                type="number"
+                inputProps={{ min: 0, step: 0.001 }}
+                value={form.state_fee_percentage ?? 0}
+                onChange={(e) => handleNumberChange('state_fee_percentage', e.target.value)}
+                helperText="Example: 4.75 for 4.75%"
+              />
+            </Grid>
+
+            <Grid>
+              <TextField
+                fullWidth
+                label="State Fee Label"
+                placeholder="NC fee"
+                value={form.state_fee_label ?? 'State fee'}
+                onChange={(e) => handleChange('state_fee_label', e.target.value)}
+              />
+            </Grid>
+          </Grid>
+        </Stack>
       </SectionCard>
 
       <SectionCard
