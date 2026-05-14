@@ -10,6 +10,31 @@ const theme = createTheme({
     primary: { main: '#023467' },
     secondary: { main: '#ffb304' },
   },
+  components: {
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+        },
+      },
+    },
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          width: 'max-content',
+          minWidth: '100%',
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          whiteSpace: 'nowrap',
+        },
+      },
+    },
+  },
 });
 
 export default function MuiProvider({ children }: { children: React.ReactNode }) {

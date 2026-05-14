@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import type { ApexOptions } from 'apexcharts';
 import { useTheme } from '@mui/material/styles';
 import {
+  Box,
   CardContent,
   Typography,
   Table,
@@ -68,24 +69,26 @@ export default function CompetitionOverview() {
 
         <Chart type="bar" options={chartOptions} series={chartSeries} height={260} />
 
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Round</TableCell>
-              <TableCell>Scheduled</TableCell>
-              <TableCell>Played</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.label}>
-                <TableCell>{row.label}</TableCell>
-                <TableCell>{row.scheduled}</TableCell>
-                <TableCell>{row.played}</TableCell>
+        <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Round</TableCell>
+                <TableCell>Scheduled</TableCell>
+                <TableCell>Played</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.label}>
+                  <TableCell>{row.label}</TableCell>
+                  <TableCell>{row.scheduled}</TableCell>
+                  <TableCell>{row.played}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
       </CardContent>
     </BlankCard>
   );

@@ -28,28 +28,30 @@ export default function StandingsSnapshot() {
         <Typography variant="h5" mb={2} color="primary">
           Tabla de Posiciones
         </Typography>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>#</TableCell>
-              <TableCell>Equipo</TableCell>
-              <TableCell>PJ</TableCell>
-              <TableCell>DG</TableCell>
-              <TableCell>PTS</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row, idx) => (
-              <TableRow key={row.team_id}>
-                <TableCell>{idx + 1}</TableCell>
-                <TableCell>{row.team_name}</TableCell>
-                <TableCell>{row.played}</TableCell>
-                <TableCell>{row.goal_difference}</TableCell>
-                <TableCell>{row.points}</TableCell>
+        <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>#</TableCell>
+                <TableCell>Equipo</TableCell>
+                <TableCell>PJ</TableCell>
+                <TableCell>DG</TableCell>
+                <TableCell>PTS</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {rows.map((row, idx) => (
+                <TableRow key={row.team_id}>
+                  <TableCell>{idx + 1}</TableCell>
+                  <TableCell>{row.team_name}</TableCell>
+                  <TableCell>{row.played}</TableCell>
+                  <TableCell>{row.goal_difference}</TableCell>
+                  <TableCell>{row.points}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
       </CardContent>
     </Card>
   );

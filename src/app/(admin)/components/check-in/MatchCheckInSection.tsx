@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Box,
   Button,
   MenuItem,
   Paper,
@@ -280,42 +281,44 @@ export default function MatchCheckInSection({ matchId }: Props) {
               No players found for this team.
             </Typography>
           ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Player</TableCell>
-                  <TableCell>Player ID</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="right">Action</TableCell>
-                </TableRow>
-              </TableHead>
+            <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Player</TableCell>
+                    <TableCell>Player ID</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">Action</TableCell>
+                  </TableRow>
+                </TableHead>
 
-              <TableBody>
-                {players.map((player) => {
-                  const alreadyCheckedIn = checkedInPlayerIds.has(player.id);
+                <TableBody>
+                  {players.map((player) => {
+                    const alreadyCheckedIn = checkedInPlayerIds.has(player.id);
 
-                  return (
-                    <TableRow key={player.id}>
-                      <TableCell>{getPlayerFullName(player)}</TableCell>
-                      <TableCell>{player.id}</TableCell>
-                      <TableCell>
-                        {alreadyCheckedIn ? 'Checked in' : 'Pending'}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Button
-                          variant="contained"
-                          size="small"
-                          disabled={alreadyCheckedIn || savingPlayerId === player.id}
-                          onClick={() => handleCheckIn(player.id)}
-                        >
-                          {alreadyCheckedIn ? 'Checked In' : 'Check In'}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                    return (
+                      <TableRow key={player.id}>
+                        <TableCell>{getPlayerFullName(player)}</TableCell>
+                        <TableCell>{player.id}</TableCell>
+                        <TableCell>
+                          {alreadyCheckedIn ? 'Checked in' : 'Pending'}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Button
+                            variant="contained"
+                            size="small"
+                            disabled={alreadyCheckedIn || savingPlayerId === player.id}
+                            onClick={() => handleCheckIn(player.id)}
+                          >
+                            {alreadyCheckedIn ? 'Checked In' : 'Check In'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </Box>
           )}
         </Stack>
       </Paper>
@@ -329,30 +332,32 @@ export default function MatchCheckInSection({ matchId }: Props) {
               No players have checked in yet.
             </Typography>
           ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Player</TableCell>
-                  <TableCell>Player ID</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Method</TableCell>
-                  <TableCell>Checked In At</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {checkedInRows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      {row.player ? getPlayerFullName(row.player) : '-'}
-                    </TableCell>
-                    <TableCell>{row.player_id}</TableCell>
-                    <TableCell>{row.status ?? '-'}</TableCell>
-                    <TableCell>{row.method ?? '-'}</TableCell>
-                    <TableCell>{formatDateTime(row.checked_in_at)}</TableCell>
+            <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Player</TableCell>
+                    <TableCell>Player ID</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Method</TableCell>
+                    <TableCell>Checked In At</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {checkedInRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        {row.player ? getPlayerFullName(row.player) : '-'}
+                      </TableCell>
+                      <TableCell>{row.player_id}</TableCell>
+                      <TableCell>{row.status ?? '-'}</TableCell>
+                      <TableCell>{row.method ?? '-'}</TableCell>
+                      <TableCell>{formatDateTime(row.checked_in_at)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
           )}
         </Stack>
       </Paper>

@@ -552,28 +552,30 @@ export default function AdminScannerClient({
               No approved players have been scanned for this team yet.
             </Typography>
           ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Player</TableCell>
-                  <TableCell>Document ID</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Method</TableCell>
-                  <TableCell>Checked In At</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {checkedInPlayers.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{row.playerName}</TableCell>
-                    <TableCell>{row.documentId ?? '-'}</TableCell>
-                    <TableCell>{formatStatusLabel(row.status)}</TableCell>
-                    <TableCell>{formatStatusLabel(row.method)}</TableCell>
-                    <TableCell>{formatDateTime(row.checkedInAt)}</TableCell>
+            <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <Table size="small" sx={{ minWidth: 640 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Player</TableCell>
+                    <TableCell>Document ID</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Method</TableCell>
+                    <TableCell>Checked In At</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {checkedInPlayers.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.playerName}</TableCell>
+                      <TableCell>{row.documentId ?? '-'}</TableCell>
+                      <TableCell>{formatStatusLabel(row.status)}</TableCell>
+                      <TableCell>{formatStatusLabel(row.method)}</TableCell>
+                      <TableCell>{formatDateTime(row.checkedInAt)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
           )}
         </Stack>
       </Paper>

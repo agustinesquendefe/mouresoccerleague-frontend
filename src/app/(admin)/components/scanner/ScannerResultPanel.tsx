@@ -77,30 +77,32 @@ export default function ScannerResultPanel({ result }: Props) {
           </Alert>
         ) : null}
 
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Check</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Details</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {result.checks.map((check) => (
-              <TableRow key={check.code}>
-                <TableCell>{check.label}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={check.passed ? 'Pass' : 'Fail'}
-                    size="small"
-                    color={check.passed ? 'success' : 'error'}
-                  />
-                </TableCell>
-                <TableCell>{check.message}</TableCell>
+        <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Check</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Details</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {result.checks.map((check) => (
+                <TableRow key={check.code}>
+                  <TableCell>{check.label}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={check.passed ? 'Pass' : 'Fail'}
+                      size="small"
+                      color={check.passed ? 'success' : 'error'}
+                    />
+                  </TableCell>
+                  <TableCell>{check.message}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
       </Stack>
     </Paper>
   );

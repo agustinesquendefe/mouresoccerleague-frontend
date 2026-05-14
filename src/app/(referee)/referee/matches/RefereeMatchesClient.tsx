@@ -113,58 +113,60 @@ export default function RefereeMatchesClient() {
 
       {payload?.matches.length ? (
         <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Match</TableCell>
-                <TableCell>Event</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {payload.matches.map((match) => (
-                <TableRow key={match.id} hover>
-                  <TableCell>
-                    <Typography fontWeight={700}>{match.team1.name} vs {match.team2.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {match.fieldName ?? 'No field assigned'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{match.eventName}</TableCell>
-                  <TableCell>{match.date ?? '-'} {match.time ?? ''}</TableCell>
-                  <TableCell>
-                    <Chip label={formatStatus(match.status)} size="small" />
-                  </TableCell>
-                  <TableCell>{formatStatus(match.role)}</TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button
-                        component={Link}
-                        href="/referee/scanner"
-                        size="small"
-                        variant="outlined"
-                        startIcon={<QrCodeScannerIcon fontSize="small" />}
-                      >
-                        Scanner
-                      </Button>
-                      <Button
-                        component={Link}
-                        href={`/referee/matches/${match.id}/check-in`}
-                        size="small"
-                        variant="contained"
-                        startIcon={<AssignmentTurnedInIcon fontSize="small" />}
-                      >
-                        Check-In
-                      </Button>
-                    </Stack>
-                  </TableCell>
+          <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Match</TableCell>
+                  <TableCell>Event</TableCell>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Role</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {payload.matches.map((match) => (
+                  <TableRow key={match.id} hover>
+                    <TableCell>
+                      <Typography fontWeight={700}>{match.team1.name} vs {match.team2.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {match.fieldName ?? 'No field assigned'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{match.eventName}</TableCell>
+                    <TableCell>{match.date ?? '-'} {match.time ?? ''}</TableCell>
+                    <TableCell>
+                      <Chip label={formatStatus(match.status)} size="small" />
+                    </TableCell>
+                    <TableCell>{formatStatus(match.role)}</TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <Button
+                          component={Link}
+                          href="/referee/scanner"
+                          size="small"
+                          variant="outlined"
+                          startIcon={<QrCodeScannerIcon fontSize="small" />}
+                        >
+                          Scanner
+                        </Button>
+                        <Button
+                          component={Link}
+                          href={`/referee/matches/${match.id}/check-in`}
+                          size="small"
+                          variant="contained"
+                          startIcon={<AssignmentTurnedInIcon fontSize="small" />}
+                        >
+                          Check-In
+                        </Button>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
         </Paper>
       ) : null}
     </Stack>
