@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  Box,
   Button,
   MenuItem,
   Paper,
@@ -167,40 +168,42 @@ export default function TeamCoachesSection({ teamId }: Props) {
             No coaches assigned to this team yet.
           </Typography>
         ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Coach</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Phone</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>
-                    {row.coach ? getCoachFullName(row.coach) : '-'}
-                  </TableCell>
-                  <TableCell>{row.coach?.email ?? '-'}</TableCell>
-                  <TableCell>{row.coach?.phone ?? '-'}</TableCell>
-                  <TableCell>{row.role ?? '-'}</TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      onClick={() => handleRemove(row.id)}
-                    >
-                      Remove
-                    </Button>
-                  </TableCell>
+          <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Coach</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Phone</TableCell>
+                  <TableCell>Role</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>
+                      {row.coach ? getCoachFullName(row.coach) : '-'}
+                    </TableCell>
+                    <TableCell>{row.coach?.email ?? '-'}</TableCell>
+                    <TableCell>{row.coach?.phone ?? '-'}</TableCell>
+                    <TableCell>{row.role ?? '-'}</TableCell>
+                    <TableCell align="right">
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        onClick={() => handleRemove(row.id)}
+                      >
+                        Remove
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
         )}
       </Stack>
     </Paper>

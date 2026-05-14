@@ -133,6 +133,29 @@ const baselightTheme = createTheme({
 
       },
     },
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
+        },
+      },
+    },
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          width: "max-content",
+          minWidth: "100%",
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          whiteSpace: "nowrap",
+        },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {

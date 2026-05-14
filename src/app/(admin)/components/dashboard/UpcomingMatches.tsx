@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  Box,
   CardContent,
   Typography,
   Table,
@@ -58,43 +59,45 @@ export default function UpcomingMatches() {
           </Typography>
         ) : (
           <>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Match</TableCell>
-                  <TableCell>Round</TableCell>
-                  <TableCell>Field</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {visibleRows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{formatDate(row.date)}</TableCell>
-                    <TableCell>
-                      <Typography variant="subtitle2">
-                        {row.team1_name} vs {row.team2_name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" spacing={1}>
-                        <Chip
-                          size="small"
-                          color="info"
-                          variant="outlined"
-                          label={
-                            row.round_number !== null
-                              ? `Round ${row.round_number}`
-                              : 'TBD'
-                          }
-                        />
-                      </Stack>
-                    </TableCell>
-                    <TableCell>{row.field_name ?? '-'}</TableCell>
+            <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Match</TableCell>
+                    <TableCell>Round</TableCell>
+                    <TableCell>Field</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {visibleRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{formatDate(row.date)}</TableCell>
+                      <TableCell>
+                        <Typography variant="subtitle2">
+                          {row.team1_name} vs {row.team2_name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1}>
+                          <Chip
+                            size="small"
+                            color="info"
+                            variant="outlined"
+                            label={
+                              row.round_number !== null
+                                ? `Round ${row.round_number}`
+                                : 'TBD'
+                            }
+                          />
+                        </Stack>
+                      </TableCell>
+                      <TableCell>{row.field_name ?? '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
 
             <TablePagination
               component="div"

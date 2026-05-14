@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
+  Box,
   Button,
   MenuItem,
   Paper,
@@ -168,60 +169,62 @@ export default function MatchRefereesSection({ matchId }: Props) {
             No referees assigned to this match yet.
           </Typography>
         ) : (
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Referee</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Phone</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>
-                    {row.referee ? (
-                      <Link
-                        href={`/referees/${row.referee.id}`}
-                        style={{ textDecoration: 'none', color: 'inherit' }}
-                      >
-                        <Typography
-                          variant="body2"
-                          fontWeight={600}
-                          sx={{
-                            cursor: 'pointer',
-                            '&:hover': { textDecoration: 'underline' },
-                          }}
-                        >
-                          {getRefereeFullName(row.referee)}
-                        </Typography>
-                      </Link>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-
-                  <TableCell>{row.referee?.email ?? '-'}</TableCell>
-                  <TableCell>{row.referee?.phone ?? '-'}</TableCell>
-                  <TableCell>{row.role ?? '-'}</TableCell>
-
-                  <TableCell align="right">
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      onClick={() => handleRemove(row.id)}
-                    >
-                      Remove
-                    </Button>
-                  </TableCell>
+          <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Referee</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Phone</TableCell>
+                  <TableCell>Role</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>
+                      {row.referee ? (
+                        <Link
+                          href={`/referees/${row.referee.id}`}
+                          style={{ textDecoration: 'none', color: 'inherit' }}
+                        >
+                          <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            sx={{
+                              cursor: 'pointer',
+                              '&:hover': { textDecoration: 'underline' },
+                            }}
+                          >
+                            {getRefereeFullName(row.referee)}
+                          </Typography>
+                        </Link>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+
+                    <TableCell>{row.referee?.email ?? '-'}</TableCell>
+                    <TableCell>{row.referee?.phone ?? '-'}</TableCell>
+                    <TableCell>{row.role ?? '-'}</TableCell>
+
+                    <TableCell align="right">
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        onClick={() => handleRemove(row.id)}
+                      >
+                        Remove
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
         )}
       </Stack>
     </Paper>

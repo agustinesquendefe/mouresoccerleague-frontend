@@ -15,6 +15,9 @@ import {
 } from '@mui/material';
 import type { Match, MatchFormData } from '@/models/match';
 import type { Field } from '@/models/field';
+import type { Referee } from '@/models/referee';
+import { getRefereeFullName } from '@/models/referee';
+import { supabase } from '@/lib/supabaseClient';
 
 type Props = {
   open: boolean;
@@ -39,6 +42,7 @@ const initialValues: MatchFormData = {
   field_number: null,
   team1_id: null,
   team2_id: null,
+  referee_id: null,
 };
 
 export default function MatchDialog({
@@ -52,9 +56,54 @@ export default function MatchDialog({
 }: Props) {
   const [values, setValues] = useState<MatchFormData>(initialValues);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [referees, setReferees] = useState<Referee[]>([]);
+  const [loadingReferees, setLoadingReferees] = useState(false);
 
   useEffect(() => {
     if (!open || !match) return;
+
+    let active = true;
+
+    const loadReferees = async () => {
+      try {
+        setLoadingReferees(true);
+
+        const [refereesRes, matchRefereeRes] = await Promise.all([
+          supabase
+            .from('referees')
+            .select('*')
+            .eq('status', 'active')
+            .order('first_name', { ascending: true }),
+          supabase
+            .from('match_referees')
+            .select('referee_id')
+            .eq('match_id', match.id)
+            .eq('role', 'main_referee')
+            .order('id', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+        if (!active) return;
+
+        if (refereesRes.error) throw new Error(refereesRes.error.message);
+        if (matchRefereeRes.error) throw new Error(matchRefereeRes.error.message);
+
+        setReferees((refereesRes.data ?? []) as Referee[]);
+        setValues((prev) => ({
+          ...prev,
+          referee_id: matchRefereeRes.data?.referee_id ? Number(matchRefereeRes.data.referee_id) : null,
+        }));
+      } catch (error) {
+        if (active) {
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to load referees.');
+        }
+      } finally {
+        if (active) {
+          setLoadingReferees(false);
+        }
+      }
+    };
 
     setValues({
       status: (match.status as MatchFormData['status']) ?? 'scheduled',
@@ -69,8 +118,15 @@ export default function MatchDialog({
       field_number: match.field_number,
       team1_id: match.team1_id,
       team2_id: match.team2_id,
+      referee_id: null,
     });
     setErrorMessage(null);
+
+    loadReferees();
+
+    return () => {
+      active = false;
+    };
   }, [open, match]);
 
   const selectedFieldNumber = useMemo(() => {
@@ -144,6 +200,7 @@ export default function MatchDialog({
         ...values,
         team1_id: values.team1_id !== undefined ? values.team1_id : match?.team1_id ?? null,
         team2_id: values.team2_id !== undefined ? values.team2_id : match?.team2_id ?? null,
+        referee_id: values.referee_id ?? null,
         winner_team_id: values.status === 'played' ? resolvedWinnerTeamId : null,
         field_number: selectedFieldNumber,
       });
@@ -218,6 +275,30 @@ export default function MatchDialog({
             <MenuItem value="in_progress">In Progress</MenuItem>
             <MenuItem value="played">Played</MenuItem>
             <MenuItem value="cancelled">Cancelled</MenuItem>
+          </TextField>
+
+          <TextField
+            select
+            label="Main Referee"
+            value={values.referee_id ?? ''}
+            onChange={(e) =>
+              setValues((prev) => ({
+                ...prev,
+                referee_id: e.target.value === '' ? null : Number(e.target.value),
+              }))
+            }
+            fullWidth
+            disabled={loading || loadingReferees}
+            helperText={loadingReferees ? 'Loading referees...' : 'Assign the main referee for this match.'}
+            InputLabelProps={{ shrink: true }}
+            SelectProps={{ displayEmpty: true }}
+          >
+            <MenuItem value="">No referee assigned</MenuItem>
+            {referees.map((referee) => (
+              <MenuItem key={referee.id} value={referee.id}>
+                {getRefereeFullName(referee)}
+              </MenuItem>
+            ))}
           </TextField>
 
           <Stack direction="row" spacing={2}>

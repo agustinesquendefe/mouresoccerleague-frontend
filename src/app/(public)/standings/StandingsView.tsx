@@ -104,7 +104,7 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
           </div>
         ) : (
           <div className="w-full overflow-x-auto rounded-2xl shadow-md border border-gray-100">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full text-sm border-collapse whitespace-nowrap">
               <thead>
                 <tr className="bg-[--color-blue,#023467] text-white" style={{ background: 'var(--color-blue, #023467)' }}>
                   <th className="px-4 py-3 text-left w-10 font-filson-bold text-xs uppercase tracking-wide">#</th>

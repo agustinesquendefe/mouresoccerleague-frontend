@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { calculatePaymentFees, getPaymentFeeSettings } from '@/lib/paymentFees';
 
 type RequestBody = {
   eventId?: number;
@@ -150,6 +151,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const feeSettings = await getPaymentFeeSettings(supabaseAdmin);
+    const feeBreakdown = calculatePaymentFees(requestedAmount, feeSettings);
     const origin = request.headers.get('origin') ?? new URL(request.url).origin;
     const checkoutBody = new URLSearchParams({
       mode: 'payment',
@@ -157,7 +160,7 @@ export async function POST(request: Request) {
       cancel_url: `${origin}/player-portal`,
       customer_email: email,
       'line_items[0][price_data][currency]': 'usd',
-      'line_items[0][price_data][unit_amount]': String(Math.round(requestedAmount * 100)),
+      'line_items[0][price_data][unit_amount]': String(Math.round(feeBreakdown.baseAmount * 100)),
       'line_items[0][price_data][product_data][name]': event.name || `Event #${eventId}`,
       'line_items[0][quantity]': '1',
       'metadata[event_id]': String(eventId),
@@ -165,8 +168,41 @@ export async function POST(request: Request) {
       'metadata[membership_id]': String(membership.id),
       'metadata[event_price]': String(eventPrice),
       'metadata[balance_due_before_payment]': String(balanceDue),
-      'metadata[payment_amount]': String(requestedAmount),
+      'metadata[payment_amount]': String(feeBreakdown.baseAmount),
+      'metadata[stripe_fee_amount]': String(feeBreakdown.stripeFeeAmount),
+      'metadata[state_fee_amount]': String(feeBreakdown.stateFeeAmount),
+      'metadata[total_fee_amount]': String(feeBreakdown.totalFeeAmount),
+      'metadata[operating_state]': feeBreakdown.settings.operatingState,
     });
+
+    let lineItemIndex = 1;
+
+    if (feeBreakdown.stripeFeeAmount > 0) {
+      checkoutBody.set(`line_items[${lineItemIndex}][price_data][currency]`, 'usd');
+      checkoutBody.set(
+        `line_items[${lineItemIndex}][price_data][unit_amount]`,
+        String(Math.round(feeBreakdown.stripeFeeAmount * 100))
+      );
+      checkoutBody.set(
+        `line_items[${lineItemIndex}][price_data][product_data][name]`,
+        'Stripe processing fee'
+      );
+      checkoutBody.set(`line_items[${lineItemIndex}][quantity]`, '1');
+      lineItemIndex += 1;
+    }
+
+    if (feeBreakdown.stateFeeAmount > 0) {
+      checkoutBody.set(`line_items[${lineItemIndex}][price_data][currency]`, 'usd');
+      checkoutBody.set(
+        `line_items[${lineItemIndex}][price_data][unit_amount]`,
+        String(Math.round(feeBreakdown.stateFeeAmount * 100))
+      );
+      checkoutBody.set(
+        `line_items[${lineItemIndex}][price_data][product_data][name]`,
+        `${feeBreakdown.settings.stateFeeLabel} (${feeBreakdown.settings.operatingState})`
+      );
+      checkoutBody.set(`line_items[${lineItemIndex}][quantity]`, '1');
+    }
 
     const session = await stripeRequest<{ id: string; url: string | null }>(
       'checkout/sessions',

@@ -15,6 +15,35 @@ type RefereeFormValues = {
   status: string;
 };
 
+async function ensurePortalAuthUser(values: RefereeFormValues, role: 'coach' | 'referee') {
+  const email = values.email.trim().toLowerCase();
+  if (!email) return { ok: true };
+
+  const response = await fetch('/api/portal/auth-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      firstName: values.first_name,
+      lastName: values.last_name,
+      role,
+    }),
+  });
+
+  const payload = await response.json();
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: payload?.error ?? 'Unable to create portal auth user.',
+    };
+  }
+
+  return { ok: true };
+}
+
 export default function RefereesPage() {
 
   const [referees, setReferees] = useState<Referee[]>([]);
@@ -62,29 +91,40 @@ export default function RefereesPage() {
   };
 
   const handleSubmit = async (values: RefereeFormValues) => {
-    setSaving(true);
+    try {
+      setSaving(true);
 
-    if (selectedReferee) {
-      const { error } = await supabase
-        .from('referees')
-        .update(values)
-        .eq('id', selectedReferee.id);
+      if (selectedReferee) {
+        const { error } = await supabase
+          .from('referees')
+          .update(values)
+          .eq('id', selectedReferee.id);
 
-      if (!error) {
+        if (error) throw new Error(error.message);
+
         setDialogOpen(false);
         setSelectedReferee(null);
         await loadReferees();
-      }
-    } else {
-      const { error } = await supabase.from('referees').insert(values);
+      } else {
+        const { error } = await supabase.from('referees').insert(values);
 
-      if (!error) {
+        if (error) throw new Error(error.message);
+
         setDialogOpen(false);
         await loadReferees();
       }
-    }
 
-    setSaving(false);
+      const authResult = await ensurePortalAuthUser(values, 'referee');
+      if (!authResult.ok) {
+        window.alert(
+          `Referee saved, but the Auth user could not be created yet: ${authResult.message}`
+        );
+      }
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to save referee.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

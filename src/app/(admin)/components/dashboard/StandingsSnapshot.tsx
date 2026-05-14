@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  Box,
   CardContent,
   Typography,
   Table,
@@ -28,28 +29,30 @@ export default function StandingsSnapshot() {
           Standings Snapshot
         </Typography>
 
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>#</TableCell>
-              <TableCell>Team</TableCell>
-              <TableCell>PJ</TableCell>
-              <TableCell>DG</TableCell>
-              <TableCell>PTS</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={row.team_id}>
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{row.team_name}</TableCell>
-                <TableCell>{row.played}</TableCell>
-                <TableCell>{row.goal_difference}</TableCell>
-                <TableCell>{row.points}</TableCell>
+        <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>#</TableCell>
+                <TableCell>Team</TableCell>
+                <TableCell>PJ</TableCell>
+                <TableCell>DG</TableCell>
+                <TableCell>PTS</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {rows.map((row, index) => (
+                <TableRow key={row.team_id}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{row.team_name}</TableCell>
+                  <TableCell>{row.played}</TableCell>
+                  <TableCell>{row.goal_difference}</TableCell>
+                  <TableCell>{row.points}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
       </CardContent>
     </BlankCard>
   );

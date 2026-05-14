@@ -6,7 +6,7 @@ import { FaFacebook, FaInstagram, FaTiktok, FaYoutube } from "react-icons/fa6";
 import Image from "next/image";
 import MobileNav from "./MobileNav";
 import { useRouter } from "next/navigation";
-import { NotebookPen, Phone } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getAppSettings } from '@/services/settings/settings.service';
 import type { AppSettings } from '@/models/appSettings';
@@ -28,9 +28,6 @@ export default function Header() {
   const instagramUrl = settings?.instagram_url || "#";
   const tiktokUrl = settings?.tiktok_url || "#";
   const youtubeUrl = settings?.youtube_url || "#";
-  const contactPhone = settings?.contact_phone || "(336) 404-7816";
-  const contactEmail = settings?.contact_email || "info@moureleague.com";
-
   return (
     <header className="w-full shadow relative z-999" style={{ background: 'var(--color-blue, #023467)' }}>
 
@@ -110,8 +107,8 @@ export default function Header() {
           {/* Spacer invisible - mismo ancho que el botón Schedule para centrar los tabs */}
           <div className="hidden xl:flex invisible">
             <span className="whitespace-nowrap px-6 py-3 text-sm flex items-center gap-2">
-              <NotebookPen size={24}/>
-              Register My Team
+              <UserRound size={24}/>
+              My Portal
             </span>
           </div>
 
@@ -143,8 +140,8 @@ export default function Header() {
             </div>
 
             <div className="relative group">
-              <Link href="/player-portal" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
-                Player Portal
+              <Link href="/reserve" className="whitespace-nowrap uppercase -tracking-tight font-medium text-brand-black hover:text-brand-green px-2 py-1 hover:text-red-600">
+                Reserve
               </Link>
             </div>
           </nav>
@@ -152,11 +149,11 @@ export default function Header() {
           {/* Schedule button - positioned to the right */}
           <div className="hidden xl:flex">
             <Link
-              href="/contact-us"
+              href="/portal"
               className="whitespace-nowrap cursor-pointer bg-red-500 hover:bg-red-600 text-white font-bold px-6 py-3 text-sm rounded shadow uppercase tracking-widest flex items-center gap-2"
             >
-              <NotebookPen size={24}/>
-              Register My Team
+              <UserRound size={24}/>
+              My Portal
             </Link>
           </div>
           

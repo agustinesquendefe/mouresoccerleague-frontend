@@ -8,7 +8,13 @@ export type AppSettings = {
   address_line_2?: string | null;
   city?: string | null;
   state?: string | null;
+  operating_state?: string | null;
   zip_code?: string | null;
+  pass_payment_fees_to_customer?: boolean | null;
+  stripe_fee_percentage?: number | null;
+  stripe_fee_fixed_amount?: number | null;
+  state_fee_percentage?: number | null;
+  state_fee_label?: string | null;
   website?: string | null;
   facebook_url?: string | null;
   instagram_url?: string | null;

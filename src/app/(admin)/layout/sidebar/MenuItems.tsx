@@ -6,7 +6,6 @@ import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
 import Diversity3Icon from '@mui/icons-material/Diversity3';
 import SettingsAccessibilityIcon from '@mui/icons-material/SettingsAccessibility';
 import SportsIcon from '@mui/icons-material/Sports';
-import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import SettingsIcon from '@mui/icons-material/Settings';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -14,6 +13,7 @@ import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import SportsSoccerOutlinedIcon from '@mui/icons-material/SportsSoccerOutlined';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 
 const Menuitems = [
   {
@@ -91,10 +91,10 @@ const Menuitems = [
     subheader: "CONTROL",
   },
   {
-    id: "check-ins",
-    title: "Check-ins",
-    icon: AssignmentTurnedInIcon,
-    href: "/admin/check-ins",
+    id: "scanner",
+    title: "Scanner",
+    icon: QrCodeScannerIcon,
+    href: "/admin/scanner",
   },
   {
     id: "standings",

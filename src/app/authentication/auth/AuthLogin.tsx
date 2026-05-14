@@ -63,6 +63,8 @@ const AuthLogin = ({ title, subtitle, subtext }: loginType) => {
       // Redirigir según rol
       if (profile?.role === 'admin') {
         router.push('/admin/dashboard');
+      } else if (profile?.role === 'referee') {
+        router.push('/referee/matches');
       } else {
         router.push('/');
       }

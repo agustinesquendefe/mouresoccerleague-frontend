@@ -18,7 +18,7 @@ export default function StandingsCard({ event, standings }: StandingsCardProps) 
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm whitespace-nowrap">
           <thead>
             <tr className="text-xs text-white font-filson-bold uppercase bg-red-600">
               <th className="px-4 py-2 text-left w-6">#</th>
