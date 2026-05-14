@@ -82,7 +82,7 @@ export default function PlayersTable({
             ) : (
               rows.map((player) => (
                 <TableRow key={player.id} hover>
-                <TableCell>{displayDocumentId(player.document_id)}</TableCell>
+                <TableCell>{player.document_id}</TableCell>
                 <TableCell>{getPlayerFullName(player)}</TableCell>
                 <TableCell>{formatDate(player.birth_date)}</TableCell>
                 <TableCell>
