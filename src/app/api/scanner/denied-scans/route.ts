@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
-import type { ScannerCheckedInPlayer } from '@/models/scanner';
+import type { ScannerDeniedPlayer } from '@/models/scanner';
 
 function normalizeName(value: string | null | undefined, fallback: string) {
   const trimmed = value?.trim();
@@ -23,14 +23,14 @@ export async function GET(request: Request) {
 
     const supabaseAdmin = createSupabaseAdminClient();
     const { data, error } = await supabaseAdmin
-      .from('match_check_ins')
+      .from('scanner_denied_scans')
       .select(`
         id,
         player_id,
-        team_id,
-        checked_in_at,
-        status,
+        scanned_code,
+        reason,
         method,
+        validated_at,
         player:players (
           id,
           full_name,
@@ -38,43 +38,39 @@ export async function GET(request: Request) {
           last_name,
           document_id,
           photo_url
-        ),
-        team:teams (
-          id,
-          name
         )
       `)
       .eq('match_id', matchId)
       .eq('team_id', teamId)
-      .order('checked_in_at', { ascending: false });
+      .order('validated_at', { ascending: false });
 
     if (error) {
       throw new Error(error.message);
     }
 
-    const rows: ScannerCheckedInPlayer[] = (data ?? []).map((row: any) => {
+    const rows: ScannerDeniedPlayer[] = (data ?? []).map((row: any) => {
       const player = Array.isArray(row.player) ? row.player[0] ?? null : row.player ?? null;
-      const team = Array.isArray(row.team) ? row.team[0] ?? null : row.team ?? null;
       const firstLastName = `${player?.first_name ?? ''} ${player?.last_name ?? ''}`.trim();
+      const playerName = player
+        ? normalizeName(player.full_name, firstLastName || `Player #${row.player_id}`)
+        : `Unknown player (${row.scanned_code})`;
 
       return {
-        id: Number(row.id),
-        playerId: Number(row.player_id),
-        playerName: normalizeName(player?.full_name, firstLastName || `Player #${row.player_id}`),
-        documentId: player?.document_id ?? null,
+        id: String(row.id),
+        playerId: row.player_id == null ? null : Number(row.player_id),
+        playerName,
+        documentId: player?.document_id ?? row.scanned_code ?? null,
         photoUrl: player?.photo_url ?? null,
-        teamId: Number(row.team_id),
-        teamName: team?.name ?? null,
-        status: row.status ?? null,
+        reason: row.reason ?? 'Player validation failed.',
         method: row.method ?? null,
-        checkedInAt: row.checked_in_at ?? null,
+        scannedAt: row.validated_at ?? null,
       };
     });
 
     return NextResponse.json({ data: rows });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unable to load scanner check-ins.' },
+      { error: error instanceof Error ? error.message : 'Unable to load denied scanner validations.' },
       { status: 500 }
     );
   }

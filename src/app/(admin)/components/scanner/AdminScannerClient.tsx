@@ -3,11 +3,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
   Grid,
+  IconButton,
   MenuItem,
   Paper,
   Stack,
@@ -20,10 +25,12 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import type {
   ScannerCheckedInPlayer,
   ScannerContextData,
+  ScannerDeniedPlayer,
   ScannerEventOption,
   ScannerMatchOption,
   ScannerValidationResponse,
@@ -43,6 +50,15 @@ type PersistedScannerContext = {
   teamId: string;
 };
 
+type PlayerPreview = {
+  name: string;
+  documentId: string | null;
+  photoUrl: string | null;
+  status: 'approved' | 'denied';
+  detail: string;
+  scannedAt: string | null;
+};
+
 const SCANNER_CONTEXT_STORAGE_KEY = 'moure-scanner-context';
 
 function formatStatusLabel(value: string | null) {
@@ -55,6 +71,58 @@ function formatDateTime(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString();
+}
+
+function getPlayerInitials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const first = words[0]?.[0] ?? '';
+  const second = words.length > 1 ? words[words.length - 1]?.[0] ?? '' : '';
+  return `${first}${second}`.toUpperCase() || '?';
+}
+
+function PlayerIdentity({
+  name,
+  documentId,
+  photoUrl,
+}: {
+  name: string;
+  documentId?: string | null;
+  photoUrl?: string | null;
+}) {
+  return (
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <Avatar
+        src={photoUrl ?? undefined}
+        alt={name}
+        sx={{ width: 40, height: 40, fontSize: 14, fontWeight: 700 }}
+      >
+        {getPlayerInitials(name)}
+      </Avatar>
+      <Box>
+        <Typography variant="body2" fontWeight={700}>{name}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {documentId ?? 'No document ID'}
+        </Typography>
+      </Box>
+    </Stack>
+  );
+}
+
+function PlayerPhotoFallback({ name }: { name: string }) {
+  return (
+    <Avatar
+      sx={{
+        width: '100%',
+        height: '100%',
+        fontSize: 72,
+        fontWeight: 800,
+        bgcolor: 'grey.200',
+        color: 'text.primary',
+      }}
+    >
+      {getPlayerInitials(name)}
+    </Avatar>
+  );
 }
 
 function readPersistedScannerContext(storageKey: string): PersistedScannerContext | null {
@@ -97,6 +165,8 @@ export default function AdminScannerClient({
   const [idleMs, setIdleMs] = useState('180');
   const [result, setResult] = useState<ScannerValidationResponse | null>(null);
   const [checkedInPlayers, setCheckedInPlayers] = useState<ScannerCheckedInPlayer[]>([]);
+  const [deniedPlayers, setDeniedPlayers] = useState<ScannerDeniedPlayer[]>([]);
+  const [selectedPlayerPreview, setSelectedPlayerPreview] = useState<PlayerPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loadingCheckIns, setLoadingCheckIns] = useState(false);
@@ -250,6 +320,25 @@ export default function AdminScannerClient({
     }
   };
 
+  const loadDeniedPlayers = async (matchId: number, teamId: number) => {
+    try {
+      setLoadingCheckIns(true);
+      const response = await fetch(`/api/scanner/denied-scans?matchId=${matchId}&teamId=${teamId}`);
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'Failed to load denied players.');
+      }
+
+      setDeniedPlayers((payload?.data ?? []) as ScannerDeniedPlayer[]);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load denied players.');
+      setDeniedPlayers([]);
+    } finally {
+      setLoadingCheckIns(false);
+    }
+  };
+
   useEffect(() => {
     const matchId = Number(selectedMatchId);
     const teamId = Number(selectedTeamId);
@@ -260,6 +349,7 @@ export default function AdminScannerClient({
     }
 
     loadCheckedInPlayers(matchId, teamId);
+    loadDeniedPlayers(matchId, teamId);
   }, [selectedMatchId, selectedTeamId]);
 
   const handleScan = async (barcode: string) => {
@@ -295,6 +385,13 @@ export default function AdminScannerClient({
 
       if (payload.data?.approved) {
         await loadCheckedInPlayers(selectedMatch.id, Number(selectedTeamId));
+        await loadDeniedPlayers(selectedMatch.id, Number(selectedTeamId));
+      } else {
+        const deniedResult = payload.data as ScannerValidationResponse;
+        await loadDeniedPlayers(
+          deniedResult.context.matchId ?? selectedMatch.id,
+          deniedResult.context.teamId ?? Number(selectedTeamId)
+        );
       }
 
       if (!response.ok && !payload.data) {
@@ -534,6 +631,79 @@ export default function AdminScannerClient({
 
       <ScannerResultPanel result={result} />
 
+      <Dialog
+        open={Boolean(selectedPlayerPreview)}
+        onClose={() => setSelectedPlayerPreview(null)}
+        fullWidth
+        maxWidth="sm"
+      >
+        {selectedPlayerPreview ? (
+          <>
+            <DialogTitle sx={{ pr: 7 }}>
+              <Stack spacing={0.5}>
+                <Typography variant="h6" fontWeight={800}>{selectedPlayerPreview.name}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Document ID: {selectedPlayerPreview.documentId ?? '-'}
+                </Typography>
+              </Stack>
+              <IconButton
+                aria-label="Close player preview"
+                onClick={() => setSelectedPlayerPreview(null)}
+                sx={{ position: 'absolute', right: 12, top: 12 }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent>
+              <Stack spacing={2.5}>
+                <Box
+                  sx={{
+                    width: '100%',
+                    aspectRatio: '1 / 1',
+                    maxHeight: { xs: 420, sm: 520 },
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    bgcolor: 'grey.100',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  {selectedPlayerPreview.photoUrl ? (
+                    <Box
+                      component="img"
+                      src={selectedPlayerPreview.photoUrl}
+                      alt={selectedPlayerPreview.name}
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                  ) : (
+                    <PlayerPhotoFallback name={selectedPlayerPreview.name} />
+                  )}
+                </Box>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <Alert
+                    severity={selectedPlayerPreview.status === 'approved' ? 'success' : 'error'}
+                    sx={{ flex: 1 }}
+                  >
+                    {selectedPlayerPreview.status === 'approved' ? 'Approved to play' : 'Denied to play'}
+                  </Alert>
+                  <Alert severity="info" sx={{ flex: 1 }}>
+                    {selectedPlayerPreview.scannedAt ? formatDateTime(selectedPlayerPreview.scannedAt) : '-'}
+                  </Alert>
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  {selectedPlayerPreview.detail}
+                </Typography>
+              </Stack>
+            </DialogContent>
+          </>
+        ) : null}
+      </Dialog>
+
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
         <Stack spacing={2}>
           <Box>
@@ -557,7 +727,6 @@ export default function AdminScannerClient({
                 <TableHead>
                   <TableRow>
                     <TableCell>Player</TableCell>
-                    <TableCell>Document ID</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Method</TableCell>
                     <TableCell>Checked In At</TableCell>
@@ -565,12 +734,119 @@ export default function AdminScannerClient({
                 </TableHead>
                 <TableBody>
                   {checkedInPlayers.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>{row.playerName}</TableCell>
-                      <TableCell>{row.documentId ?? '-'}</TableCell>
+                    <TableRow
+                      key={row.id}
+                      hover
+                      tabIndex={0}
+                      sx={{ cursor: 'pointer' }}
+                      onClick={() => setSelectedPlayerPreview({
+                        name: row.playerName,
+                        documentId: row.documentId,
+                        photoUrl: row.photoUrl,
+                        status: 'approved',
+                        detail: `Status: ${formatStatusLabel(row.status)} · Method: ${formatStatusLabel(row.method)}`,
+                        scannedAt: row.checkedInAt,
+                      })}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedPlayerPreview({
+                            name: row.playerName,
+                            documentId: row.documentId,
+                            photoUrl: row.photoUrl,
+                            status: 'approved',
+                            detail: `Status: ${formatStatusLabel(row.status)} · Method: ${formatStatusLabel(row.method)}`,
+                            scannedAt: row.checkedInAt,
+                          });
+                        }
+                      }}
+                    >
+                      <TableCell>
+                        <PlayerIdentity
+                          name={row.playerName}
+                          documentId={row.documentId}
+                          photoUrl={row.photoUrl}
+                        />
+                      </TableCell>
                       <TableCell>{formatStatusLabel(row.status)}</TableCell>
                       <TableCell>{formatStatusLabel(row.method)}</TableCell>
                       <TableCell>{formatDateTime(row.checkedInAt)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          )}
+        </Stack>
+      </Paper>
+
+      <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h6" fontWeight={700}>Denied Players</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Players scanned for the selected match and team who were not cleared to play.
+            </Typography>
+          </Box>
+
+          {!selectedMatch || !selectedTeamId ? (
+            <Typography color="text.secondary">
+              Select a match and team to see denied scans.
+            </Typography>
+          ) : deniedPlayers.length === 0 ? (
+            <Typography color="text.secondary">
+              No denied players have been scanned for this team yet.
+            </Typography>
+          ) : (
+            <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <Table size="small" sx={{ minWidth: 720 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Player</TableCell>
+                    <TableCell>Reason</TableCell>
+                    <TableCell>Method</TableCell>
+                    <TableCell>Scanned At</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {deniedPlayers.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      hover
+                      tabIndex={0}
+                      sx={{ cursor: 'pointer' }}
+                      onClick={() => setSelectedPlayerPreview({
+                        name: row.playerName,
+                        documentId: row.documentId,
+                        photoUrl: row.photoUrl,
+                        status: 'denied',
+                        detail: row.reason,
+                        scannedAt: row.scannedAt,
+                      })}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedPlayerPreview({
+                            name: row.playerName,
+                            documentId: row.documentId,
+                            photoUrl: row.photoUrl,
+                            status: 'denied',
+                            detail: row.reason,
+                            scannedAt: row.scannedAt,
+                          });
+                        }
+                      }}
+                    >
+                      <TableCell>
+                        <PlayerIdentity
+                          name={row.playerName}
+                          documentId={row.documentId}
+                          photoUrl={row.photoUrl}
+                        />
+                      </TableCell>
+                      <TableCell>{row.reason}</TableCell>
+                      <TableCell>{formatStatusLabel(row.method)}</TableCell>
+                      <TableCell>{formatDateTime(row.scannedAt)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

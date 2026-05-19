@@ -27,6 +27,7 @@ export type ScannerPlayerSummary = {
   id: number;
   fullName: string;
   documentId: string;
+  photoUrl: string | null;
   paidMembership: boolean;
   amountPaid: number;
   balanceDue: number;
@@ -55,6 +56,7 @@ export type ScannerValidationResponse = {
   checks: ScannerValidationCheck[];
   validatedAt: string;
   checkIn?: ScannerCheckInSummary | null;
+  deniedScan?: ScannerDeniedScanSummary | null;
 };
 
 export type ScannerCheckInSummary = {
@@ -65,16 +67,35 @@ export type ScannerCheckInSummary = {
   message: string;
 };
 
+export type ScannerDeniedScanSummary = {
+  id: number;
+  method: 'scanner';
+  savedAt: string;
+  message: string;
+};
+
 export type ScannerCheckedInPlayer = {
   id: number;
   playerId: number;
   playerName: string;
   documentId: string | null;
+  photoUrl: string | null;
   teamId: number;
   teamName: string | null;
   status: string | null;
   method: string | null;
   checkedInAt: string | null;
+};
+
+export type ScannerDeniedPlayer = {
+  id: string;
+  playerId: number | null;
+  playerName: string;
+  documentId: string | null;
+  photoUrl: string | null;
+  reason: string;
+  method: string | null;
+  scannedAt: string;
 };
 
 export type ScannerMatchOption = {

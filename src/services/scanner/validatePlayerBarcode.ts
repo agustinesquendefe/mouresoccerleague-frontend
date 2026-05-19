@@ -174,6 +174,87 @@ async function registerScannerCheckIn(
   };
 }
 
+async function registerDeniedScan(
+  client: SupabaseClient,
+  response: ScannerValidationResponse
+): Promise<NonNullable<ScannerValidationResponse['deniedScan']> | null> {
+  const { context, player, checks, summary, validatedAt } = response;
+
+  if (!context.matchId || !context.teamId || !context.scannedCode) {
+    return null;
+  }
+
+  const now = new Date().toISOString();
+  const reason = checks.find((check) => !check.passed)?.message ?? summary;
+
+  const { data: existingDeniedScan, error: existingError } = await client
+    .from('scanner_denied_scans')
+    .select('id')
+    .eq('match_id', context.matchId)
+    .eq('team_id', context.teamId)
+    .eq('scanned_code', context.scannedCode)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  const payload = {
+    event_id: context.eventId,
+    match_id: context.matchId,
+    team_id: context.teamId,
+    player_id: player?.id ?? null,
+    scanned_code: context.scannedCode,
+    reason,
+    summary,
+    method: 'scanner',
+    checks,
+    validated_at: validatedAt,
+    updated_at: now,
+  };
+
+  if (existingDeniedScan) {
+    const { data, error } = await client
+      .from('scanner_denied_scans')
+      .update(payload)
+      .eq('id', existingDeniedScan.id)
+      .select('id, updated_at')
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      id: Number(data.id),
+      method: 'scanner',
+      savedAt: data.updated_at ?? now,
+      message: 'Denied scan was updated.',
+    };
+  }
+
+  const { data, error } = await client
+    .from('scanner_denied_scans')
+    .insert({
+      ...payload,
+      created_at: now,
+    })
+    .select('id, created_at')
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return {
+    id: Number(data.id),
+    method: 'scanner',
+    savedAt: data.created_at ?? now,
+    message: 'Denied scan was saved.',
+  };
+}
+
 async function resolveEvent(client: SupabaseClient, eventId?: number | null): Promise<EventRow | null> {
   if (eventId) {
     const { data, error } = await client
@@ -328,7 +409,7 @@ export async function validatePlayerBarcode(
 
   const { data: player, error: playerError } = await client
     .from('players')
-    .select('id, full_name, document_id, paid_membership, is_active')
+    .select('id, full_name, document_id, photo_url, paid_membership, is_active')
     .eq('document_id', barcode)
     .limit(1)
     .maybeSingle();
@@ -345,7 +426,7 @@ export async function validatePlayerBarcode(
   );
 
   if (!player) {
-    return buildDeniedResponse(barcode, [eventCheck, matchCheck, teamCheck, playerExistsCheck], {
+    const response = buildDeniedResponse(barcode, [eventCheck, matchCheck, teamCheck, playerExistsCheck], {
       context: {
         scannerMode: 'keyboard_wedge',
         scannedCode: barcode,
@@ -359,6 +440,12 @@ export async function validatePlayerBarcode(
         teamName: normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`),
       },
     });
+
+    const deniedScan = await registerDeniedScan(client, response);
+    return {
+      ...response,
+      deniedScan,
+    };
   }
 
   const playerActiveCheck = buildCheck(
@@ -462,7 +549,7 @@ export async function validatePlayerBarcode(
       })
     : null;
 
-  return {
+  const response: ScannerValidationResponse = {
     approved,
     outcome: approved ? 'approved' : 'denied',
     headline: approved ? 'APPROVED' : 'DENIED',
@@ -487,6 +574,7 @@ export async function validatePlayerBarcode(
       id: Number(player.id),
       fullName: normalizeName(player.full_name, `Player #${player.id}`),
       documentId: player.document_id ?? barcode,
+      photoUrl: player.photo_url ?? null,
       paidMembership: Number(player.paid_membership ?? 0) > 0,
       amountPaid,
       balanceDue,
@@ -497,4 +585,21 @@ export async function validatePlayerBarcode(
     validatedAt: new Date().toISOString(),
     checkIn,
   };
+
+  if (!approved) {
+    response.deniedScan = await registerDeniedScan(client, response);
+  } else if (match?.id) {
+    const { error } = await client
+      .from('scanner_denied_scans')
+      .delete()
+      .eq('match_id', match.id)
+      .eq('team_id', resolvedTeam.id)
+      .eq('scanned_code', barcode);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  return response;
 }
