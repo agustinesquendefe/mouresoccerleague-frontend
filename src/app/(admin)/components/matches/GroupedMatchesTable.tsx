@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import type { Match } from '@/models/match';
 import type { Field } from '@/models/field';
+import { formatTime12Hour } from '@/utils/formatTime';
 
 type Props = {
   matches: Match[];
@@ -96,7 +97,7 @@ export default function GroupedMatchesTable({
                     )}
 
                     <Typography variant="body2" color="text.secondary">
-                      Date: {match.date ?? '-'}{match.time ? ` — ${match.time}` : ''}
+                      Date: {match.date ?? '-'}{match.time ? ` — ${formatTime12Hour(match.time)}` : ''}
                     </Typography>
 
                     <Typography variant="body2" color="text.secondary">

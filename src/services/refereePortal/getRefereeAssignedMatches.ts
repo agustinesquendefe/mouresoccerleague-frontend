@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ScannerContextData, ScannerEventOption, ScannerMatchOption } from '@/models/scanner';
+import { formatTime12Hour } from '@/utils/formatTime';
 
 export type RefereeAssignedMatch = {
   id: number;
@@ -27,7 +28,7 @@ function normalizeName(value: string | null | undefined, fallback: string) {
 }
 
 function buildMatchLabel(match: Pick<RefereeAssignedMatch, 'date' | 'time' | 'team1' | 'team2'>) {
-  const matchDate = match.date ? `${match.date}${match.time ? ` ${match.time}` : ''}` : 'No date';
+  const matchDate = match.date ? `${match.date}${match.time ? ` ${formatTime12Hour(match.time)}` : ''}` : 'No date';
   return `${match.team1.name} vs ${match.team2.name} · ${matchDate}`;
 }
 

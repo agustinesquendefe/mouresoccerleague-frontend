@@ -21,6 +21,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { supabase } from "@/lib/supabaseClient";
 import type { PlayerPortalData, PlayerPortalEvent } from "@/services/playerPortal";
+import { formatTime12Hour } from "@/utils/formatTime";
 
 function formatDate(value?: string | null) {
   if (!value) return "TBD";
@@ -34,15 +35,7 @@ function formatDate(value?: string | null) {
 }
 
 function formatTime(value?: string | null) {
-  if (!value) return "";
-  const [hours, minutes] = value.split(":");
-  if (!hours || !minutes) return value;
-  const date = new Date();
-  date.setHours(Number(hours), Number(minutes), 0, 0);
-  return date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatTime12Hour(value);
 }
 
 function getPaymentColor(status: PlayerPortalEvent["payment_status"]) {

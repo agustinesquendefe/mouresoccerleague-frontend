@@ -2,6 +2,7 @@ import { Box, Button, Paper, Stack, Typography } from '@mui/material';
 import Link from 'next/link';
 import { IconChevronLeft } from '@tabler/icons-react';
 import { supabase } from '@/lib/supabaseClient';
+import { formatTime12Hour } from '@/utils/formatTime';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -68,7 +69,7 @@ export default async function RefereeDetailPage({ params }: Props) {
                   <Typography variant="body2" fontWeight={600} sx={{ '&:hover': { textDecoration: 'underline' } }}>
                     Match #{mr.match_id}
                     {mr.matches?.date ? ` — ${mr.matches.date}` : ''}
-                    {mr.matches?.time ? ` ${mr.matches.time.slice(0, 5)}` : ''}
+                    {mr.matches?.time ? ` ${formatTime12Hour(mr.matches.time)}` : ''}
                   </Typography>
                 </Link>
                 {mr.role && (

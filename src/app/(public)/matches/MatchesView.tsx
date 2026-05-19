@@ -15,6 +15,7 @@ import {
 import Image from 'next/image';
 import type { Event } from '@/models/event';
 import type { PublicMatchRow } from '@/services/matches/getPublicMatches';
+import { formatTime12Hour } from '@/utils/formatTime';
 
 const BRACKET_ROUND_LABELS: Record<string, string> = {
   round_of_16: 'Round of 16',
@@ -45,13 +46,6 @@ function formatRoundLabel(match: PublicMatchRow): string {
     return BRACKET_ROUND_LABELS[match.bracket_round] ?? match.bracket_round;
   }
   return match.round_number != null ? `Jornada ${match.round_number}` : 'Sin jornada';
-}
-
-function formatTimeET(time: string): string {
-  const [h, m] = time.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
 type Props = {
@@ -319,7 +313,7 @@ export default function MatchesView({ events, initialEventId, matchesByEvent }: 
 
                           {row.time && (
                             <Typography variant="caption" color="text.secondary" textAlign="center" mt={0.25} className="font-filson-regular">
-                              🕐 {formatTimeET(row.time)}
+                              🕐 {formatTime12Hour(row.time)}
                             </Typography>
                           )}
                         </Stack>

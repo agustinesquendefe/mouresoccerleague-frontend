@@ -21,6 +21,7 @@ import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import { supabase } from '@/lib/supabaseClient';
 import type { RefereeAssignedMatch } from '@/services/refereePortal/getRefereeAssignedMatches';
+import { formatTime12Hour } from '@/utils/formatTime';
 
 type RefereeMatchesPayload = {
   user: {
@@ -135,7 +136,7 @@ export default function RefereeMatchesClient() {
                       </Typography>
                     </TableCell>
                     <TableCell>{match.eventName}</TableCell>
-                    <TableCell>{match.date ?? '-'} {match.time ?? ''}</TableCell>
+                    <TableCell>{match.date ?? '-'} {formatTime12Hour(match.time)}</TableCell>
                     <TableCell>
                       <Chip label={formatStatus(match.status)} size="small" />
                     </TableCell>

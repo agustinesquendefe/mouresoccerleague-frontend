@@ -15,6 +15,7 @@ import {
 import type { Match } from '@/models/match';
 import type { Field } from '@/models/field';
 import type { MatchScheduleUpdate } from '@/services/matches';
+import { formatTime12Hour } from '@/utils/formatTime';
 
 type MatchScheduleDraft = {
   id: number;
@@ -306,7 +307,7 @@ export default function RoundSchedulePlanner({
                 {timeSlots.map((time) => (
                   <Fragment key={time}>
                     <Paper key={`${time}:label`} variant="outlined" sx={{ p: 1.5 }}>
-                      <Typography fontWeight={600}>{time}</Typography>
+                      <Typography fontWeight={600}>{formatTime12Hour(time)}</Typography>
                     </Paper>
                     {fields.map((field) => {
                       const match = scheduledBySlot.get(`${time}:${field.id}`);

@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import type { MatchListRow } from '@/services/matches/getAllMatches';
 import Link from 'next/link';
+import { formatTime12Hour } from '@/utils/formatTime';
 
 type Props = {
   matches: MatchListRow[];
@@ -43,7 +44,7 @@ export default function MatchesPageTable({ matches, onEdit }: Props) {
         <TableBody>
           {matches.map((match) => (
             <TableRow key={match.id} hover>
-              <TableCell>{match.date ?? '-'}{match.time ? ` ${match.time}` : ''}</TableCell>
+              <TableCell>{match.date ?? '-'}{match.time ? ` ${formatTime12Hour(match.time)}` : ''}</TableCell>
               <TableCell>{match.event_name ?? '-'}</TableCell>
               <TableCell>{match.event_season_name ?? '-'}</TableCell>
               <TableCell>{match.event_category_name ?? '-'}</TableCell>
