@@ -13,7 +13,7 @@ export async function getEventGroups(eventId: number): Promise<EventGroupWithTea
 
   const { data: eventTeams, error: teamsError } = await supabase
     .from('event_teams')
-    .select('id, team_id, group_id, order_index, teams(name)')
+    .select('id, team_id, display_name, group_id, order_index, teams(name)')
     .eq('event_id', eventId)
     .order('order_index', { ascending: true })
     .order('id', { ascending: true });
@@ -29,7 +29,7 @@ export async function getEventGroups(eventId: number): Promise<EventGroupWithTea
     teamsByGroup.get(et.group_id)!.push({
       event_team_id: et.id,
       team_id: et.team_id,
-      team_name: team?.name ?? `#${et.team_id}`,
+      team_name: et.display_name?.trim() || team?.name || `#${et.team_id}`,
     });
   });
 

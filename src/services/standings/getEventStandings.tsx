@@ -25,6 +25,7 @@ type MatchRow = {
 
 type EventTeamRow = {
   team_id: number;
+  display_name: string | null;
   teams?: {
     name: string;
   } | Array<{ name: string }>;
@@ -61,7 +62,7 @@ export async function getEventStandings(
   // Build event_teams query — when filtering by group, only include teams in that group
   let teamsQuery = supabase
     .from('event_teams')
-    .select('team_id, teams(name)')
+    .select('team_id, display_name, teams(name)')
     .eq('event_id', eventId);
 
   if (groupId != null) {
@@ -81,7 +82,7 @@ export async function getEventStandings(
 
     standingsMap.set(row.team_id, {
       team_id: row.team_id,
-      team_name: team?.name ?? `#${row.team_id}`,
+      team_name: row.display_name?.trim() || team?.name || `#${row.team_id}`,
       played: 0,
       won: 0,
       drawn: 0,

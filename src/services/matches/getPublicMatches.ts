@@ -36,6 +36,15 @@ type RawMatch = {
   field_id: number | null;
 };
 
+type TeamSummary = {
+  name: string;
+  logo_url: string | null;
+};
+
+function getEventTeamKey(eventId: number, teamId: number) {
+  return `${eventId}:${teamId}`;
+}
+
 export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[]> {
   const { data, error } = await supabase
     .from('matches')
@@ -71,9 +80,16 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
     new Set(matches.map((m) => m.field_id).filter((id): id is number => Number.isFinite(id)))
   );
 
-  const [teamRes, fieldRes] = await Promise.all([
+  const [teamRes, eventTeamRes, fieldRes] = await Promise.all([
     teamIds.length > 0
       ? supabase.from('teams').select('id, name, logo_url').in('id', teamIds)
+      : Promise.resolve({ data: [], error: null }),
+    teamIds.length > 0
+      ? supabase
+        .from('event_teams')
+        .select('event_id, team_id, display_name')
+        .eq('event_id', eventId)
+        .in('team_id', teamIds)
       : Promise.resolve({ data: [], error: null }),
     fieldIds.length > 0
       ? supabase.from('fields').select('id, name').in('id', fieldIds)
@@ -81,14 +97,25 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
   ]);
 
   if (teamRes.error) throw new Error(teamRes.error.message);
+  if (eventTeamRes.error) throw new Error(eventTeamRes.error.message);
   if (fieldRes.error) throw new Error(fieldRes.error.message);
 
-  const teamById = new Map<number, { name: string; logo_url: string | null }>(
+  const teamById = new Map<number, TeamSummary>(
     ((teamRes.data ?? []) as { id: number; name: string; logo_url: string | null }[]).map((t) => [t.id, t])
+  );
+  const eventTeamDisplayNameByKey = new Map<string, string>(
+    ((eventTeamRes.data ?? []) as { event_id: number; team_id: number; display_name: string | null }[])
+      .filter((row) => Boolean(row.display_name?.trim()))
+      .map((row) => [getEventTeamKey(row.event_id, row.team_id), row.display_name!.trim()])
   );
   const fieldById = new Map<number, string>(
     ((fieldRes.data ?? []) as { id: number; name: string }[]).map((f) => [f.id, f.name])
   );
+
+  const getTeamName = (teamId: number | null) => {
+    if (teamId == null) return '-';
+    return eventTeamDisplayNameByKey.get(getEventTeamKey(eventId, teamId)) ?? teamById.get(teamId)?.name ?? '-';
+  };
 
   return matches.map((m) => ({
     id: m.id,
@@ -103,9 +130,9 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
     score2: m.score2,
     team1_id: m.team1_id ?? 0,
     team2_id: m.team2_id ?? 0,
-    team1_name: m.team1_id != null ? (teamById.get(m.team1_id)?.name ?? '-') : '-',
+    team1_name: getTeamName(m.team1_id),
     team1_logo: m.team1_id != null ? (teamById.get(m.team1_id)?.logo_url ?? null) : null,
-    team2_name: m.team2_id != null ? (teamById.get(m.team2_id)?.name ?? '-') : '-',
+    team2_name: getTeamName(m.team2_id),
     team2_logo: m.team2_id != null ? (teamById.get(m.team2_id)?.logo_url ?? null) : null,
     field_name: m.field_id != null ? (fieldById.get(m.field_id) ?? null) : null,
   }));

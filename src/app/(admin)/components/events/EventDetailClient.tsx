@@ -9,6 +9,8 @@ import EventStandingsSection from '../standings/EventStandingsSection';
 import EventGroupsSection from './EventGroupsSection';
 import EventMembershipsSection from './EventMembershipsSection';
 import { supabase } from '@/lib/supabaseClient';
+import { getAppSettings } from '@/services/settings/settings.service';
+import type { AppSettings } from '@/models/appSettings';
 
 type Props = {
   eventId: number;
@@ -18,17 +20,24 @@ export default function EventDetailClient({ eventId }: Props) {
   const [standingsRefreshKey, setStandingsRefreshKey] = useState(0);
   const [formatType, setFormatType] = useState<string | null>(null);
   const [matchFormat, setMatchFormat] = useState<string | null>(null);
+  const [eventName, setEventName] = useState<string | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
 
   useEffect(() => {
-    supabase
-      .from('events')
-      .select('format_type, match_format')
-      .eq('id', eventId)
-      .single()
-      .then(({ data }) => {
-        setFormatType(data?.format_type ?? null);
-        setMatchFormat(data?.match_format ?? null);
-      });
+    Promise.all([
+      supabase
+        .from('events')
+        .select('name, format_type, match_format')
+        .eq('id', eventId)
+        .single(),
+      getAppSettings(),
+    ]).then(([eventResult, appSettings]) => {
+      const data = eventResult.data;
+      setEventName(data?.name ?? null);
+      setFormatType(data?.format_type ?? null);
+      setMatchFormat(data?.match_format ?? null);
+      setSettings(appSettings);
+    });
   }, [eventId]);
 
   const handleMatchUpdated = () => {
@@ -56,10 +65,14 @@ export default function EventDetailClient({ eventId }: Props) {
 
       <EventMatchesSection
         eventId={eventId}
+        eventName={eventName ?? `Event #${eventId}`}
+        printCompany={settings}
         onMatchUpdated={handleMatchUpdated}
       />
       <EventStandingsSection
         eventId={eventId}
+        eventName={eventName ?? `Event #${eventId}`}
+        printCompany={settings}
         refreshKey={standingsRefreshKey}
       />
     </Box>

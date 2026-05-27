@@ -5,6 +5,23 @@ export async function updateMatch(
   id: number,
   payload: MatchFormData
 ): Promise<Match> {
+  const { data: existingMatch, error: existingMatchError } = await supabase
+    .from('matches')
+    .select('date, rescheduled_from_date')
+    .eq('id', id)
+    .single();
+
+  if (existingMatchError) {
+    throw new Error(existingMatchError.message);
+  }
+
+  const rescheduledFromDate =
+    existingMatch.date &&
+    payload.date &&
+    existingMatch.date !== payload.date
+      ? existingMatch.rescheduled_from_date ?? existingMatch.date
+      : existingMatch.rescheduled_from_date ?? null;
+
   const { data, error } = await supabase
     .from('matches')
     .update({
@@ -18,6 +35,9 @@ export async function updateMatch(
       time: payload.time,
       field_id: payload.field_id,
       field_number: payload.field_number,
+      team1_id: payload.team1_id,
+      team2_id: payload.team2_id,
+      rescheduled_from_date: rescheduledFromDate,
     })
     .eq('id', id)
     .select()

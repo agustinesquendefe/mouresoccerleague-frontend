@@ -4,7 +4,7 @@ import type { Category } from '@/models/category';
 
 export async function updateTeam(
   id: number,
-  payload: TeamFormData & { category_ids?: number[] }
+  payload: TeamFormData & { category_ids?: number[]; playing_days?: number[] }
 ): Promise<Team> {
   // Actualizar datos del equipo
   const { data, error } = await supabase
@@ -38,6 +38,21 @@ export async function updateTeam(
         .from('team_categories')
         .insert(inserts);
       if (catError) throw new Error(catError.message);
+    }
+  }
+
+  if (payload.playing_days) {
+    await supabase.from('team_playing_days').delete().eq('team_id', id);
+
+    if (payload.playing_days.length > 0) {
+      const inserts = payload.playing_days.map((day_of_week) => ({
+        team_id: id,
+        day_of_week,
+      }));
+      const { error: daysError } = await supabase
+        .from('team_playing_days')
+        .insert(inserts);
+      if (daysError) throw new Error(daysError.message);
     }
   }
 

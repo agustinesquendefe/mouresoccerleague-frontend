@@ -18,6 +18,23 @@ export async function updateMatchesSchedule(
 
   const results = await Promise.all(
     updates.map(async (update) => {
+      const { data: existingMatch, error: existingMatchError } = await supabase
+        .from('matches')
+        .select('date, rescheduled_from_date')
+        .eq('id', update.id)
+        .single();
+
+      if (existingMatchError) {
+        throw new Error(existingMatchError.message);
+      }
+
+      const rescheduledFromDate =
+        existingMatch.date &&
+        update.date &&
+        existingMatch.date !== update.date
+          ? existingMatch.rescheduled_from_date ?? existingMatch.date
+          : existingMatch.rescheduled_from_date ?? null;
+
       const { data, error } = await supabase
         .from('matches')
         .update({
@@ -25,6 +42,7 @@ export async function updateMatchesSchedule(
           time: update.time,
           field_id: update.field_id,
           field_number: update.field_number,
+          rescheduled_from_date: rescheduledFromDate,
         })
         .eq('id', update.id)
         .select()

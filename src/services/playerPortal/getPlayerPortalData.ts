@@ -42,6 +42,7 @@ type TeamPlayerRow = {
 type EventTeamRow = {
   event_id: number;
   team_id: number;
+  display_name: string | null;
 };
 
 type PortalEventRow = {
@@ -123,7 +124,7 @@ export async function getPlayerPortalData(
 
   const { data: eventTeams, error: eventTeamsError } = await client
     .from('event_teams')
-    .select('event_id, team_id')
+    .select('event_id, team_id, display_name')
     .in('team_id', teamIds);
 
   if (eventTeamsError) {
@@ -199,6 +200,15 @@ export async function getPlayerPortalData(
     ((eventsResult.data ?? []) as PortalEventRow[]).map((event) => [event.id, event])
   );
   const teamMap = new Map((teamsResult.data ?? []).map((team) => [team.id, team]));
+  const eventTeamDisplayNameMap = new Map(
+    eventTeamRows
+      .filter((row) => Boolean(row.display_name?.trim()))
+      .map((row) => [`${row.event_id}:${row.team_id}`, row.display_name!.trim()])
+  );
+  const getTeamName = (eventId: number, teamId: number | null) => {
+    if (teamId == null) return 'TBD';
+    return eventTeamDisplayNameMap.get(`${eventId}:${teamId}`) ?? teamMap.get(teamId)?.name ?? `Team #${teamId}`;
+  };
   const fieldMap = new Map((fieldsResult.data ?? []).map((field) => [field.id, field]));
   const membershipMap = new Map(
     ((memberships ?? []) as MembershipRow[]).map((membership) => [
@@ -241,10 +251,7 @@ export async function getPlayerPortalData(
               (match.team1_id === row.team_id || match.team2_id === row.team_id)
           )
           .map((match) => {
-            const homeTeam = match.team1_id ? teamMap.get(match.team1_id) : null;
-            const awayTeam = match.team2_id ? teamMap.get(match.team2_id) : null;
             const opponentId = match.team1_id === row.team_id ? match.team2_id : match.team1_id;
-            const opponent = opponentId ? teamMap.get(opponentId) : null;
 
             return {
               id: match.id,
@@ -252,9 +259,9 @@ export async function getPlayerPortalData(
               time: match.time,
               status: match.status,
               field_name: match.field_id ? (fieldMap.get(match.field_id)?.name ?? null) : null,
-              opponent_name: opponent?.name ?? 'TBD',
-              home_team_name: homeTeam?.name ?? 'TBD',
-              away_team_name: awayTeam?.name ?? 'TBD',
+              opponent_name: getTeamName(match.event_id, opponentId),
+              home_team_name: getTeamName(match.event_id, match.team1_id),
+              away_team_name: getTeamName(match.event_id, match.team2_id),
             };
           });
 
@@ -264,7 +271,7 @@ export async function getPlayerPortalData(
           event_price: eventPrice,
           stripe_price_id: event?.stripe_price_id ?? null,
           team_id: row.team_id,
-          team_name: team?.name ?? `Team #${row.team_id}`,
+          team_name: eventTeamDisplayNameMap.get(`${row.event_id}:${row.team_id}`) ?? team?.name ?? `Team #${row.team_id}`,
           jersey_number: teamPlayer?.jersey_number ?? null,
           payment_status: balanceDue <= 0 && eventPrice > 0 ? 'paid' as const : 'pending' as const,
           paid_amount: paidAmount,

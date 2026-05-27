@@ -149,7 +149,7 @@ export default function MatchDialog({
       values.score2 !== null &&
       values.score1 > values.score2
     ) {
-      return match.team1_id;
+      return values.team1_id ?? match.team1_id;
     }
 
     if (
@@ -157,7 +157,7 @@ export default function MatchDialog({
       values.score2 !== null &&
       values.score2 > values.score1
     ) {
-      return match.team2_id;
+      return values.team2_id ?? match.team2_id;
     }
 
     if (
@@ -166,12 +166,12 @@ export default function MatchDialog({
       values.penalty_score1 !== null &&
       values.penalty_score2 !== null
     ) {
-      if (values.penalty_score1 > values.penalty_score2) return match.team1_id;
-      if (values.penalty_score2 > values.penalty_score1) return match.team2_id;
+      if (values.penalty_score1 > values.penalty_score2) return values.team1_id ?? match.team1_id;
+      if (values.penalty_score2 > values.penalty_score1) return values.team2_id ?? match.team2_id;
     }
 
     return null;
-  }, [match, values.score1, values.score2, values.penalty_score1, values.penalty_score2, isKnockout, isTiedRegularScore]);
+  }, [match, values.team1_id, values.team2_id, values.score1, values.score2, values.penalty_score1, values.penalty_score2, isKnockout, isTiedRegularScore]);
 
   const handleSubmit = async () => {
     try {
