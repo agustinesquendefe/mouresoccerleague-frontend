@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Box, Snackbar, Stack, Tab, Tabs, Typography } from '@mui/material';
+import { Alert, Box, Button, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { getMatchesByEvent, updateMatch, updateMatchesSchedule, type MatchScheduleUpdate } from '@/services/matches';
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
 import { getFieldsByEvent } from '@/services/eventFields/getFieldsByEvent';
@@ -13,10 +13,16 @@ import GroupedMatchesTable from './GroupedMatchesTable';
 import MatchDialog from './MatchDialog';
 import AdvanceKnockoutRoundButton from './AdvanceKnockoutRoundButton';
 import RoundSchedulePlanner from './RoundSchedulePlanner';
+import { escapeHtml, printHtml } from '@/utils/printHtml';
+import { formatTime12Hour } from '@/utils/formatTime';
+import type { AppSettings } from '@/models/appSettings';
+
+type MatchQuickFilter = 'all' | 'played' | 'pending' | 'rescheduled';
 
 type EventTeamRow = {
   id: number;
   team_id: number;
+  display_name?: string | null;
   teams?: Array<{
     id: number;
     name: string;
@@ -26,10 +32,12 @@ type EventTeamRow = {
 
 type Props = {
   eventId: number;
+  eventName?: string;
+  printCompany?: Partial<AppSettings> | null;
   onMatchUpdated?: () => void;
 };
 
-export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) {
+export default function EventMatchesSection({ eventId, eventName, printCompany, onMatchUpdated }: Props) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [eventTeams, setEventTeams] = useState<EventTeamRow[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
@@ -41,6 +49,8 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
   const [scheduleSaving, setScheduleSaving] = useState(false);
 
   const [selectedLeagueTab, setSelectedLeagueTab] = useState('all');
+  const [teamSearch, setTeamSearch] = useState('');
+  const [quickFilter, setQuickFilter] = useState<MatchQuickFilter>('all');
 
   const [toast, setToast] = useState<{
     open: boolean;
@@ -84,9 +94,10 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
   const teamMap = useMemo(() => {
     return eventTeams.reduce<Record<number, string>>((acc, row: any) => {
       const team = Array.isArray(row.teams) ? row.teams[0] : row.teams;
+      const displayName = row.display_name?.trim() || team?.name;
 
-      if (team?.name) {
-        acc[row.team_id] = team.name;
+      if (displayName) {
+        acc[row.team_id] = displayName;
       }
 
       return acc;
@@ -112,10 +123,47 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
   }, [leagueMatches]);
 
   const visibleLeagueMatches = useMemo(() => {
-    if (selectedLeagueTab === 'all') return leagueMatches;
+    const tabMatches = selectedLeagueTab === 'all'
+      ? leagueMatches
+      : leagueMatches.filter(
+        (match) => String(match.round_number) === String(selectedLeagueTab)
+      );
 
-    return leagueMatches.filter(
-      (match) => String(match.round_number) === String(selectedLeagueTab)
+    const quickFilteredMatches = tabMatches.filter((match) => {
+      const status = String(match.status ?? '').toLowerCase();
+
+      if (quickFilter === 'played') return status === 'played';
+      if (quickFilter === 'pending') return status !== 'played' && status !== 'cancelled';
+      if (quickFilter === 'rescheduled') return Boolean(match.rescheduled_from_date);
+
+      return true;
+    });
+
+    const term = teamSearch.trim().toLowerCase();
+    if (!term) return quickFilteredMatches;
+
+    return quickFilteredMatches.filter((match) => {
+      const team1Name = teamMap[match.team1_id]?.toLowerCase() ?? '';
+      const team2Name = teamMap[match.team2_id]?.toLowerCase() ?? '';
+      return team1Name.includes(term) || team2Name.includes(term);
+    });
+  }, [leagueMatches, selectedLeagueTab, quickFilter, teamSearch, teamMap]);
+
+  const quickFilterCounts = useMemo(() => {
+    const sourceMatches = selectedLeagueTab === 'all'
+      ? leagueMatches
+      : leagueMatches.filter((match) => String(match.round_number) === String(selectedLeagueTab));
+
+    return sourceMatches.reduce(
+      (acc, match) => {
+        const status = String(match.status ?? '').toLowerCase();
+        acc.all += 1;
+        if (status === 'played') acc.played += 1;
+        if (status !== 'played' && status !== 'cancelled') acc.pending += 1;
+        if (match.rescheduled_from_date) acc.rescheduled += 1;
+        return acc;
+      },
+      { all: 0, played: 0, pending: 0, rescheduled: 0 }
     );
   }, [leagueMatches, selectedLeagueTab]);
 
@@ -227,6 +275,89 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
     }
   };
 
+  const buildMatchesTable = (rows: Match[]) => {
+    return `
+      <table>
+        <thead>
+          <tr>
+            <th>Round</th>
+            <th>Match</th>
+            <th>Date</th>
+            <th>Original Date</th>
+            <th>Time</th>
+            <th>Field</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((match) => {
+            const team1 = teamMap[match.team1_id] ?? `#${match.team1_id}`;
+            const team2 = teamMap[match.team2_id] ?? `#${match.team2_id}`;
+            const fieldName = match.field_id
+              ? fields.find((field) => field.id === match.field_id)?.name ?? `#${match.field_id}`
+              : '-';
+
+            return `
+              <tr>
+                <td>${escapeHtml(match.round_number ? `Round ${match.round_number}` : '-')}</td>
+                <td>${escapeHtml(`${team1} vs ${team2}`)}</td>
+                <td>${escapeHtml(match.date ?? '-')}</td>
+                <td>${escapeHtml(match.rescheduled_from_date ?? '-')}</td>
+                <td>${escapeHtml(match.time ? formatTime12Hour(match.time) : '-')}</td>
+                <td>${escapeHtml(fieldName)}</td>
+                <td>${escapeHtml(match.rescheduled_from_date ? `${match.status ?? 'scheduled'} / rescheduled` : match.status ?? 'scheduled')}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  };
+
+  const handlePrintLeagueMatches = () => {
+    if (selectedLeagueTab === 'all') {
+      const term = teamSearch.trim();
+      const groupedByRound = visibleLeagueMatches.reduce<Record<string, Match[]>>((acc, match) => {
+        const key = String(match.round_number ?? 'No Round');
+        acc[key] = acc[key] ?? [];
+        acc[key].push(match);
+        return acc;
+      }, {});
+
+      const sortedRounds = Object.keys(groupedByRound).sort((left, right) => {
+        if (left === 'No Round') return 1;
+        if (right === 'No Round') return -1;
+        return Number(left) - Number(right);
+      });
+
+      printHtml({
+        title: term ? `${eventName ?? `Event #${eventId}`} - ${term}` : `${eventName ?? `Event #${eventId}`} - League Schedule`,
+        company: printCompany,
+        subtitle: term
+          ? 'All rounds where this team appears.'
+          : 'All league rounds.',
+        body: `
+          <div class="round-grid">
+            ${sortedRounds.map((round) => `
+              <section class="round-card">
+                <h2>${escapeHtml(round === 'No Round' ? 'No Round' : `Round ${round}`)}</h2>
+                ${buildMatchesTable(groupedByRound[round])}
+              </section>
+            `).join('')}
+          </div>
+        `,
+      });
+      return;
+    }
+
+    printHtml({
+      title: `${eventName ?? `Event #${eventId}`} - Round ${selectedLeagueTab}`,
+      company: printCompany,
+      subtitle: 'League matchups for this round.',
+      body: buildMatchesTable(visibleLeagueMatches),
+    });
+  };
+
   return (
     <Stack spacing={4} sx={{ width: '100%', minWidth: 0 }}>
       <Stack spacing={2}>
@@ -238,7 +369,10 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
         {!loading && leagueMatches.length > 0 && (
           <Tabs
             value={selectedLeagueTab}
-            onChange={(_, value) => setSelectedLeagueTab(value)}
+            onChange={(_, value) => {
+              setSelectedLeagueTab(value);
+              setTeamSearch('');
+            }}
             variant="scrollable"
             scrollButtons="auto"
           >
@@ -249,6 +383,52 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
           </Tabs>
         )}
 
+        {!loading && leagueMatches.length > 0 && (
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {([
+              ['all', 'All', quickFilterCounts.all],
+              ['played', 'Played', quickFilterCounts.played],
+              ['pending', 'Pending', quickFilterCounts.pending],
+              ['rescheduled', 'Rescheduled', quickFilterCounts.rescheduled],
+            ] as const).map(([value, label, count]) => (
+              <Button
+                key={value}
+                variant={quickFilter === value ? 'contained' : 'outlined'}
+                size="small"
+                onClick={() => setQuickFilter(value)}
+              >
+                {label} ({count})
+              </Button>
+            ))}
+          </Stack>
+        )}
+
+        {!loading && selectedLeagueTab === 'all' && leagueMatches.length > 0 && (
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'flex-start' }}>
+            <TextField
+              label="Search by team"
+              value={teamSearch}
+              onChange={(event) => setTeamSearch(event.target.value)}
+              placeholder="Type a team name"
+              size="small"
+              fullWidth
+              helperText={
+                teamSearch.trim()
+                  ? `Showing ${visibleLeagueMatches.length} match${visibleLeagueMatches.length === 1 ? '' : 'es'} across all rounds.`
+                  : 'All rounds are grouped by round in columns.'
+              }
+            />
+            <Button
+              variant="outlined"
+              onClick={handlePrintLeagueMatches}
+              disabled={visibleLeagueMatches.length === 0 || !teamSearch.trim()}
+              sx={{ minWidth: 180 }}
+            >
+              Print Team Rounds
+            </Button>
+          </Stack>
+        )}
+
         {loading && <Typography>Loading matches...</Typography>}
 
         {!loading && leagueMatches.length === 0 && (
@@ -256,24 +436,37 @@ export default function EventMatchesSection({ eventId, onMatchUpdated }: Props) 
         )}
 
         {!loading && selectedLeagueTab !== 'all' && visibleLeagueMatches.length > 0 && (
-          <RoundSchedulePlanner
-            roundLabel={`Round ${selectedLeagueTab}`}
-            matches={visibleLeagueMatches}
-            teamMap={teamMap}
-            fields={fields}
-            loading={scheduleSaving}
-            onSave={handleSaveRoundSchedule}
-          />
+          <Stack spacing={2}>
+            <Stack direction="row" justifyContent="flex-end">
+              <Button variant="outlined" onClick={handlePrintLeagueMatches}>
+                Print Round
+              </Button>
+            </Stack>
+            <RoundSchedulePlanner
+              roundLabel={`Round ${selectedLeagueTab}`}
+              matches={visibleLeagueMatches}
+              teamMap={teamMap}
+              fields={fields}
+              loading={scheduleSaving}
+              onSave={handleSaveRoundSchedule}
+            />
+          </Stack>
         )}
 
         {!loading && leagueMatches.length > 0 && (
-          <GroupedMatchesTable
-            matches={visibleLeagueMatches}
-            teamMap={teamMap}
-            fields={fields}
-            onEdit={handleEdit}
-            groupByDate={selectedLeagueTab === 'all'}
-          />
+          visibleLeagueMatches.length > 0 ? (
+            <GroupedMatchesTable
+              matches={visibleLeagueMatches}
+              teamMap={teamMap}
+              fields={fields}
+              onEdit={handleEdit}
+              groupByDate={selectedLeagueTab !== 'all'}
+              groupByRound={selectedLeagueTab === 'all'}
+              compact={selectedLeagueTab === 'all'}
+            />
+          ) : (
+            <Alert severity="info">No matches found for the selected filters.</Alert>
+          )
         )}
       </Stack>
 

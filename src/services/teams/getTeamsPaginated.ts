@@ -8,7 +8,7 @@ type Params = {
   search: string;
 };
 
-type TeamWithCategories = Team & { categories: Category[] };
+type TeamWithCategories = Team & { categories: Category[]; playing_days: number[] };
 
 function mapTeamCategories(team: any): TeamWithCategories {
   return {
@@ -17,6 +17,9 @@ function mapTeamCategories(team: any): TeamWithCategories {
       ? team.team_categories
           .map((teamCategory: any) => teamCategory.category)
           .filter((category: Category | null) => !!category)
+      : [],
+    playing_days: Array.isArray(team.team_playing_days)
+      ? team.team_playing_days.map((row: any) => Number(row.day_of_week)).sort((a: number, b: number) => a - b)
       : [],
   };
 }
@@ -55,7 +58,7 @@ export async function getTeamsPaginated({
 
   let query = supabase
     .from('teams')
-    .select('*, team_categories:team_categories(*, category:categories(*))', {
+    .select('*, team_categories:team_categories(*, category:categories(*)), team_playing_days(day_of_week)', {
       count: 'exact',
     })
     .order('id', { ascending: true })

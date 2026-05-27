@@ -6,6 +6,7 @@ export async function getEventTeams(eventId: number) {
     .select(`
       id,
       team_id,
+      display_name,
       order_index,
       teams (
         id,

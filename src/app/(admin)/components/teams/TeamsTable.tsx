@@ -17,9 +17,10 @@ import {
 } from '@mui/material';
 import type { Team } from '@/models/team';
 import type { Category } from '@/models/category';
+import { getWeekdayLabel } from '@/utils/weekdays';
 
 type TeamsTableProps = {
-  teams: (Team & { categories?: Category[] })[];
+  teams: (Team & { categories?: Category[]; playing_days?: number[] | null })[];
   count: number;
   page: number;
   rowsPerPage: number;
@@ -62,6 +63,9 @@ export default function TeamsTable({
                 Categories
               </TableCell>
               <TableCell>
+                Playing Days
+              </TableCell>
+              <TableCell>
                 Code
               </TableCell>
               <TableCell>
@@ -82,7 +86,7 @@ export default function TeamsTable({
           <TableBody>
             {teams.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8}>
+                <TableCell colSpan={9}>
                   <Typography variant="h6" fontWeight={600}>
                     No teams found
                   </Typography>
@@ -129,6 +133,12 @@ export default function TeamsTable({
               <TableCell>
                 {Array.isArray(team.categories) && team.categories.length > 0
                   ? team.categories.map((cat) => cat.name).join(', ')
+                  : '-'}
+              </TableCell>
+
+              <TableCell>
+                {Array.isArray(team.playing_days) && team.playing_days.length > 0
+                  ? team.playing_days.map(getWeekdayLabel).join(', ')
                   : '-'}
               </TableCell>
 

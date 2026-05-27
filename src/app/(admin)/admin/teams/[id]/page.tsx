@@ -2,6 +2,7 @@ import { Box, Button, Paper, Stack, Typography } from '@mui/material';
 import Link from 'next/link';
 import TeamPlayersSection from '@/app/(admin)/components/teams/TeamPlayersSection';
 import TeamCoachesSection from '@/app/(admin)/components/teams/TeamCoachesSection';
+import PrintTeamInfoButton from '@/app/(admin)/components/teams/PrintTeamInfoButton';
 import { IconChevronLeft } from '@tabler/icons-react';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -38,13 +39,19 @@ export default async function TeamDetailPage({ params }: Props) {
           </Button>
         </Link>
 
-        <Typography variant="h4" fontWeight={700}>
-          {teamName}
-        </Typography>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2}>
+          <Box>
+            <Typography variant="h4" fontWeight={700}>
+              {teamName}
+            </Typography>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {team?.code ? `Code: ${team.code}` : `Team ID: ${teamId}`}
-        </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {team?.code ? `Code: ${team.code}` : `Team ID: ${teamId}`}
+            </Typography>
+          </Box>
+
+          <PrintTeamInfoButton teamId={teamId} teamName={teamName} teamCode={team?.code ?? null} />
+        </Stack>
       </Box>
 
       <Paper sx={{ p: 3 }}>

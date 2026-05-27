@@ -25,6 +25,7 @@ import type { Category } from '@/models/category';
 import { getCategories } from '@/services/categories';
 import Autocomplete from '@mui/material/Autocomplete';
 import Chip from '@mui/material/Chip';
+import { WEEKDAY_OPTIONS } from '@/utils/weekdays';
 
 type TeamDialogProps = {
   open: boolean;
@@ -48,6 +49,7 @@ const initialValues: TeamFormData = {
   national: false,
   logo_url: null,
   category_ids: [],
+  playing_days: [],
 };
 
 const initialConflicts: ConflictState = {
@@ -130,6 +132,7 @@ export default function TeamDialog({
         national: team.national ?? false,
         logo_url: team.logo_url ?? null,
         category_ids: team.category_ids ?? [],
+        playing_days: team.playing_days ?? [],
       });
       setConflicts(initialConflicts);
       setSubmitError(null);
@@ -254,6 +257,7 @@ export default function TeamDialog({
         national: values.national,
         logo_url: logoUrl,
         category_ids: values.category_ids ?? [],
+        playing_days: values.playing_days ?? [],
       });
     } catch (error) {
       const message =
@@ -385,6 +389,33 @@ export default function TeamDialog({
                 ))
               }
               isOptionEqualToValue={(option, value) => option.id === value.id}
+              disabled={loading}
+            />
+
+            <Autocomplete
+              multiple
+              options={WEEKDAY_OPTIONS}
+              getOptionLabel={(option) => option.label}
+              value={WEEKDAY_OPTIONS.filter((day) => values.playing_days?.includes(day.value))}
+              onChange={(_, newValue) =>
+                setValues((prev) => ({
+                  ...prev,
+                  playing_days: newValue.map((day) => day.value),
+                }))
+              }
+              renderInput={(params) => (
+                <TextField {...params} label="Playing days" placeholder="Select days" fullWidth />
+              )}
+              renderTags={(tagValue, getTagProps) =>
+                tagValue.map((option, index) => (
+                  <Chip
+                    label={option.label}
+                    {...getTagProps({ index })}
+                    key={option.value}
+                  />
+                ))
+              }
+              isOptionEqualToValue={(option, value) => option.value === value.value}
               disabled={loading}
             />
 

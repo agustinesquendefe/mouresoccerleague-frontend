@@ -23,6 +23,7 @@ export type Match = {
   penalty_score2: number | null;
   winner_team_id: number | null;
   date: string | null;
+  rescheduled_from_date: string | null;
   time: string | null;
   field_number: number | null;
   field_id: number | null;

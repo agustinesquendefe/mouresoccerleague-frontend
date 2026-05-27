@@ -79,8 +79,9 @@ export default function TeamsPage() {
     const category_ids = Array.isArray(team.categories)
       ? team.categories.map((cat: any) => cat.id)
       : team.category_ids || [];
+    const playing_days = Array.isArray(team.playing_days) ? team.playing_days : [];
     setDialogMode('edit');
-    setSelectedTeam({ ...team, category_ids });
+    setSelectedTeam({ ...team, category_ids, playing_days });
     setDialogOpen(true);
   };
 

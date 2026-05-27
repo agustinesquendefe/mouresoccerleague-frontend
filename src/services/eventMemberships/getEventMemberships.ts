@@ -58,7 +58,7 @@ export async function getEventMemberships(
         .single(),
       client
         .from('event_teams')
-        .select('team_id, teams(name)')
+        .select('team_id, display_name, teams(name)')
         .eq('event_id', eventId)
     ]);
 
@@ -75,7 +75,7 @@ export async function getEventMemberships(
   const teamNameMap = new Map(
     eventTeamRows.map((row: any) => [
       Number(row.team_id),
-      Array.isArray(row.teams) ? row.teams[0]?.name ?? null : row.teams?.name ?? null,
+      row.display_name?.trim() || (Array.isArray(row.teams) ? row.teams[0]?.name ?? null : row.teams?.name ?? null),
     ])
   );
 

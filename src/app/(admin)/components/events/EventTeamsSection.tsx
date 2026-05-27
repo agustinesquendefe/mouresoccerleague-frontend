@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Avatar, Button, CircularProgress, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
+import { Alert, Avatar, Button, CircularProgress, IconButton, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CloseIcon from '@mui/icons-material/Close';
 import UploadIcon from '@mui/icons-material/Upload';
 
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
@@ -12,6 +15,7 @@ import {
   hasStartedLeagueMatches,
   updateEventTeamsOrder,
 } from '@/services/eventTeams/updateEventTeamsOrder';
+import { updateEventTeamDisplayName } from '@/services/eventTeams/updateEventTeamDisplayName';
 import { uploadImage } from '@/services/storage/uploadImage';
 import { supabase } from '@/lib/supabaseClient';
 import AddTeamToEventDialog from './AddTeamToEventDialog';
@@ -19,6 +23,7 @@ import AddTeamToEventDialog from './AddTeamToEventDialog';
 type EventTeamRow = {
   id: number;
   team_id: number;
+  display_name: string | null;
   order_index: number;
   teams?: {
     id: number;
@@ -41,6 +46,9 @@ export default function EventTeamsSection({ eventId }: Props) {
   const [draggingTeamId, setDraggingTeamId] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
   const [reorderLocked, setReorderLocked] = useState(false);
+  const [editingEventTeamId, setEditingEventTeamId] = useState<number | null>(null);
+  const [draftDisplayName, setDraftDisplayName] = useState('');
+  const [savingDisplayNameId, setSavingDisplayNameId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingTeamRef = useRef<{ teamId: number } | null>(null);
 
@@ -84,6 +92,30 @@ export default function EventTeamsSection({ eventId }: Props) {
   const handleUploadClick = (teamId: number) => {
     pendingTeamRef.current = { teamId };
     fileInputRef.current?.click();
+  };
+
+  const startEditingDisplayName = (eventTeam: EventTeamRow) => {
+    setEditingEventTeamId(eventTeam.id);
+    setDraftDisplayName(eventTeam.display_name ?? eventTeam.teams?.name ?? '');
+  };
+
+  const cancelEditingDisplayName = () => {
+    setEditingEventTeamId(null);
+    setDraftDisplayName('');
+  };
+
+  const saveDisplayName = async (eventTeam: EventTeamRow) => {
+    try {
+      setSavingDisplayNameId(eventTeam.id);
+      await updateEventTeamDisplayName(eventTeam.id, draftDisplayName);
+      await loadTeams();
+      cancelEditingDisplayName();
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'Failed to update team name');
+    } finally {
+      setSavingDisplayNameId(null);
+    }
   };
 
   const moveTeam = async (draggedTeamId: number, targetTeamId: number) => {
@@ -248,16 +280,53 @@ export default function EventTeamsSection({ eventId }: Props) {
 
               <Avatar
                 src={et.teams?.logo_url ?? undefined}
-                alt={et.teams?.name}
+                alt={et.display_name ?? et.teams?.name}
                 variant="rounded"
                 sx={{ width: 36, height: 36 }}
               />
-              <Stack spacing={0.25}>
-                <Typography>{et.teams?.name}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Position {et.order_index + 1}
-                </Typography>
-              </Stack>
+              {editingEventTeamId === et.id ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
+                    size="small"
+                    label="Event team name"
+                    value={draftDisplayName}
+                    onChange={(event) => setDraftDisplayName(event.target.value)}
+                    placeholder={et.teams?.name ?? 'Team name'}
+                    disabled={savingDisplayNameId === et.id}
+                  />
+                  <Tooltip title="Save name for this event">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => saveDisplayName(et)}
+                        disabled={savingDisplayNameId === et.id}
+                      >
+                        {savingDisplayNameId === et.id ? <CircularProgress size={18} /> : <SaveIcon fontSize="small" />}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Cancel">
+                    <IconButton size="small" onClick={cancelEditingDisplayName}>
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              ) : (
+                <Stack spacing={0.25}>
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Typography>{et.display_name ?? et.teams?.name}</Typography>
+                    <Tooltip title="Rename only in this event">
+                      <IconButton size="small" onClick={() => startEditingDisplayName(et)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary">
+                    Position {et.order_index + 1}
+                    {et.display_name ? ` | Base team: ${et.teams?.name ?? `#${et.team_id}`}` : ''}
+                  </Typography>
+                </Stack>
+              )}
             </Stack>
 
             <Stack direction="row" spacing={0.5} alignItems="center">

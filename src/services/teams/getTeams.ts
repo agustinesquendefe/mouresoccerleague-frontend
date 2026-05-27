@@ -2,10 +2,10 @@ import { supabase } from '@/lib/supabaseClient';
 import type { Team } from '@/models/team';
 import type { Category } from '@/models/category';
 
-export async function getTeamsWithCategories(): Promise<(Team & { categories: Category[] })[]> {
+export async function getTeamsWithCategories(): Promise<(Team & { categories: Category[]; playing_days: number[] })[]> {
   const { data, error } = await supabase
     .from('teams')
-    .select(`*, team_categories:team_categories(*, category:categories(*))`)
+    .select(`*, team_categories:team_categories(*, category:categories(*)), team_playing_days(day_of_week)`)
     .order('id', { ascending: true });
 
   if (error) {
@@ -19,6 +19,9 @@ export async function getTeamsWithCategories(): Promise<(Team & { categories: Ca
       ? team.team_categories
           .map((tc: any) => tc.category)
           .filter((cat: Category | null) => !!cat)
+      : [],
+    playing_days: Array.isArray(team.team_playing_days)
+      ? team.team_playing_days.map((row: any) => Number(row.day_of_week)).sort((a: number, b: number) => a - b)
       : [],
   }));
 }

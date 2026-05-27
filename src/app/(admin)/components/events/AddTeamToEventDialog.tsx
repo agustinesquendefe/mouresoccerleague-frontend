@@ -15,11 +15,13 @@ import {
 
 import { supabase } from '@/lib/supabaseClient';
 import { addTeamToEvent } from '@/services/eventTeams/addTeamToEvent';
+import { getWeekdayLabel } from '@/utils/weekdays';
 
 type TeamOption = {
   id: number;
   name: string;
   team_categories?: { category_id: number }[];
+  team_playing_days?: { day_of_week: number }[];
 };
 
 type EventTeamRow = {
@@ -45,6 +47,7 @@ export default function AddTeamToEventDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [eventCategoryId, setEventCategoryId] = useState<number | null>(null);
+  const [eventMatchDay, setEventMatchDay] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -54,29 +57,39 @@ export default function AddTeamToEventDialog({
         setErrorMessage(null);
         setLoading(true);
 
-        // Load event details to get category_id
+        // Load event details to get category and match day filters.
         const eventResponse = await supabase
           .from('events')
-          .select('category_id')
+          .select('category_id, match_day_of_week')
           .eq('id', eventId)
           .single();
 
         if (eventResponse.error) throw new Error(eventResponse.error.message);
 
         const catId: number | null = eventResponse.data?.category_id ?? null;
+        const matchDay: number | null = eventResponse.data?.match_day_of_week ?? null;
         setEventCategoryId(catId);
+        setEventMatchDay(matchDay);
 
-        // Filter through team_categories because teams no longer stores category_id directly.
-        const teamsQuery = catId !== null
-          ? supabase
-              .from('teams')
-              .select('id, name, team_categories!inner(category_id)')
-              .eq('team_categories.category_id', catId)
-              .order('name')
-          : supabase
-              .from('teams')
-              .select('id, name')
-              .order('name');
+        const baseSelect = [
+          'id',
+          'name',
+          catId !== null ? 'team_categories!inner(category_id)' : 'team_categories(category_id)',
+          matchDay !== null ? 'team_playing_days!inner(day_of_week)' : 'team_playing_days(day_of_week)',
+        ].join(', ');
+
+        let teamsQuery = supabase
+          .from('teams')
+          .select(baseSelect)
+          .order('name');
+
+        if (catId !== null) {
+          teamsQuery = teamsQuery.eq('team_categories.category_id', catId);
+        }
+
+        if (matchDay !== null) {
+          teamsQuery = teamsQuery.eq('team_playing_days.day_of_week', matchDay);
+        }
 
         const [teamsResponse, eventTeamsResponse] = await Promise.all([
           teamsQuery,
@@ -87,7 +100,7 @@ export default function AddTeamToEventDialog({
         if (eventTeamsResponse.error) throw new Error(eventTeamsResponse.error.message);
 
         setTeams(
-          ((teamsResponse.data ?? []) as TeamOption[]).map(({ id, name }) => ({ id, name }))
+          ((teamsResponse.data ?? []) as unknown as TeamOption[]).map(({ id, name }) => ({ id, name }))
         );
         setExistingEventTeams((eventTeamsResponse.data ?? []) as EventTeamRow[]);
         setSelectedTeam('');
@@ -146,9 +159,21 @@ export default function AddTeamToEventDialog({
           </Alert>
         )}
 
+        {eventMatchDay !== null && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Only teams configured to play on {getWeekdayLabel(eventMatchDay)} are shown.
+          </Alert>
+        )}
+
         {eventCategoryId === null && (
           <Alert severity="warning" sx={{ mt: 2 }}>
             This event has no category set. All teams are shown.
+          </Alert>
+        )}
+
+        {eventMatchDay === null && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            This event has no match day set. Teams are not filtered by playing day.
           </Alert>
         )}
 
@@ -173,9 +198,9 @@ export default function AddTeamToEventDialog({
           ))}
         </TextField>
 
-        {availableTeams.length === 0 && !loading && eventCategoryId !== null && (
+        {availableTeams.length === 0 && !loading && (eventCategoryId !== null || eventMatchDay !== null) && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Tip: Assign the same category to teams in the Teams section to see them here.
+            Tip: Assign the matching category and playing day to teams in the Teams section to see them here.
           </Typography>
         )}
       </DialogContent>
