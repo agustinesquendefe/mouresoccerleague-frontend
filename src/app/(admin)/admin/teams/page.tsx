@@ -13,17 +13,27 @@ import {
 import TeamDialog from '@/app/(admin)/components/teams/TeamDialog';
 import TeamsFilters from '@/app/(admin)/components/teams/TeamsFilters';
 import TeamsTable from '@/app/(admin)/components/teams/TeamsTable';
+import type { Category } from '@/models/category';
 import type { Team, TeamFormData } from '@/models/team';
+import { getCategories } from '@/services/categories';
 import { createTeam, updateTeam, deleteTeam, getTeamsPaginated } from '@/services/teams';
 
 const PAGE_SIZE = 25;
 
+function getCurrentLeagueWeekday(): number {
+  const jsDay = new Date().getDay();
+  return jsDay === 0 ? 7 : jsDay;
+}
+
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState('');
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [dayOfWeek, setDayOfWeek] = useState<number | null>(() => getCurrentLeagueWeekday());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -43,7 +53,14 @@ export default function TeamsPage() {
 
   useEffect(() => {
     loadTeams();
-  }, [page, submittedSearch]);
+  }, [page, submittedSearch, categoryId, dayOfWeek]);
+
+  useEffect(() => {
+    getCategories().then(setCategories).catch((error) => {
+      const message = error instanceof Error ? error.message : 'Failed to load categories';
+      showToast(message, 'error');
+    });
+  }, []);
 
   const showToast = (message: string, severity: 'success' | 'error') => {
     setToast({ open: true, message, severity });
@@ -56,6 +73,8 @@ export default function TeamsPage() {
         page,
         pageSize: PAGE_SIZE,
         search: submittedSearch,
+        categoryId,
+        dayOfWeek,
       });
       setTeams(result.rows);
       setCount(result.count);
@@ -164,9 +183,14 @@ export default function TeamsPage() {
       <Stack mb={3}>
         <TeamsFilters
           initialSearch={search}
-          onSearch={(value) => {
-            setSearch(value);
-            setSubmittedSearch(value);
+          initialCategoryId={categoryId}
+          initialDayOfWeek={dayOfWeek}
+          categories={categories}
+          onFilter={(filters) => {
+            setSearch(filters.search);
+            setSubmittedSearch(filters.search);
+            setCategoryId(filters.categoryId);
+            setDayOfWeek(filters.dayOfWeek);
             setPage(0);
           }}
         />

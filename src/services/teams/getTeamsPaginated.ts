@@ -6,6 +6,8 @@ type Params = {
   page: number;
   pageSize: number;
   search: string;
+  categoryId?: number | null;
+  dayOfWeek?: number | null;
 };
 
 type TeamWithCategories = Team & { categories: Category[]; playing_days: number[] };
@@ -45,6 +47,8 @@ export async function getTeamsPaginated({
   page,
   pageSize,
   search,
+  categoryId = null,
+  dayOfWeek = null,
 }: Params): Promise<{ rows: TeamWithCategories[]; count: number }> {
   const from = page * pageSize;
   const to = from + pageSize - 1;
@@ -58,11 +62,24 @@ export async function getTeamsPaginated({
 
   let query = supabase
     .from('teams')
-    .select('*, team_categories:team_categories(*, category:categories(*)), team_playing_days(day_of_week)', {
-      count: 'exact',
-    })
+    .select(
+      [
+        '*',
+        `${categoryId !== null ? 'team_categories:team_categories!inner' : 'team_categories:team_categories'}(*, category:categories(*))`,
+        `${dayOfWeek !== null ? 'team_playing_days:team_playing_days!inner' : 'team_playing_days:team_playing_days'}(day_of_week)`,
+      ].join(', '),
+      { count: 'exact' }
+    )
     .order('id', { ascending: true })
     .range(from, to);
+
+  if (categoryId !== null) {
+    query = query.eq('team_categories.category_id', categoryId);
+  }
+
+  if (dayOfWeek !== null) {
+    query = query.eq('team_playing_days.day_of_week', dayOfWeek);
+  }
 
   if (term) {
     const conditions = [`name.ilike.%${term}%`, `code.ilike.%${term}%`];

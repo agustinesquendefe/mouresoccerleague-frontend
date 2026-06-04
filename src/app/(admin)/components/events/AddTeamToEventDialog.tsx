@@ -14,8 +14,10 @@ import {
 } from '@mui/material';
 
 import { supabase } from '@/lib/supabaseClient';
+import type { Category } from '@/models/category';
+import { getCategories } from '@/services/categories';
 import { addTeamToEvent } from '@/services/eventTeams/addTeamToEvent';
-import { getWeekdayLabel } from '@/utils/weekdays';
+import { WEEKDAY_OPTIONS, getWeekdayLabel } from '@/utils/weekdays';
 
 type TeamOption = {
   id: number;
@@ -48,21 +50,30 @@ export default function AddTeamToEventDialog({
   const [loading, setLoading] = useState(false);
   const [eventCategoryId, setEventCategoryId] = useState<number | null>(null);
   const [eventMatchDay, setEventMatchDay] = useState<number | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<number | ''>('');
+  const [dayFilter, setDayFilter] = useState<number | ''>('');
+  const [filtersReady, setFiltersReady] = useState(false);
 
   useEffect(() => {
     if (!open) return;
 
-    const loadData = async () => {
+    const loadEventFilters = async () => {
       try {
         setErrorMessage(null);
         setLoading(true);
+        setFiltersReady(false);
+        setSearch('');
 
-        // Load event details to get category and match day filters.
-        const eventResponse = await supabase
-          .from('events')
-          .select('category_id, match_day_of_week')
-          .eq('id', eventId)
-          .single();
+        const [eventResponse, categoriesResponse] = await Promise.all([
+          supabase
+            .from('events')
+            .select('category_id, match_day_of_week')
+            .eq('id', eventId)
+            .single(),
+          getCategories(),
+        ]);
 
         if (eventResponse.error) throw new Error(eventResponse.error.message);
 
@@ -70,11 +81,37 @@ export default function AddTeamToEventDialog({
         const matchDay: number | null = eventResponse.data?.match_day_of_week ?? null;
         setEventCategoryId(catId);
         setEventMatchDay(matchDay);
+        setCategoryFilter(catId ?? '');
+        setDayFilter(matchDay ?? '');
+        setCategories(categoriesResponse);
+        setSelectedTeam('');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load teams';
+        setErrorMessage(message);
+      } finally {
+        setLoading(false);
+        setFiltersReady(true);
+      }
+    };
 
+    loadEventFilters();
+  }, [open, eventId]);
+
+  useEffect(() => {
+    if (!open || !filtersReady) return;
+
+    const loadTeams = async () => {
+      try {
+        setErrorMessage(null);
+        setLoading(true);
+
+        const categoryId = categoryFilter === '' ? null : Number(categoryFilter);
+        const matchDay = dayFilter === '' ? null : Number(dayFilter);
+        const term = search.trim();
         const baseSelect = [
           'id',
           'name',
-          catId !== null ? 'team_categories!inner(category_id)' : 'team_categories(category_id)',
+          categoryId !== null ? 'team_categories!inner(category_id)' : 'team_categories(category_id)',
           matchDay !== null ? 'team_playing_days!inner(day_of_week)' : 'team_playing_days(day_of_week)',
         ].join(', ');
 
@@ -83,12 +120,16 @@ export default function AddTeamToEventDialog({
           .select(baseSelect)
           .order('name');
 
-        if (catId !== null) {
-          teamsQuery = teamsQuery.eq('team_categories.category_id', catId);
+        if (categoryId !== null) {
+          teamsQuery = teamsQuery.eq('team_categories.category_id', categoryId);
         }
 
         if (matchDay !== null) {
           teamsQuery = teamsQuery.eq('team_playing_days.day_of_week', matchDay);
+        }
+
+        if (term) {
+          teamsQuery = teamsQuery.or(`name.ilike.%${term}%,code.ilike.%${term}%`);
         }
 
         const [teamsResponse, eventTeamsResponse] = await Promise.all([
@@ -112,8 +153,8 @@ export default function AddTeamToEventDialog({
       }
     };
 
-    loadData();
-  }, [open, eventId]);
+    loadTeams();
+  }, [open, filtersReady, eventId, categoryFilter, dayFilter, search]);
 
   const availableTeams = useMemo(() => {
     const existingTeamIds = new Set(existingEventTeams.map((item) => item.team_id));
@@ -155,13 +196,13 @@ export default function AddTeamToEventDialog({
 
         {eventCategoryId !== null && (
           <Alert severity="info" sx={{ mt: 2 }}>
-            Only teams matching this event&apos;s category are shown.
+            Category starts with this event&apos;s category.
           </Alert>
         )}
 
         {eventMatchDay !== null && (
           <Alert severity="info" sx={{ mt: 2 }}>
-            Only teams configured to play on {getWeekdayLabel(eventMatchDay)} are shown.
+            Playing day starts with this event&apos;s match day: {getWeekdayLabel(eventMatchDay)}.
           </Alert>
         )}
 
@@ -176,6 +217,50 @@ export default function AddTeamToEventDialog({
             This event has no match day set. Teams are not filtered by playing day.
           </Alert>
         )}
+
+        <TextField
+          label="Search team"
+          placeholder="Name or code"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          fullWidth
+          sx={{ mt: 2 }}
+          disabled={loading}
+        />
+
+        <TextField
+          select
+          label="Category"
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value === '' ? '' : Number(e.target.value))}
+          fullWidth
+          sx={{ mt: 2 }}
+          disabled={loading}
+        >
+          <MenuItem value="">All categories</MenuItem>
+          {categories.map((category) => (
+            <MenuItem key={category.id} value={category.id}>
+              {category.name}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          select
+          label="Playing day"
+          value={dayFilter}
+          onChange={(e) => setDayFilter(e.target.value === '' ? '' : Number(e.target.value))}
+          fullWidth
+          sx={{ mt: 2 }}
+          disabled={loading}
+        >
+          <MenuItem value="">All days</MenuItem>
+          {WEEKDAY_OPTIONS.map((day) => (
+            <MenuItem key={day.value} value={day.value}>
+              {day.label}
+            </MenuItem>
+          ))}
+        </TextField>
 
         <TextField
           select
