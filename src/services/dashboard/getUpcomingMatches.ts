@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import type { Event } from '@/models/event';
+import { getLocalDateString } from '@/utils/dateOnly';
 
 export type UpcomingMatchRow = {
   id: number;
@@ -49,7 +50,7 @@ type FieldNameRow = {
 
 
 export async function getUpcomingMatches(eventIdOrLimit?: number, eventId?: number): Promise<UpcomingMatchRow[]> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateString();
 
   // If only one arg is passed, treat it as eventId (no limit)
   const resolvedEventId = eventId ?? (eventIdOrLimit !== undefined && !eventId ? eventIdOrLimit : undefined);

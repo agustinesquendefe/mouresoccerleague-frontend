@@ -5,18 +5,7 @@ import { getLegalDocuments } from '@/services/legalDocuments';
 import type { LegalDocument } from '@/models/legalDocument';
 import { supabase } from '@/lib/supabaseClient';
 import { getPlayerLegalDocuments, deletePlayerLegalDocument, addPlayerLegalDocument } from '@/services/playerLegalDocuments';
-// Helper to calculate age from birth date string (YYYY-MM-DD)
-function getAge(birthDate: string): number {
-  if (!birthDate) return 0;
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  const m = today.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-  return age;
-}
+import { getAgeFromDateOnly, getLocalDateString } from '@/utils/dateOnly';
 
 // Central download function for signed URLs
 async function handleDownloadFile(url: string, filename: string) {
@@ -91,7 +80,7 @@ const initialValues: PlayerFormData = {
   photo_url: null,
   we_have_id: false,
   paid_membership: 0,
-  registered_at: new Date().toISOString().split('T')[0],
+  registered_at: getLocalDateString(),
   signature: '',
 };
 
@@ -238,7 +227,7 @@ export default function PlayerDialog({
         photo_url: player.photo_url ?? null,
         we_have_id: player.we_have_id ?? false,
         paid_membership: player.paid_membership ?? 0,
-        registered_at: player.registered_at ?? new Date().toISOString().split('T')[0],
+        registered_at: player.registered_at ?? getLocalDateString(),
         signature: player.signature ?? '',
       });
       setPhotoPreview(player.photo_url ?? null);
@@ -363,7 +352,7 @@ export default function PlayerDialog({
     conflicts.keyExists || conflicts.emailExists || conflicts.documentExists;
 
   // Minor logic: require both files if under 18
-  const isMinor = useMemo(() => getAge(values.birth_date) < 18, [values.birth_date]);
+  const isMinor = useMemo(() => getAgeFromDateOnly(values.birth_date) < 18, [values.birth_date]);
   // Solo requiere input si no existe ni en la base ni en el input
   const missingTutor = isMinor && !tutorFile && !playerLegalDocs.tutor;
   const missingParticipant = isMinor && !participantFile && !playerLegalDocs.participant;
@@ -466,7 +455,7 @@ export default function PlayerDialog({
         formData.append('legal_document_id', tutorLegalDoc.id);
         formData.append('uploaded_by', user.id);
         // Solo fecha para el campo date
-        const today = new Date().toISOString().split('T')[0];
+        const today = getLocalDateString();
         formData.append('date', today);
         formData.append('status', 'vigente');
         console.log('[DEBUG] Insertando documento legal de tutor:', {
@@ -492,7 +481,7 @@ export default function PlayerDialog({
         formData.append('legal_document_id', participantLegalDoc.id);
         formData.append('uploaded_by', user.id);
         // Solo fecha para el campo date
-        const today = new Date().toISOString().split('T')[0];
+        const today = getLocalDateString();
         formData.append('date', today);
         formData.append('status', 'vigente');
         console.log('[DEBUG] Insertando documento legal de participante:', {

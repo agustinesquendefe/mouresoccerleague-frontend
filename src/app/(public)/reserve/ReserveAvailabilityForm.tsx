@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { CalendarCheck, Mail, Phone } from 'lucide-react';
 import type { FieldType, FormatSupported } from '@/models/field';
+import { getLocalDateString } from '@/utils/dateOnly';
 
 type AvailableField = {
   id: number;
@@ -26,7 +27,7 @@ type Props = {
   contactPhone: string;
 };
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getLocalDateString();
 
 export default function ReserveAvailabilityForm({ contactEmail, contactPhone }: Props) {
   const [date, setDate] = useState(today);

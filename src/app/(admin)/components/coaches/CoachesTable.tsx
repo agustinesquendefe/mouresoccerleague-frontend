@@ -16,19 +16,13 @@ import {
 } from '@mui/material';
 import type { Coach } from '@/models/coach';
 import { getCoachFullName } from '@/models/coach';
+import { formatStoredDate } from '@/utils/dateOnly';
 
 type CoachesTableProps = {
   coaches: Coach[];
   onEdit: (coach: Coach) => void;
   onDelete: (coach: Coach) => void;
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString();
-}
 
 export default function CoachesTable({
   coaches,
@@ -97,7 +91,7 @@ export default function CoachesTable({
                 />
               </TableCell>
 
-              <TableCell>{formatDate(coach.updated_at)}</TableCell>
+              <TableCell>{formatStoredDate(coach.updated_at)}</TableCell>
 
               <TableCell align="right">
                 <Stack direction="row" spacing={1} justifyContent="flex-end">

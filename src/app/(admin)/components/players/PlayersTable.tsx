@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@mui/material';
 import type { Player } from '@/models/player';
+import { formatStoredDate } from '@/utils/dateOnly';
 import { Typography } from '@mui/system';
 
 type PlayersTableProps = {
@@ -34,13 +35,6 @@ function displayDocumentId(value?: string | null) {
 
 function getPlayerFullName(player: Player) {
   return `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim();
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString();
 }
 
 export default function PlayersTable({
@@ -84,7 +78,7 @@ export default function PlayersTable({
                 <TableRow key={player.id} hover>
                 <TableCell>{player.document_id}</TableCell>
                 <TableCell>{getPlayerFullName(player)}</TableCell>
-                <TableCell>{formatDate(player.birth_date)}</TableCell>
+                <TableCell>{formatStoredDate(player.birth_date)}</TableCell>
                 <TableCell>
                   <Chip
                     label={player.we_have_id ? 'Yes' : 'No'}
@@ -93,7 +87,7 @@ export default function PlayersTable({
                   />
                 </TableCell>
                 <TableCell>{player.paid_membership ?? 0}</TableCell>
-                <TableCell>{formatDate(player.registered_at)}</TableCell>
+                <TableCell>{formatStoredDate(player.registered_at)}</TableCell>
                 <TableCell>
                   <Chip
                     label={player.is_active ? 'Active' : 'Inactive'}

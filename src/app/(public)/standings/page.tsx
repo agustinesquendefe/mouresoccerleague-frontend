@@ -2,6 +2,7 @@ import type { Event } from '@/models/event';
 import { getEvents } from '@/services/events/getEvents';
 import { getEventStandings, type StandingRow } from '@/services/standings/getEventStandings';
 import { getPublicMatches, type PublicMatchRow } from '@/services/matches/getPublicMatches';
+import { parseStoredDate } from '@/utils/dateOnly';
 import StandingsView from './StandingsView';
 
 export const dynamic = 'force-dynamic';
@@ -19,9 +20,12 @@ export default async function StandingsPage() {
   }
 
   // Default: oldest active event
-  const defaultEvent = activeEvents.reduce((oldest, e) =>
-    new Date(e.start_date) < new Date(oldest.start_date) ? e : oldest
-  );
+  const defaultEvent = activeEvents.reduce((oldest, e) => {
+    const currentTime = parseStoredDate(e.start_date)?.getTime() ?? Number.POSITIVE_INFINITY;
+    const oldestTime = parseStoredDate(oldest.start_date)?.getTime() ?? Number.POSITIVE_INFINITY;
+
+    return currentTime < oldestTime ? e : oldest;
+  });
 
   const standingsByEvent: Record<number, StandingRow[]> = {};
   const knockoutByEvent: Record<number, PublicMatchRow[]> = {};

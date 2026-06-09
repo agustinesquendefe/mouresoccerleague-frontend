@@ -1,6 +1,7 @@
 import type { Event } from '@/models/event';
 import { getEvents } from '@/services/events/getEvents';
 import { getPublicMatches, type PublicMatchRow } from '@/services/matches/getPublicMatches';
+import { parseStoredDate } from '@/utils/dateOnly';
 import MatchesView from './MatchesView';
 
 
@@ -9,9 +10,12 @@ export const dynamic = 'force-dynamic';
 async function getOldestActiveEvent(events: Event[]): Promise<Event | null> {
   const active = events.filter((e) => e.status === 'active');
   if (active.length === 0) return null;
-  return active.reduce((oldest, e) =>
-    new Date(e.start_date) < new Date(oldest.start_date) ? e : oldest
-  );
+  return active.reduce((oldest, e) => {
+    const currentTime = parseStoredDate(e.start_date)?.getTime() ?? Number.POSITIVE_INFINITY;
+    const oldestTime = parseStoredDate(oldest.start_date)?.getTime() ?? Number.POSITIVE_INFINITY;
+
+    return currentTime < oldestTime ? e : oldest;
+  });
 }
 
 export default async function MatchesPage() {

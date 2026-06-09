@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import type { Team } from '@/models/team';
 import type { Category } from '@/models/category';
+import { formatStoredDate } from '@/utils/dateOnly';
 import { getWeekdayLabel } from '@/utils/weekdays';
 
 type TeamsTableProps = {
@@ -28,15 +29,6 @@ type TeamsTableProps = {
   onEdit: (team: Team) => void;
   onDelete: (team: Team) => void;
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-
-  return date.toLocaleDateString();
-}
 
 export default function TeamsTable({
   teams,
@@ -165,7 +157,7 @@ export default function TeamsTable({
               </TableCell>
 
               <TableCell>
-                {formatDate(
+                {formatStoredDate(
                   'updated_at' in team ? (team.updated_at as string | null | undefined) : null
                 )}
               </TableCell>

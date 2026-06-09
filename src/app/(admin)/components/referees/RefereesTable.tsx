@@ -16,21 +16,13 @@ import {
 } from '@mui/material';
 import type { Referee } from '@/models/referee';
 import { getRefereeFullName } from '@/models/referee';
+import { formatStoredDate } from '@/utils/dateOnly';
 
 type RefereesTableProps = {
   referees: Referee[];
   onEdit: (referee: Referee) => void;
   onDelete: (referee: Referee) => void;
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-
-  return date.toLocaleDateString();
-}
 
 export default function RefereesTable({
   referees,
@@ -99,7 +91,7 @@ export default function RefereesTable({
                 />
               </TableCell>
 
-              <TableCell>{formatDate(referee.updated_at)}</TableCell>
+              <TableCell>{formatStoredDate(referee.updated_at)}</TableCell>
 
               <TableCell align="right">
                 <Stack direction="row" spacing={1} justifyContent="flex-end">
