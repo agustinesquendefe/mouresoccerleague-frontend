@@ -128,7 +128,15 @@ async function registerScannerCheckIn(
 
   const { data: membership, error: membershipError } = await client
     .from('event_memberships')
-    .select('id, appearances_count')
+    .select(`
+      id,
+      amount_paid,
+      appearances_count,
+      event:events (
+        event_price,
+        membership_price
+      )
+    `)
     .eq('event_id', eventId)
     .eq('player_id', playerId)
     .maybeSingle();
@@ -138,16 +146,23 @@ async function registerScannerCheckIn(
   }
 
   if (membership) {
-    const { error: updateMembershipError } = await client
-      .from('event_memberships')
-      .update({
-        appearances_count: Number(membership.appearances_count ?? 0) + 1,
-        updated_at: now,
-      })
-      .eq('id', membership.id);
+    const event = Array.isArray(membership.event) ? membership.event[0] ?? null : membership.event ?? null;
+    const eventPrice = Number(event?.event_price ?? event?.membership_price ?? 0);
+    const amountPaid = Number(membership.amount_paid ?? 0);
+    const balanceDue = Math.max(eventPrice - amountPaid, 0);
 
-    if (updateMembershipError) {
-      throw new Error(updateMembershipError.message);
+    if (balanceDue > 0) {
+      const { error: updateMembershipError } = await client
+        .from('event_memberships')
+        .update({
+          appearances_count: Number(membership.appearances_count ?? 0) + 1,
+          updated_at: now,
+        })
+        .eq('id', membership.id);
+
+      if (updateMembershipError) {
+        throw new Error(updateMembershipError.message);
+      }
     }
   } else {
     const { error: createMembershipError } = await client

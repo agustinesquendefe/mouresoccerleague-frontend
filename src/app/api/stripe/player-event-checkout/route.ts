@@ -173,6 +173,7 @@ export async function POST(request: Request) {
       'metadata[state_fee_amount]': String(feeBreakdown.stateFeeAmount),
       'metadata[total_fee_amount]': String(feeBreakdown.totalFeeAmount),
       'metadata[operating_state]': feeBreakdown.settings.operatingState,
+      'metadata[source]': 'player_event_checkout',
     });
 
     let lineItemIndex = 1;

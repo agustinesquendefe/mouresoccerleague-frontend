@@ -30,6 +30,11 @@ export type PlayerPortalEvent = {
 
 export type PlayerPortalData = {
   player: Pick<Player, 'id' | 'first_name' | 'last_name' | 'full_name' | 'email'>;
+  payment_methods: {
+    zelle?: string | null;
+    venmo?: string | null;
+    cashapp?: string | null;
+  };
   events: PlayerPortalEvent[];
 };
 
@@ -113,6 +118,7 @@ export async function getPlayerPortalData(
   if (playerTeamRows.length === 0) {
     return {
       player,
+      payment_methods: {},
       events: [],
     };
   }
@@ -143,6 +149,7 @@ export async function getPlayerPortalData(
   if (eventIds.length === 0) {
     return {
       player,
+      payment_methods: {},
       events: [],
     };
   }
@@ -164,6 +171,14 @@ export async function getPlayerPortalData(
 
   if (eventsResult.error) throw new Error(eventsResult.error.message);
   if (matchesResult.error) throw new Error(matchesResult.error.message);
+
+  const { data: settings, error: settingsError } = await client
+    .from('app_settings')
+    .select('zelle_enabled, zelle_recipient, venmo_enabled, venmo_recipient, cashapp_enabled, cashapp_recipient')
+    .eq('id', 1)
+    .maybeSingle();
+
+  if (settingsError) throw new Error(settingsError.message);
 
   const matches = (matchesResult.data ?? []) as MatchRow[];
   const matchTeamIds = matches.flatMap((match) => [match.team1_id, match.team2_id]);
@@ -229,6 +244,11 @@ export async function getPlayerPortalData(
 
   return {
     player,
+    payment_methods: {
+      zelle: settings?.zelle_enabled ? settings.zelle_recipient ?? null : null,
+      venmo: settings?.venmo_enabled ? settings.venmo_recipient ?? null : null,
+      cashapp: settings?.cashapp_enabled ? settings.cashapp_recipient ?? null : null,
+    },
     events: uniquePairs
       .map((row) => {
         const event = eventMap.get(row.event_id);

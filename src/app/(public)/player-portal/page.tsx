@@ -14,6 +14,7 @@ import {
   Chip,
   Divider,
   LinearProgress,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -77,6 +78,9 @@ export default function PlayerPortalPage() {
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
   const [payingEventId, setPayingEventId] = useState<number | null>(null);
   const [paymentAmounts, setPaymentAmounts] = useState<Record<number, string>>({});
+  const [externalMethodByEvent, setExternalMethodByEvent] = useState<Record<number, string>>({});
+  const [externalReferenceByEvent, setExternalReferenceByEvent] = useState<Record<number, string>>({});
+  const [recordingExternalEventId, setRecordingExternalEventId] = useState<number | null>(null);
 
   const playerFirstName = useMemo(() => {
     if (!portalData?.player) return "Player";
@@ -283,6 +287,65 @@ export default function PlayerPortalPage() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to start checkout.");
       setPayingEventId(null);
+    }
+  };
+
+  const handleExternalPayment = async (event: PlayerPortalEvent) => {
+    try {
+      const amount = Number(paymentAmounts[event.event_id] ?? event.balance_due);
+      const method = externalMethodByEvent[event.event_id];
+      const reference = externalReferenceByEvent[event.event_id] ?? "";
+
+      if (!method) {
+        throw new Error("Please select a payment method.");
+      }
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Payment amount must be greater than zero.");
+      }
+
+      if (amount > event.balance_due) {
+        throw new Error(`Payment amount cannot be greater than ${formatMoney(event.balance_due)}.`);
+      }
+
+      setRecordingExternalEventId(event.event_id);
+      setErrorMessage(null);
+      setPaymentMessage(null);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Please sign in again before recording payment.");
+      }
+
+      const response = await fetch("/api/player-portal/external-payment", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventId: event.event_id,
+          amount,
+          method,
+          reference,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Unable to record payment.");
+      }
+
+      setPaymentMessage("Payment recorded. A receipt was sent to you and the league.");
+      setExternalReferenceByEvent((prev) => ({ ...prev, [event.event_id]: "" }));
+      await loadPortalData(sessionEmail ?? "");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to record payment.");
+    } finally {
+      setRecordingExternalEventId(null);
     }
   };
 
@@ -605,6 +668,78 @@ export default function PlayerPortalPage() {
                                 ? "Paid"
                                 : "Pay event"}
                           </Button>
+                          {portalData && (
+                            <Stack spacing={1}>
+                              <Divider>Other methods</Divider>
+                              {Object.entries(portalData.payment_methods).filter(([, value]) => Boolean(value)).length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  No external payment methods are currently enabled.
+                                </Typography>
+                              ) : (
+                                <>
+                                  <TextField
+                                    select
+                                    size="small"
+                                    label="Payment method"
+                                    value={externalMethodByEvent[event.event_id] ?? ""}
+                                    onChange={(changeEvent) =>
+                                      setExternalMethodByEvent((prev) => ({
+                                        ...prev,
+                                        [event.event_id]: changeEvent.target.value,
+                                      }))
+                                    }
+                                    fullWidth
+                                  >
+                                    {portalData.payment_methods.zelle && (
+                                      <MenuItem value="zelle">Zelle</MenuItem>
+                                    )}
+                                    {portalData.payment_methods.venmo && (
+                                      <MenuItem value="venmo">Venmo</MenuItem>
+                                    )}
+                                    {portalData.payment_methods.cashapp && (
+                                      <MenuItem value="cashapp">Cash App</MenuItem>
+                                    )}
+                                  </TextField>
+                                  {externalMethodByEvent[event.event_id] && (
+                                    <Alert severity="info">
+                                      Send payment to{" "}
+                                      <strong>
+                                        {portalData.payment_methods[
+                                          externalMethodByEvent[event.event_id] as keyof typeof portalData.payment_methods
+                                        ]}
+                                      </strong>
+                                      , then enter the confirmation/reference.
+                                    </Alert>
+                                  )}
+                                  <TextField
+                                    size="small"
+                                    label="Confirmation / reference"
+                                    value={externalReferenceByEvent[event.event_id] ?? ""}
+                                    onChange={(changeEvent) =>
+                                      setExternalReferenceByEvent((prev) => ({
+                                        ...prev,
+                                        [event.event_id]: changeEvent.target.value,
+                                      }))
+                                    }
+                                    fullWidth
+                                  />
+                                  <Button
+                                    variant="outlined"
+                                    disabled={
+                                      event.balance_due <= 0 ||
+                                      !externalMethodByEvent[event.event_id] ||
+                                      recordingExternalEventId === event.event_id
+                                    }
+                                    onClick={() => handleExternalPayment(event)}
+                                  >
+                                    {recordingExternalEventId === event.event_id
+                                      ? "Recording..."
+                                      : "Record external payment"}
+                                  </Button>
+                                </>
+                              )}
+                            </Stack>
+                          )}
                         </Stack>
                       </Stack>
 

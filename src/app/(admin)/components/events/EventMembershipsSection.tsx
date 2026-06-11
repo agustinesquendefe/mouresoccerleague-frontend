@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Chip,
+  MenuItem,
   Paper,
   Stack,
   Tab,
@@ -45,6 +46,8 @@ function getControlStatus(membership: EventMembershipSummary) {
 export default function EventMembershipsSection({ eventId }: Props) {
   const [memberships, setMemberships] = useState<EventMembershipSummary[]>([]);
   const [paymentByMembership, setPaymentByMembership] = useState<Record<number, string>>({});
+  const [methodByMembership, setMethodByMembership] = useState<Record<number, string>>({});
+  const [referenceByMembership, setReferenceByMembership] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -193,21 +196,44 @@ export default function EventMembershipsSection({ eventId }: Props) {
       setErrorMessage(null);
       setSuccessMessage(null);
 
-      const response = await fetch('/api/stripe/admin-event-membership-checkout', {
-        method: 'POST',
+      const method = methodByMembership[membership.id] ?? 'stripe';
+      const reference = referenceByMembership[membership.id] ?? '';
+      const response = await fetch(
+        method === 'stripe'
+          ? '/api/stripe/admin-event-membership-checkout'
+          : `/api/admin/event-memberships/${membership.id}`,
+        {
+        method: method === 'stripe' ? 'POST' : 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          membershipId: membership.id,
-          amount,
-          returnPath: window.location.pathname,
-        }),
+        body: JSON.stringify(
+          method === 'stripe'
+            ? {
+                membershipId: membership.id,
+                amount,
+                returnPath: window.location.pathname,
+              }
+            : {
+                action: 'add_payment',
+                amount,
+                method,
+                reference,
+              }
+        ),
       });
       const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result?.error ?? 'Failed to start checkout');
+      }
+
+      if (method !== 'stripe') {
+        setSuccessMessage(result.emailWarning ?? 'Payment recorded and receipt emails sent.');
+        setPaymentByMembership((prev) => ({ ...prev, [membership.id]: '' }));
+        setReferenceByMembership((prev) => ({ ...prev, [membership.id]: '' }));
+        await loadData();
+        return;
       }
 
       if (!result.checkout_url) {
@@ -338,6 +364,7 @@ export default function EventMembershipsSection({ eventId }: Props) {
                           paymentAmount <= 0 ||
                           paymentAmount > membership.balance_due);
                       const controlStatus = getControlStatus(membership);
+                      const isFullyPaid = membership.balance_due <= 0;
 
                       return (
                         <TableRow key={membership.id} hover>
@@ -345,7 +372,11 @@ export default function EventMembershipsSection({ eventId }: Props) {
                           <TableCell>{membership.player_document_id ?? '-'}</TableCell>
                           <TableCell>{formatMoney(membership.amount_paid)}</TableCell>
                           <TableCell>{formatMoney(membership.balance_due)}</TableCell>
-                          <TableCell>{membership.appearances_count} / 4 free</TableCell>
+                          <TableCell>
+                            {membership.balance_due <= 0
+                              ? 'Paid in full'
+                              : `${membership.appearances_count} / 4 free`}
+                          </TableCell>
                           <TableCell>
                             <Chip
                               label={controlStatus.label}
@@ -353,12 +384,48 @@ export default function EventMembershipsSection({ eventId }: Props) {
                               size="small"
                             />
                           </TableCell>
-                          <TableCell align="right">
-                            <Stack direction="row" alignItems={"center"} spacing={1} justifyContent="flex-end">
+                          <TableCell align="right" sx={{ verticalAlign: 'top', pt: 2 }}>
+                            <Stack
+                              direction="row"
+                              alignItems="flex-start"
+                              spacing={1}
+                              justifyContent="flex-end"
+                              sx={{
+                                minWidth: 480,
+                                '& .MuiFormControl-root': {
+                                  mt: 0,
+                                },
+                                '& .MuiFormHelperText-root': {
+                                  minHeight: 20,
+                                  m: '3px 0 0',
+                                },
+                              }}
+                            >
+                              <TextField
+                                select
+                                size="small"
+                                value={methodByMembership[membership.id] ?? 'stripe'}
+                                disabled={isFullyPaid || saving}
+                                onChange={(event) =>
+                                  setMethodByMembership((prev) => ({
+                                    ...prev,
+                                    [membership.id]: event.target.value,
+                                  }))
+                                }
+                                helperText=" "
+                                sx={{ width: 120 }}
+                              >
+                                <MenuItem value="stripe">Stripe</MenuItem>
+                                <MenuItem value="cash">Cash</MenuItem>
+                                <MenuItem value="zelle">Zelle</MenuItem>
+                                <MenuItem value="venmo">Venmo</MenuItem>
+                                <MenuItem value="cashapp">Cash App</MenuItem>
+                              </TextField>
                               <TextField
                                 size="small"
                                 type="number"
                                 value={paymentValue}
+                                disabled={isFullyPaid || saving}
                                 onChange={(event) =>
                                   setPaymentByMembership((prev) => ({
                                     ...prev,
@@ -374,31 +441,53 @@ export default function EventMembershipsSection({ eventId }: Props) {
                                 }
                                 sx={{ width: 110 }}
                               />
+                              {(methodByMembership[membership.id] ?? 'stripe') !== 'stripe' && (
+                                <TextField
+                                  size="small"
+                                  label="Ref"
+                                  value={referenceByMembership[membership.id] ?? ''}
+                                  disabled={isFullyPaid || saving}
+                                  onChange={(event) =>
+                                    setReferenceByMembership((prev) => ({
+                                      ...prev,
+                                      [membership.id]: event.target.value,
+                                    }))
+                                  }
+                                  helperText=" "
+                                  sx={{ width: 120 }}
+                                />
+                              )}
                               <Button
                                 variant="outlined"
                                 size="small"
+                                sx={{ mt: 0, height: 40, minWidth: 86 }}
                                 onClick={() => handleAddPayment(membership)}
                                 disabled={
                                   saving ||
-                                  membership.balance_due <= 0 ||
+                                  isFullyPaid ||
                                   !Number.isFinite(paymentAmount) ||
                                   paymentAmount <= 0 ||
                                   paymentAmount > membership.balance_due
                                 }
                               >
-                                Checkout
+                                {isFullyPaid
+                                  ? 'Paid'
+                                  : (methodByMembership[membership.id] ?? 'stripe') === 'stripe'
+                                  ? 'Checkout'
+                                  : 'Record'}
                               </Button>
                             </Stack>
                           </TableCell>
-                          <TableCell align="right">
+                          <TableCell align="right" sx={{ verticalAlign: 'top', pt: 2 }}>
                             <Button
                               variant="outlined"
                               size="small"
                               color={membership.can_play ? 'primary' : 'error'}
                               onClick={() => handleAddAppearance(membership)}
-                              disabled={saving || !membership.can_play}
+                              disabled={saving || !membership.can_play || isFullyPaid}
+                              sx={{ height: 40, minWidth: 86 }}
                             >
-                              Count
+                              {isFullyPaid ? 'Paid' : 'Count'}
                             </Button>
                           </TableCell>
                         </TableRow>

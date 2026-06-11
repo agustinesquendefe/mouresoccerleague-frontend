@@ -7,6 +7,7 @@ import {
   Chip,
   CircularProgress,
   Grid,
+  MenuItem,
   Paper,
   Stack,
   Tab,
@@ -34,9 +35,12 @@ import {
 } from '@/services/dashboard';
 
 const PAYMENT_ROWS_PER_PAGE = 10;
+const PAYMENT_RECORDS_PER_PAGE = 10;
 const PAYMENT_TABS = ['all', 'paid', 'partial', 'pending'] as const;
+const PAYMENT_METHODS = ['all', 'stripe', 'cash', 'zelle', 'venmo', 'cashapp', 'legacy'] as const;
 
 type PaymentTab = (typeof PAYMENT_TABS)[number];
+type PaymentMethodFilter = (typeof PAYMENT_METHODS)[number];
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat(undefined, {
@@ -129,7 +133,9 @@ export default function FinancialsPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusTab, setStatusTab] = useState<PaymentTab>('all');
   const [search, setSearch] = useState('');
+  const [methodFilter, setMethodFilter] = useState<PaymentMethodFilter>('all');
   const [page, setPage] = useState(0);
+  const [recordsPage, setRecordsPage] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -179,6 +185,32 @@ export default function FinancialsPage() {
     const start = page * PAYMENT_ROWS_PER_PAGE;
     return filteredPaymentRows.slice(start, start + PAYMENT_ROWS_PER_PAGE);
   }, [filteredPaymentRows, page]);
+
+  const filteredPaymentRecords = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const rows = overview?.paymentRecords ?? [];
+
+    const methodRows = methodFilter === 'all'
+      ? rows
+      : rows.filter((row) => row.method === methodFilter);
+
+    if (!query) return methodRows;
+
+    return methodRows.filter((row) =>
+      [row.playerName, row.eventName, row.methodLabel, row.source, row.reference ?? ''].some((value) =>
+        value.toLowerCase().includes(query)
+      )
+    );
+  }, [overview, search, methodFilter]);
+
+  useEffect(() => {
+    setRecordsPage(0);
+  }, [search, methodFilter]);
+
+  const paginatedPaymentRecords = useMemo(() => {
+    const start = recordsPage * PAYMENT_RECORDS_PER_PAGE;
+    return filteredPaymentRecords.slice(start, start + PAYMENT_RECORDS_PER_PAGE);
+  }, [filteredPaymentRecords, recordsPage]);
 
   return (
     <PageContainer title="Financials" description="Admin financial overview">
@@ -237,6 +269,35 @@ export default function FinancialsPage() {
                   />
                 </Grid>
               </Grid>
+
+              <DashboardCard
+                title="Collected by Payment Method"
+                subtitle="Breakdown of every recorded payment provider, including legacy balances from before payment history existed."
+              >
+                {overview.paymentMethodBreakdown.length === 0 ? (
+                  <Typography color="text.secondary">No payment records found yet.</Typography>
+                ) : (
+                  <Grid container spacing={2}>
+                    {overview.paymentMethodBreakdown.map((row) => (
+                      <Grid key={row.method} size={{ xs: 6, md: 2.4 }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, height: '100%' }}>
+                          <Typography variant="body2" color="text.secondary">{row.label}</Typography>
+                          <Typography variant="h6" fontWeight={800}>{formatMoney(row.grossSales)}</Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Fees {formatMoney(row.fees)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Net {formatMoney(row.netSales)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {row.count} payment{row.count === 1 ? '' : 's'}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
+              </DashboardCard>
 
               <Grid container spacing={3}>
                 <Grid size={{ xs: 12, lg: 7 }}>
@@ -426,6 +487,85 @@ export default function FinancialsPage() {
                     </>
                   )}
                 </Stack>
+              </DashboardCard>
+
+              <DashboardCard
+                title="Payment Records"
+                subtitle="Audit trail of collected payments by provider and source."
+              >
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  sx={{ mb: 2 }}
+                >
+                  <TextField
+                    select
+                    size="small"
+                    label="Payment method"
+                    value={methodFilter}
+                    onChange={(event) => setMethodFilter(event.target.value as PaymentMethodFilter)}
+                    sx={{ minWidth: 220 }}
+                  >
+                    <MenuItem value="all">All methods</MenuItem>
+                    <MenuItem value="stripe">Card / Stripe</MenuItem>
+                    <MenuItem value="cash">Cash</MenuItem>
+                    <MenuItem value="zelle">Zelle</MenuItem>
+                    <MenuItem value="venmo">Venmo</MenuItem>
+                    <MenuItem value="cashapp">Cash App</MenuItem>
+                    <MenuItem value="legacy">Legacy balance</MenuItem>
+                  </TextField>
+                </Stack>
+                {filteredPaymentRecords.length === 0 ? (
+                  <Typography color="text.secondary">No payment records match the current search.</Typography>
+                ) : (
+                  <>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Date</TableCell>
+                            <TableCell>Player</TableCell>
+                            <TableCell>Event</TableCell>
+                            <TableCell>Method</TableCell>
+                            <TableCell>Source</TableCell>
+                            <TableCell>Reference</TableCell>
+                            <TableCell align="right">Gross Sales</TableCell>
+                            <TableCell align="right">Fees</TableCell>
+                            <TableCell align="right">Net Sales</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {paginatedPaymentRecords.map((row) => (
+                            <TableRow key={`${row.method}:${row.id}:${row.membershipId}`} hover>
+                              <TableCell>{new Date(row.createdAt).toLocaleDateString()}</TableCell>
+                              <TableCell>
+                                <Typography fontWeight={600}>{row.playerName}</Typography>
+                              </TableCell>
+                              <TableCell>{row.eventName}</TableCell>
+                              <TableCell>
+                                <Chip label={row.methodLabel} size="small" variant="outlined" />
+                              </TableCell>
+                              <TableCell>{row.source}</TableCell>
+                              <TableCell>{row.reference ?? '-'}</TableCell>
+                              <TableCell align="right">{formatMoney(row.amount)}</TableCell>
+                              <TableCell align="right">{formatMoney(row.feeAmount)}</TableCell>
+                              <TableCell align="right">{formatMoney(row.netAmount)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+
+                    <TablePagination
+                      component="div"
+                      count={filteredPaymentRecords.length}
+                      page={recordsPage}
+                      onPageChange={(_, nextPage) => setRecordsPage(nextPage)}
+                      rowsPerPage={PAYMENT_RECORDS_PER_PAGE}
+                      rowsPerPageOptions={[PAYMENT_RECORDS_PER_PAGE]}
+                    />
+                  </>
+                )}
               </DashboardCard>
             </Stack>
           )}

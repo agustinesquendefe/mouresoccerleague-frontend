@@ -112,6 +112,9 @@ export default function GeneralSettingsForm() {
         pass_payment_fees_to_customer: form.pass_payment_fees_to_customer ?? true,
         stripe_fee_percentage: form.stripe_fee_percentage ?? 2.9,
         stripe_fee_fixed_amount: form.stripe_fee_fixed_amount ?? 0.3,
+        zelle_enabled: form.zelle_enabled ?? false,
+        venmo_enabled: form.venmo_enabled ?? false,
+        cashapp_enabled: form.cashapp_enabled ?? false,
         state_fee_percentage: form.state_fee_percentage ?? 0,
         state_fee_label: form.state_fee_label || 'State fee',
       };
@@ -315,6 +318,17 @@ export default function GeneralSettingsForm() {
             <Grid>
               <TextField
                 fullWidth
+                label="Payment Order Email"
+                placeholder="payments@league.com"
+                value={form.payment_order_email ?? ''}
+                onChange={(e) => handleChange('payment_order_email', e.target.value)}
+                helperText="Internal email that receives Stripe payment order backups. If empty, Contact Email is used."
+              />
+            </Grid>
+
+            <Grid>
+              <TextField
+                fullWidth
                 label="Stripe Fee Percentage"
                 type="number"
                 inputProps={{ min: 0, step: 0.001 }}
@@ -355,6 +369,79 @@ export default function GeneralSettingsForm() {
                 placeholder="NC fee"
                 value={form.state_fee_label ?? 'State fee'}
                 onChange={(e) => handleChange('state_fee_label', e.target.value)}
+              />
+            </Grid>
+          </Grid>
+
+          <Divider />
+
+          <Box>
+            <Typography variant="subtitle1" fontWeight={700}>
+              External Payment Methods
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              These methods appear in the player portal. Cash remains admin-only.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={2} direction={"column"}>
+            <Grid>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={form.zelle_enabled ?? false}
+                    onChange={(e) => handleBooleanChange('zelle_enabled', e.target.checked)}
+                  />
+                }
+                label="Accept Zelle"
+              />
+              <TextField
+                fullWidth
+                label="Zelle recipient"
+                placeholder="phone or email"
+                value={form.zelle_recipient ?? ''}
+                onChange={(e) => handleChange('zelle_recipient', e.target.value)}
+                disabled={!form.zelle_enabled}
+              />
+            </Grid>
+
+            <Grid>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={form.venmo_enabled ?? false}
+                    onChange={(e) => handleBooleanChange('venmo_enabled', e.target.checked)}
+                  />
+                }
+                label="Accept Venmo"
+              />
+              <TextField
+                fullWidth
+                label="Venmo username"
+                placeholder="@username"
+                value={form.venmo_recipient ?? ''}
+                onChange={(e) => handleChange('venmo_recipient', e.target.value)}
+                disabled={!form.venmo_enabled}
+              />
+            </Grid>
+
+            <Grid>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={form.cashapp_enabled ?? false}
+                    onChange={(e) => handleBooleanChange('cashapp_enabled', e.target.checked)}
+                  />
+                }
+                label="Accept Cash App"
+              />
+              <TextField
+                fullWidth
+                label="Cash App cashtag"
+                placeholder="$cashtag"
+                value={form.cashapp_recipient ?? ''}
+                onChange={(e) => handleChange('cashapp_recipient', e.target.value)}
+                disabled={!form.cashapp_enabled}
               />
             </Grid>
           </Grid>

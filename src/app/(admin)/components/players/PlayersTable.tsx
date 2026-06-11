@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Avatar,
   Button,
   Chip,
   Paper,
@@ -53,6 +54,7 @@ export default function PlayersTable({
           <TableHead>
             <TableRow>
               <TableCell>ID</TableCell>
+              <TableCell>Avatar</TableCell>
               <TableCell>Name</TableCell>
               <TableCell>Birthday</TableCell>
               <TableCell>Have ID</TableCell>
@@ -77,6 +79,20 @@ export default function PlayersTable({
               rows.map((player) => (
                 <TableRow key={player.id} hover>
                 <TableCell>{player.document_id}</TableCell>
+                <TableCell>
+                  <Avatar
+                    src={player.photo_url ?? undefined}
+                    alt={getPlayerFullName(player) || 'Player'}
+                    sx={{ width: 40, height: 40 }}
+                  >
+                    {getPlayerFullName(player)
+                      .split(' ')
+                      .map((part) => part.charAt(0))
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase() || '?'}
+                  </Avatar>
+                </TableCell>
                 <TableCell>{getPlayerFullName(player)}</TableCell>
                 <TableCell>{formatStoredDate(player.birth_date)}</TableCell>
                 <TableCell>

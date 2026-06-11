@@ -351,12 +351,13 @@ export default function PlayerDialog({
   const hasConflicts =
     conflicts.keyExists || conflicts.emailExists || conflicts.documentExists;
 
-  // Minor logic: require both files if under 18
+  // Legal document requirements: participant always, tutor only for minors.
   const isMinor = useMemo(() => getAgeFromDateOnly(values.birth_date) < 18, [values.birth_date]);
-  // Solo requiere input si no existe ni en la base ni en el input
+  const requiresParticipantDocument = true;
+  const requiresTutorDocument = isMinor;
   const missingTutor = isMinor && !tutorFile && !playerLegalDocs.tutor;
-  const missingParticipant = isMinor && !participantFile && !playerLegalDocs.participant;
-  const missingMinorDocs = missingTutor || missingParticipant;
+  const missingParticipant = requiresParticipantDocument && !participantFile && !playerLegalDocs.participant;
+  const missingRequiredDocs = missingTutor || missingParticipant;
   const isDisabled =
     !values.first_name.trim() ||
     !values.last_name.trim() ||
@@ -364,7 +365,7 @@ export default function PlayerDialog({
     loading ||
     checkingConflicts ||
     hasConflicts ||
-    missingMinorDocs;
+    missingRequiredDocs;
 
   const handleSubmit = async () => {
     try {
@@ -388,19 +389,28 @@ export default function PlayerDialog({
         return;
       }
 
-      // Validate minor docs (solo si no existen en la base ni input)
-      if (isMinor) {
-        let valid = true;
-        if (!tutorFile && !playerLegalDocs.tutor) {
-          setTutorFileError('Required for minors');
-          valid = false;
-        }
-        if (!participantFile && !playerLegalDocs.participant) {
-          setParticipantFileError('Required for minors');
-          valid = false;
-        }
-        if (!valid) return;
+      const tutorLegalDoc = legalDocs.find((doc) => doc.type === 'tutor');
+      const participantLegalDoc = legalDocs.find((doc) => doc.type === 'participant');
+
+      // Validate legal docs (solo si no existen en la base ni input)
+      let validLegalDocs = true;
+      if (requiresTutorDocument && !tutorLegalDoc) {
+        setTutorFileError('Configure a tutor legal document first');
+        validLegalDocs = false;
       }
+      if (requiresParticipantDocument && !participantLegalDoc) {
+        setParticipantFileError('Configure a participant legal document first');
+        validLegalDocs = false;
+      }
+      if (requiresTutorDocument && !tutorFile && !playerLegalDocs.tutor) {
+        setTutorFileError('Required for minors');
+        validLegalDocs = false;
+      }
+      if (requiresParticipantDocument && !participantFile && !playerLegalDocs.participant) {
+        setParticipantFileError('Required');
+        validLegalDocs = false;
+      }
+      if (!validLegalDocs) return;
 
       // 1. Crear/editar jugador y obtener playerId
       const playerResult = await onSubmit(
@@ -429,9 +439,6 @@ export default function PlayerDialog({
       if (!playerId) return;
 
       // 2. Registrar documentos legales si hay archivos nuevos
-      const tutorLegalDoc = legalDocs.find((doc) => doc.type === 'tutor');
-      const participantLegalDoc = legalDocs.find((doc) => doc.type === 'participant');
-
       // Verificar usuario autenticado antes de subir documentos legales
       let user: any = null;
       if ((tutorFile && tutorLegalDoc) || (participantFile && participantLegalDoc)) {
@@ -659,17 +666,19 @@ export default function PlayerDialog({
             </Stack>
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                {/* Legal documents for minors */}
-                {isMinor && (
-                  <Box mt={2} mb={1} p={2} sx={{ border: '1px solid', borderColor: 'warning.main', borderRadius: 2, bgcolor: 'warning.light' }}>
-                    <Typography variant="subtitle1" color="warning.dark" fontWeight={600} gutterBottom>
-                      Required Documents for Minors
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" mb={1}>
-                      Both documents must be uploaded to register a minor:
-                    </Typography>
-                    <Stack direction="column" spacing={2}>
-                      {/* Tutor */}
+                {/* Legal documents */}
+                <Box mt={2} mb={1} p={2} sx={{ border: '1px solid', borderColor: isMinor ? 'warning.main' : 'divider', borderRadius: 2, bgcolor: isMinor ? 'warning.light' : 'background.paper' }}>
+                  <Typography variant="subtitle1" color={isMinor ? 'warning.dark' : 'text.primary'} fontWeight={600} gutterBottom>
+                    Required Legal Documents
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" mb={1}>
+                    {isMinor
+                      ? 'Upload the tutor and participant documents to register a minor.'
+                      : 'Upload the participant document to register an adult player.'}
+                  </Typography>
+                  <Stack direction="column" spacing={2}>
+                    {/* Tutor */}
+                    {requiresTutorDocument && (
                       <Box>
                         <Typography variant="caption" fontWeight={600}>Tutor</Typography>
                         {loadingLegalDocs ? (
@@ -743,83 +752,83 @@ export default function PlayerDialog({
                           <Typography variant="caption" color="error">{tutorFileError}</Typography>
                         )}
                       </Box>
-                      {/* Participante */}
-                      <Box>
-                        <Typography variant="caption" fontWeight={600}>Participant</Typography>
-                        {loadingLegalDocs ? (
-                          <CircularProgress size={18} />
-                        ) : participantFile ? (
+                    )}
+                    {/* Participante */}
+                    <Box>
+                      <Typography variant="caption" fontWeight={600}>Participant</Typography>
+                      {loadingLegalDocs ? (
+                        <CircularProgress size={18} />
+                      ) : participantFile ? (
+                        <Button
+                          variant="outlined"
+                          component="label"
+                          color={participantFileError ? 'error' : 'primary'}
+                          sx={{ minWidth: 180, maxWidth: 260, overflowX: 'auto', textAlign: 'left', display: 'flex', alignItems: 'center' }}
+                        >
+                          <span style={{
+                            display: 'inline-block',
+                            maxWidth: 180,
+                            overflowX: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            verticalAlign: 'middle',
+                          }}>
+                            {participantFile.name}
+                          </span>
+                          <input
+                            type="file"
+                            accept="application/pdf,image/*"
+                            hidden
+                            onChange={handleParticipantFileChange}
+                          />
+                        </Button>
+                      ) : playerLegalDocs.participant && playerLegalDocUrls.participant ? (
+                        <Box display="flex" alignItems="center" gap={1}>
                           <Button
                             variant="outlined"
-                            component="label"
-                            color={participantFileError ? 'error' : 'primary'}
-                            sx={{ minWidth: 180, maxWidth: 260, overflowX: 'auto', textAlign: 'left', display: 'flex', alignItems: 'center' }}
+                            size="small"
+                            onClick={() =>
+                              handleDownloadFile(
+                                playerLegalDocUrls.participant!,
+                                playerLegalDocs.participant.file_url?.split('/').pop() || 'participant_document.pdf'
+                              )
+                            }
                           >
-                            <span style={{
-                              display: 'inline-block',
-                              maxWidth: 180,
-                              overflowX: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              verticalAlign: 'middle',
-                            }}>
-                              {participantFile.name}
-                            </span>
-                            <input
-                              type="file"
-                              accept="application/pdf,image/*"
-                              hidden
-                              onChange={handleParticipantFileChange}
-                            />
+                            Download Participant Document
                           </Button>
-                        ) : playerLegalDocs.participant && playerLegalDocUrls.participant ? (
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              onClick={() =>
-                                handleDownloadFile(
-                                  playerLegalDocUrls.tutor!,
-                                  playerLegalDocs.tutor.file_url?.split('/').pop() || 'tutor_document.pdf'
-                                )
-                              }
-                            >
-                              Download Participant Document
-                            </Button>
-                            <Button size="small" color="error" onClick={() => handleDeletePlayerLegalDoc('tutor')}>Delete</Button>
-                          </Box>
-                        ) : (
-                          <Button
-                            variant="outlined"
-                            component="label"
-                            color={participantFileError ? 'error' : 'primary'}
-                            sx={{ minWidth: 180, maxWidth: 260, overflowX: 'auto', textAlign: 'left', display: 'flex', alignItems: 'center' }}
-                          >
-                            <span style={{
-                              display: 'inline-block',
-                              maxWidth: 180,
-                              overflowX: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              verticalAlign: 'middle',
-                            }}>
-                              Upload Participant Document
-                            </span>
-                            <input
-                              type="file"
-                              accept="application/pdf,image/*"
-                              hidden
-                              onChange={handleParticipantFileChange}
-                            />
-                          </Button>
-                        )}
-                        {participantFileError && (
-                          <Typography variant="caption" color="error">{participantFileError}</Typography>
-                        )}
-                      </Box>
-                    </Stack>
-                  </Box>
-                )}
+                          <Button size="small" color="error" onClick={() => handleDeletePlayerLegalDoc('participant')}>Delete</Button>
+                        </Box>
+                      ) : (
+                        <Button
+                          variant="outlined"
+                          component="label"
+                          color={participantFileError ? 'error' : 'primary'}
+                          sx={{ minWidth: 180, maxWidth: 260, overflowX: 'auto', textAlign: 'left', display: 'flex', alignItems: 'center' }}
+                        >
+                          <span style={{
+                            display: 'inline-block',
+                            maxWidth: 180,
+                            overflowX: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            verticalAlign: 'middle',
+                          }}>
+                            Upload Participant Document
+                          </span>
+                          <input
+                            type="file"
+                            accept="application/pdf,image/*"
+                            hidden
+                            onChange={handleParticipantFileChange}
+                          />
+                        </Button>
+                      )}
+                      {participantFileError && (
+                        <Typography variant="caption" color="error">{participantFileError}</Typography>
+                      )}
+                    </Box>
+                  </Stack>
+                </Box>
             </Stack>
 
             <TextField

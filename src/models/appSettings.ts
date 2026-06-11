@@ -13,6 +13,13 @@ export type AppSettings = {
   pass_payment_fees_to_customer?: boolean | null;
   stripe_fee_percentage?: number | null;
   stripe_fee_fixed_amount?: number | null;
+  payment_order_email?: string | null;
+  zelle_enabled?: boolean | null;
+  zelle_recipient?: string | null;
+  venmo_enabled?: boolean | null;
+  venmo_recipient?: string | null;
+  cashapp_enabled?: boolean | null;
+  cashapp_recipient?: string | null;
   state_fee_percentage?: number | null;
   state_fee_label?: string | null;
   website?: string | null;

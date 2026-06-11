@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { registerExternalPayment, type ExternalPaymentMethod } from '@/lib/externalPayments';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -8,6 +9,9 @@ type Params = {
 type RequestBody = {
   action?: 'add_payment' | 'count_game';
   amount?: number;
+  method?: ExternalPaymentMethod;
+  reference?: string;
+  note?: string;
 };
 
 function getAdminClient() {
@@ -40,7 +44,14 @@ export async function PATCH(request: Request, { params }: Params) {
 
     const { data: membership, error: membershipError } = await supabaseAdmin
       .from('event_memberships')
-      .select('amount_paid, appearances_count')
+      .select(`
+        amount_paid,
+        appearances_count,
+        event:events (
+          event_price,
+          membership_price
+        )
+      `)
       .eq('id', membershipId)
       .single();
 
@@ -56,20 +67,35 @@ export async function PATCH(request: Request, { params }: Params) {
         );
       }
 
-      const { error: updateError } = await supabaseAdmin
-        .from('event_memberships')
-        .update({
-          amount_paid: Number(membership.amount_paid ?? 0) + amount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', membershipId);
+      const method = body.method ?? 'cash';
 
-      if (updateError) throw new Error(updateError.message);
+      if (!['cash', 'zelle', 'venmo', 'cashapp'].includes(method)) {
+        return NextResponse.json({ error: 'Unsupported payment method.' }, { status: 400 });
+      }
+
+      await registerExternalPayment({
+        supabaseAdmin,
+        membershipId,
+        amount,
+        method,
+        source: 'admin',
+        reference: body.reference,
+        note: body.note,
+      });
 
       return NextResponse.json({ ok: true });
     }
 
     if (body.action === 'count_game') {
+      const event = Array.isArray(membership.event) ? membership.event[0] ?? null : membership.event ?? null;
+      const eventPrice = Number(event?.event_price ?? event?.membership_price ?? 0);
+      const amountPaid = Number(membership.amount_paid ?? 0);
+      const balanceDue = Math.max(eventPrice - amountPaid, 0);
+
+      if (balanceDue <= 0) {
+        return NextResponse.json({ error: 'This player is fully paid; game count is no longer required.' }, { status: 400 });
+      }
+
       const { error: updateError } = await supabaseAdmin
         .from('event_memberships')
         .update({
