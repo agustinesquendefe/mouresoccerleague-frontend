@@ -41,8 +41,39 @@ type TeamSummary = {
   logo_url: string | null;
 };
 
+function getTodayDateKey() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function getEventTeamKey(eventId: number, teamId: number) {
   return `${eventId}:${teamId}`;
+}
+
+function filterUpcomingRounds(matches: RawMatch[]) {
+  const today = getTodayDateKey();
+  const upcomingRoundNumbers = Array.from(
+    new Set(
+      matches
+        .filter((match) => match.round_number != null && (!match.date || match.date >= today))
+        .sort((a, b) => {
+          const dateCompare = (a.date ?? '9999-12-31').localeCompare(b.date ?? '9999-12-31');
+          if (dateCompare !== 0) return dateCompare;
+          return (a.round_number ?? 0) - (b.round_number ?? 0);
+        })
+        .map((match) => match.round_number as number)
+    )
+  ).slice(0, 4);
+
+  if (upcomingRoundNumbers.length === 0) {
+    return [];
+  }
+
+  const visibleRounds = new Set(upcomingRoundNumbers);
+  return matches.filter((match) => match.round_number != null && visibleRounds.has(match.round_number));
 }
 
 export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[]> {
@@ -71,7 +102,7 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
 
   if (error) throw new Error(error.message);
 
-  const matches = (data ?? []) as RawMatch[];
+  const matches = filterUpcomingRounds((data ?? []) as RawMatch[]);
 
   const teamIds = Array.from(
     new Set(matches.flatMap((m) => [m.team1_id, m.team2_id]).filter((id): id is number => Number.isFinite(id)))

@@ -103,6 +103,53 @@ export default function MatchesPage() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('referee_payment_session_id');
+
+    if (!sessionId) return;
+
+    const confirmRefereePayment = async () => {
+      try {
+        setSaving(true);
+
+        const response = await fetch('/api/stripe/referee-payment-checkout/confirm', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sessionId }),
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.error ?? 'Failed to confirm referee payment');
+        }
+
+        if (result.paid) {
+          setToast({
+            open: true,
+            message: result.emailWarning ?? 'Referee card payment confirmed.',
+            severity: result.emailWarning ? 'error' : 'success',
+          });
+          await loadMatches();
+        }
+
+        window.history.replaceState({}, '', window.location.pathname);
+      } catch (error) {
+        setToast({
+          open: true,
+          message: error instanceof Error ? error.message : 'Failed to confirm referee payment',
+          severity: 'error',
+        });
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    confirmRefereePayment();
+  }, []);
+
+  useEffect(() => {
     loadMatches();
   }, [filters]);
 

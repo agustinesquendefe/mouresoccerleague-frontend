@@ -8,6 +8,26 @@ export type MatchBracketRound =
   | 'semifinal'
   | 'final'
   | 'third_place';
+export type RefereePaymentMethod = 'stripe' | 'cash' | 'zelle' | 'cashapp' | 'venmo';
+export type RefereePaymentStatus = 'pending' | 'paid' | 'waived';
+
+export type MatchRefereePaymentFormData = {
+  team_slot: 'team1' | 'team2';
+  team_id: number | null;
+  amount: number | null;
+  method: RefereePaymentMethod | null;
+  status: RefereePaymentStatus;
+  payer_player_id: number | null;
+  payer_document_id: string | null;
+  payer_name: string | null;
+  paid_at: string | null;
+  stripe_fee_amount?: number | null;
+  state_fee_amount?: number | null;
+  total_fee_amount?: number | null;
+  total_paid_amount?: number | null;
+  reference: string | null;
+  note: string | null;
+};
 
 export type Match = {
   id: number;
@@ -48,4 +68,5 @@ export type MatchFormData = {
   team1_id: number | null;
   team2_id: number | null;
   referee_id?: number | null;
+  referee_payments?: MatchRefereePaymentFormData[];
 };

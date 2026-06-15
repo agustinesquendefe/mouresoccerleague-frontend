@@ -96,5 +96,47 @@ export async function updateMatch(
     }
   }
 
+  if (payload.referee_payments && payload.referee_payments.length > 0) {
+    const paymentRows = payload.referee_payments
+      .filter((payment) => payment.team_id !== null)
+      .map((payment) => ({
+        match_id: id,
+        team_id: payment.team_id,
+        referee_id: payload.referee_id ?? null,
+        payer_player_id: payment.payer_player_id ?? null,
+        payer_document_id: payment.payer_document_id?.trim() || null,
+        payer_name: payment.payer_name?.trim() || null,
+        amount: payment.amount ?? 0,
+        stripe_fee_amount: payment.method === 'stripe' ? payment.stripe_fee_amount ?? 0 : 0,
+        state_fee_amount: payment.method === 'stripe' ? payment.state_fee_amount ?? 0 : 0,
+        total_fee_amount: payment.method === 'stripe' ? payment.total_fee_amount ?? 0 : 0,
+        total_paid_amount:
+          payment.status === 'paid'
+            ? payment.method === 'stripe'
+              ? payment.total_paid_amount ?? payment.amount ?? 0
+              : payment.amount ?? 0
+            : 0,
+        method: payment.status === 'paid' ? payment.method : null,
+        status: payment.status,
+        paid_at:
+          payment.status === 'paid'
+            ? payment.paid_at || new Date().toISOString()
+            : payment.paid_at,
+        reference: payment.reference?.trim() || null,
+        note: payment.note?.trim() || null,
+        updated_at: new Date().toISOString(),
+      }));
+
+    if (paymentRows.length > 0) {
+      const { error: paymentsError } = await supabase
+        .from('match_referee_payments')
+        .upsert(paymentRows, { onConflict: 'match_id,team_id' });
+
+      if (paymentsError) {
+        throw new Error(paymentsError.message);
+      }
+    }
+  }
+
   return data as Match;
 }
