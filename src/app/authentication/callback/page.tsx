@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert, Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { supabase } from '@/lib/supabaseClient';
@@ -11,7 +11,7 @@ function getRedirectPath(role?: string | null) {
   return '/';
 }
 
-export default function AuthenticationCallbackPage() {
+function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -72,5 +72,22 @@ export default function AuthenticationCallbackPage() {
         )}
       </Stack>
     </Box>
+  );
+}
+
+export default function AuthenticationCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <Box minHeight="100vh" display="flex" alignItems="center" justifyContent="center" p={3}>
+          <Stack spacing={2} alignItems="center" maxWidth={420}>
+            <CircularProgress />
+            <Typography color="text.secondary">Completing sign in...</Typography>
+          </Stack>
+        </Box>
+      }
+    >
+      <CallbackContent />
+    </Suspense>
   );
 }
