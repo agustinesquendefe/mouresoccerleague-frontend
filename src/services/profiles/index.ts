@@ -21,10 +21,12 @@ export async function updateProfile(id: string, payload: ProfileFormData): Promi
 }
 
 export async function deleteProfile(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('profiles')
-    .delete()
-    .eq('id', id);
+  const response = await fetch(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  const data = await response.json().catch(() => null);
 
-  if (error) throw new Error(error.message);
+  if (!response.ok) {
+    throw new Error(data?.error ?? 'Failed to delete user');
+  }
 }

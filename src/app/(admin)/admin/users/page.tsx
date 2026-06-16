@@ -11,6 +11,8 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  MenuItem,
+  Select,
   Snackbar,
   Stack,
   TextField,
@@ -38,6 +40,8 @@ export default function UsersPage() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFullName, setInviteFullName] = useState('');
+  const [inviteRole, setInviteRole] = useState<ProfileFormData['role']>('admin');
   const [inviting, setInviting] = useState(false);
 
   const [toast, setToast] = useState<{
@@ -118,14 +122,29 @@ export default function UsersPage() {
     e.preventDefault();
     try {
       setInviting(true);
-      const { error } = await supabase.auth.signInWithOtp({
-        email: inviteEmail,
-        options: { shouldCreateUser: true },
+      const response = await fetch('/api/admin/users/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: inviteEmail,
+          fullName: inviteFullName,
+          role: inviteRole,
+        }),
       });
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error ?? 'Failed to send invitation');
+      }
+
       showToast(`Invitation sent to ${inviteEmail}`, 'success');
       setInviteOpen(false);
       setInviteEmail('');
+      setInviteFullName('');
+      setInviteRole('admin');
+      await loadData();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to send invitation', 'error');
     } finally {
@@ -191,7 +210,7 @@ export default function UsersPage() {
           <DialogContentText>
             Are you sure you want to remove{' '}
             <strong>{profileToDelete?.full_name ?? profileToDelete?.email}</strong>? This will
-            delete their profile but not their authentication account.
+            delete their profile and authentication account.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -226,6 +245,26 @@ export default function UsersPage() {
               required
               autoFocus
             />
+            <TextField
+              label="Full Name"
+              value={inviteFullName}
+              onChange={(e) => setInviteFullName(e.target.value)}
+              size="small"
+              fullWidth
+              sx={{ mt: 2 }}
+            />
+            <Select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as ProfileFormData['role'])}
+              size="small"
+              fullWidth
+              sx={{ mt: 2 }}
+            >
+              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="editor">Editor</MenuItem>
+              <MenuItem value="referee">Referee</MenuItem>
+              <MenuItem value="viewer">Viewer</MenuItem>
+            </Select>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setInviteOpen(false)} disabled={inviting}>Cancel</Button>

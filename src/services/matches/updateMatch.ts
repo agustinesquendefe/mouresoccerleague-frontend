@@ -99,6 +99,16 @@ export async function updateMatch(
   if (payload.referee_payments && payload.referee_payments.length > 0) {
     const paymentRows = payload.referee_payments
       .filter((payment) => payment.team_id !== null)
+      .filter(
+        (payment) =>
+          payment.status !== 'pending' ||
+          payment.amount !== null ||
+          payment.method !== null ||
+          Boolean(payment.payer_document_id?.trim()) ||
+          Boolean(payment.payer_name?.trim()) ||
+          Boolean(payment.reference?.trim()) ||
+          Boolean(payment.note?.trim())
+      )
       .map((payment) => ({
         match_id: id,
         team_id: payment.team_id,

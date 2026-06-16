@@ -323,30 +323,6 @@ export default function MatchDialog({
         }
       }
 
-      for (const payment of refereePayments) {
-        if (payment.status === 'paid') {
-          if (!payment.method) {
-            setErrorMessage('Paid referee payments must include a payment method.');
-            return;
-          }
-
-          if (payment.amount === null || payment.amount <= 0) {
-            setErrorMessage('Paid referee payments must include an amount greater than zero.');
-            return;
-          }
-
-          if (!payment.payer_document_id?.trim()) {
-            setErrorMessage('Paid referee payments must include the payer document ID.');
-            return;
-          }
-
-          if (payment.method === 'stripe' && (!payment.paid_at || !payment.reference)) {
-            setErrorMessage('Card referee payments must be captured through checkout before saving as paid.');
-            return;
-          }
-        }
-      }
-
       await onSubmit({
         ...values,
         team1_id: values.team1_id !== undefined ? values.team1_id : match?.team1_id ?? null,
