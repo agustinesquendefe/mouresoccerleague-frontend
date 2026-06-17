@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "players:validate": "node src/scripts/importPlayersFromCsv.mjs",
+    "players:import": "node src/scripts/importPlayersFromCsv.mjs --reset"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
