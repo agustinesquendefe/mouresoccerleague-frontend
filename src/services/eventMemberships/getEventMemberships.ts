@@ -87,9 +87,18 @@ export async function getEventMemberships(
 
   if (teamPlayersError) throw new Error(teamPlayersError.message);
 
-  const rosterRows = (teamPlayers ?? []).filter(
-    (row: any) => row.event_id == null || Number(row.event_id) === eventId
+  const teamsWithEventRoster = new Set(
+    (teamPlayers ?? [])
+      .filter((row: any) => Number(row.event_id) === eventId)
+      .map((row: any) => Number(row.team_id))
   );
+
+  const rosterRows = (teamPlayers ?? []).filter((row: any) => {
+    const teamId = Number(row.team_id);
+    return teamsWithEventRoster.has(teamId)
+      ? Number(row.event_id) === eventId
+      : row.event_id == null || Number(row.event_id) === eventId;
+  });
 
   const playerIds = Array.from(new Set(rosterRows.map((row: any) => Number(row.player_id))));
 

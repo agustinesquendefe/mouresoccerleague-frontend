@@ -470,19 +470,40 @@ export async function validatePlayerBarcode(
     player.is_active ? 'Player is active.' : 'Player is inactive and cannot be validated.'
   );
 
-  const { data: teamMembershipRows, error: teamMembershipError } = await client
-    .from('team_players')
-    .select('id, team_id, event_id, is_active')
-    .eq('player_id', player.id)
-    .eq('team_id', resolvedTeam.id)
-    .eq('is_active', true);
+  const [teamMembershipResult, eventRosterResult] = await Promise.all([
+    client
+      .from('team_players')
+      .select('id, team_id, event_id, is_active')
+      .eq('player_id', player.id)
+      .eq('team_id', resolvedTeam.id)
+      .eq('is_active', true),
+    client
+      .from('team_players')
+      .select('id')
+      .eq('team_id', resolvedTeam.id)
+      .eq('event_id', resolvedEvent.id)
+      .eq('is_active', true)
+      .limit(1),
+  ]);
+
+  const { data: teamMembershipRows, error: teamMembershipError } = teamMembershipResult;
+  const { data: eventRosterRows, error: eventRosterError } = eventRosterResult;
 
   if (teamMembershipError) {
     throw new Error(teamMembershipError.message);
   }
 
+  if (eventRosterError) {
+    throw new Error(eventRosterError.message);
+  }
+
+  const hasEventRoster = (eventRosterRows ?? []).length > 0;
+
   const belongsToTeam = (teamMembershipRows ?? []).some(
-    (row: any) => row.event_id == null || Number(row.event_id) === Number(resolvedEvent.id)
+    (row: any) =>
+      hasEventRoster
+        ? Number(row.event_id) === Number(resolvedEvent.id)
+        : row.event_id == null || Number(row.event_id) === Number(resolvedEvent.id)
   );
 
   const teamMembershipCheck = buildCheck(
@@ -490,8 +511,10 @@ export async function validatePlayerBarcode(
     'Belongs to selected team',
     belongsToTeam,
     belongsToTeam
-      ? `Player belongs to ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)}.`
-      : `Player does not belong to ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)} for the selected event.`
+      ? `Player belongs to ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)}${hasEventRoster ? ' on the selected event roster' : ''}.`
+      : hasEventRoster
+        ? `Player is not on ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)}'s roster for the selected event.`
+        : `Player does not belong to ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)} for the selected event.`
   );
 
   const memberships = await getEventMemberships(resolvedEvent.id, client, {

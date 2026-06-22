@@ -1,7 +1,11 @@
 import { supabase } from '@/lib/supabaseClient';
 import type { Player } from '@/models/player';
 
-export async function getAvailablePlayers(teamId: number, search = ''): Promise<Player[]> {
+export async function getAvailablePlayers(
+  teamId: number,
+  search = '',
+  eventId?: number | null
+): Promise<Player[]> {
   const trimmedSearch = search.trim();
   let playersQuery = supabase
     .from('players')
@@ -17,13 +21,19 @@ export async function getAvailablePlayers(teamId: number, search = ''): Promise<
     );
   }
 
+  let assignedQuery = supabase
+    .from('team_players')
+    .select('player_id')
+    .eq('team_id', teamId);
+
+  assignedQuery = eventId != null
+    ? assignedQuery.eq('event_id', eventId)
+    : assignedQuery.is('event_id', null);
+
   const [{ data: players, error: playersError }, { data: teamPlayers, error: teamPlayersError }] =
     await Promise.all([
       playersQuery,
-      supabase
-        .from('team_players')
-        .select('player_id')
-        .eq('team_id', teamId),
+      assignedQuery,
     ]);
 
   if (playersError) {

@@ -14,12 +14,16 @@ export type TeamPlayerRow = {
   player_phone: string | null;
 };
 
-export async function getTeamPlayers(teamId: number): Promise<TeamPlayerRow[]> {
-  const { data: teamPlayers, error } = await supabase
+export async function getTeamPlayers(teamId: number, eventId?: number | null): Promise<TeamPlayerRow[]> {
+  let query = supabase
     .from('team_players')
     .select('*')
     .eq('team_id', teamId)
     .order('created_at', { ascending: true });
+
+  query = eventId != null ? query.eq('event_id', eventId) : query.is('event_id', null);
+
+  const { data: teamPlayers, error } = await query;
 
   if (error) {
     throw new Error(error.message);

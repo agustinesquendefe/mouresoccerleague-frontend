@@ -18,6 +18,7 @@ import { addPlayerToTeam, getAvailablePlayers } from '@/services/teamPlayers';
 type Props = {
   open: boolean;
   teamId: number;
+  eventId?: number | null;
   onClose: () => void;
   onAdded: () => Promise<void> | void;
 };
@@ -25,6 +26,7 @@ type Props = {
 export default function AddPlayerToTeamDialog({
   open,
   teamId,
+  eventId = null,
   onClose,
   onAdded,
 }: Props) {
@@ -48,7 +50,7 @@ export default function AddPlayerToTeamDialog({
         setLoadingPlayers(true);
         setErrorMessage(null);
 
-        const data = await getAvailablePlayers(teamId, searchValue);
+        const data = await getAvailablePlayers(teamId, searchValue, eventId);
         setPlayers(data);
       } catch (error) {
         setErrorMessage(
@@ -62,7 +64,7 @@ export default function AddPlayerToTeamDialog({
     const timeout = setTimeout(loadPlayers, searchValue ? 300 : 0);
 
     return () => clearTimeout(timeout);
-  }, [open, teamId, searchValue, selectedPlayer]);
+  }, [open, teamId, eventId, searchValue, selectedPlayer]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +83,7 @@ export default function AddPlayerToTeamDialog({
       await addPlayerToTeam({
         playerId: selectedPlayer.id,
         teamId,
+        eventId,
         jerseyNumber: jerseyNumber === '' ? null : Number(jerseyNumber),
       });
 

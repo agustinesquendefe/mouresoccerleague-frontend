@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Avatar, Button, CircularProgress, IconButton, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { Alert, Avatar, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadIcon from '@mui/icons-material/Upload';
+import GroupsIcon from '@mui/icons-material/Groups';
 
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
 import { removeTeamFromEvent } from '@/services/eventTeams/removeTeamFromEvent';
@@ -19,6 +20,7 @@ import { updateEventTeamDisplayName } from '@/services/eventTeams/updateEventTea
 import { uploadImage } from '@/services/storage/uploadImage';
 import { supabase } from '@/lib/supabaseClient';
 import AddTeamToEventDialog from './AddTeamToEventDialog';
+import TeamPlayersSection from '@/app/(admin)/components/teams/TeamPlayersSection';
 
 type EventTeamRow = {
   id: number;
@@ -49,6 +51,7 @@ export default function EventTeamsSection({ eventId }: Props) {
   const [editingEventTeamId, setEditingEventTeamId] = useState<number | null>(null);
   const [draftDisplayName, setDraftDisplayName] = useState('');
   const [savingDisplayNameId, setSavingDisplayNameId] = useState<number | null>(null);
+  const [rosterTeam, setRosterTeam] = useState<EventTeamRow | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingTeamRef = useRef<{ teamId: number } | null>(null);
 
@@ -330,6 +333,16 @@ export default function EventTeamsSection({ eventId }: Props) {
             </Stack>
 
             <Stack direction="row" spacing={0.5} alignItems="center">
+              <Tooltip title="Manage roster for this event">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<GroupsIcon />}
+                  onClick={() => setRosterTeam(et)}
+                >
+                  Roster
+                </Button>
+              </Tooltip>
               {uploadingId === et.teams?.id ? (
                 <CircularProgress size={20} />
               ) : (
@@ -361,6 +374,30 @@ export default function EventTeamsSection({ eventId }: Props) {
         eventId={eventId}
         onAdded={loadTeams}
       />
+
+      <Dialog
+        open={Boolean(rosterTeam)}
+        onClose={() => setRosterTeam(null)}
+        fullWidth
+        maxWidth="lg"
+      >
+        <DialogTitle>
+          Event Roster · {rosterTeam?.display_name ?? rosterTeam?.teams?.name ?? 'Team'}
+        </DialogTitle>
+        <DialogContent dividers>
+          {rosterTeam && (
+            <TeamPlayersSection
+              teamId={rosterTeam.team_id}
+              eventId={eventId}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRosterTeam(null)}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

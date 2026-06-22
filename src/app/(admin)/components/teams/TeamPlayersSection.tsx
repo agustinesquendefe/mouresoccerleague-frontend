@@ -18,9 +18,10 @@ import {
 
 type Props = {
   teamId: number;
+  eventId?: number | null;
 };
 
-export default function TeamPlayersSection({ teamId }: Props) {
+export default function TeamPlayersSection({ teamId, eventId = null }: Props) {
   const [rows, setRows] = useState<TeamPlayerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -38,7 +39,7 @@ export default function TeamPlayersSection({ teamId }: Props) {
   const loadRows = async () => {
     try {
       setLoading(true);
-      const data = await getTeamPlayers(teamId);
+      const data = await getTeamPlayers(teamId, eventId);
       setRows(data);
     } catch (error) {
       setToast({
@@ -53,7 +54,7 @@ export default function TeamPlayersSection({ teamId }: Props) {
 
   useEffect(() => {
     loadRows();
-  }, [teamId]);
+  }, [teamId, eventId]);
 
   const handleRemove = async (row: TeamPlayerRow) => {
     const confirmed = window.confirm(
@@ -83,7 +84,7 @@ export default function TeamPlayersSection({ teamId }: Props) {
   return (
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <Typography variant="h6">Players</Typography>
+        <Typography variant="h6">{eventId ? 'Event Roster' : 'Players'}</Typography>
         <Button variant="contained" onClick={() => setDialogOpen(true)}>
           Add Player
         </Button>
@@ -102,6 +103,7 @@ export default function TeamPlayersSection({ teamId }: Props) {
       <AddPlayerToTeamDialog
         open={dialogOpen}
         teamId={teamId}
+        eventId={eventId}
         onClose={() => setDialogOpen(false)}
         onAdded={loadRows}
       />
