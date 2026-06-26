@@ -315,8 +315,22 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
   };
 
   const handlePrintLeagueMatches = () => {
+    if (visibleLeagueMatches.length === 0) {
+      window.alert(
+        leagueMatches.length === 0
+          ? 'No league matches generated yet. Generate matches before printing.'
+          : 'No matches available to print for the selected filters.'
+      );
+      return;
+    }
+
     if (selectedLeagueTab === 'all') {
       const term = teamSearch.trim();
+      if (!term) {
+        window.alert('Search and select a team context before printing team rounds.');
+        return;
+      }
+
       const groupedByRound = visibleLeagueMatches.reduce<Record<string, Match[]>>((acc, match) => {
         const key = String(match.round_number ?? 'No Round');
         acc[key] = acc[key] ?? [];

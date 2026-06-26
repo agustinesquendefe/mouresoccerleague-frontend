@@ -124,6 +124,11 @@ export default function PrintTeamInfoButton({ teamId, teamName, teamCode }: Prop
         throw new Error(coachesResponse.error.message);
       }
 
+      if (players.length === 0) {
+        window.alert('No players assigned to this team yet. Add players before printing team information.');
+        return;
+      }
+
       const coaches = ((coachesResponse.data ?? []) as any[]).map((row) => ({
         ...row,
         coach: Array.isArray(row.coach) ? row.coach[0] ?? null : row.coach ?? null,

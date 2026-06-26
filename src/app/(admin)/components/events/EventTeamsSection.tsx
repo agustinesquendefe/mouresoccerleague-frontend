@@ -27,6 +27,7 @@ type EventTeamRow = {
   team_id: number;
   display_name: string | null;
   order_index: number;
+  player_count?: number;
   teams?: {
     id: number;
     name: string;
@@ -58,15 +59,29 @@ export default function EventTeamsSection({ eventId }: Props) {
   const loadTeams = async () => {
     try {
       setLoading(true);
-      const [data, locked] = await Promise.all([
+      const [data, locked, rosterResponse] = await Promise.all([
         getEventTeams(eventId),
         hasStartedLeagueMatches(eventId),
+        supabase
+          .from('team_players')
+          .select('team_id')
+          .eq('event_id', eventId),
       ]);
+
+      if (rosterResponse.error) {
+        throw new Error(rosterResponse.error.message);
+      }
+
+      const playerCounts = new Map<number, number>();
+      (rosterResponse.data ?? []).forEach((row) => {
+        playerCounts.set(row.team_id, (playerCounts.get(row.team_id) ?? 0) + 1);
+      });
 
       setReorderLocked(locked);
       setTeams(
         ((data ?? []) as any[]).map((eventTeam) => ({
           ...eventTeam,
+          player_count: playerCounts.get(eventTeam.team_id) ?? 0,
           teams: Array.isArray(eventTeam.teams)
             ? (eventTeam.teams[0] ?? null)
             : (eventTeam.teams ?? null),
@@ -326,6 +341,7 @@ export default function EventTeamsSection({ eventId }: Props) {
                   </Stack>
                   <Typography variant="caption" color="text.secondary">
                     Position {et.order_index + 1}
+                    {` | Players: ${et.player_count ?? 0}`}
                     {et.display_name ? ` | Base team: ${et.teams?.name ?? `#${et.team_id}`}` : ''}
                   </Typography>
                 </Stack>
@@ -389,6 +405,9 @@ export default function EventTeamsSection({ eventId }: Props) {
             <TeamPlayersSection
               teamId={rosterTeam.team_id}
               eventId={eventId}
+              teamName={rosterTeam.display_name ?? rosterTeam.teams?.name ?? `Team #${rosterTeam.team_id}`}
+              teamLogoUrl={rosterTeam.teams?.logo_url ?? null}
+              onRosterChanged={loadTeams}
             />
           )}
         </DialogContent>

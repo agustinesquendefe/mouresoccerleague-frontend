@@ -40,6 +40,11 @@ export default function EventStandingsSection({ eventId, eventName, printCompany
   }, [eventId, refreshKey, selectedTab]);
 
   const handlePrintStandings = () => {
+    if (standings.length === 0) {
+      window.alert('No standings available to print yet. Play matches to generate the table.');
+      return;
+    }
+
     printHtml({
       title: `${eventName ?? `Event #${eventId}`} - Standings`,
       company: printCompany,

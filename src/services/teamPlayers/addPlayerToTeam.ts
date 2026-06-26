@@ -13,6 +13,27 @@ export async function addPlayerToTeam({
   eventId = null,
   jerseyNumber = null,
 }: AddPlayerToTeamInput): Promise<void> {
+  if (eventId != null) {
+    const { data: existingEventAssignment, error: existingEventAssignmentError } = await supabase
+      .from('team_players')
+      .select('id, team_id')
+      .eq('event_id', eventId)
+      .eq('player_id', playerId)
+      .maybeSingle();
+
+    if (existingEventAssignmentError) {
+      throw new Error(existingEventAssignmentError.message);
+    }
+
+    if (existingEventAssignment) {
+      throw new Error(
+        existingEventAssignment.team_id === teamId
+          ? 'This player is already assigned to the team.'
+          : 'This player is already assigned to another team in this event.'
+      );
+    }
+  }
+
   const insertPayload = {
     player_id: playerId,
     team_id: teamId,
@@ -29,7 +50,11 @@ export async function addPlayerToTeam({
 
   if (error) {
     if (error.code === '23505') {
-      throw new Error('This player is already assigned to the team.');
+      throw new Error(
+        eventId != null
+          ? 'This player is already assigned to a team in this event.'
+          : 'This player is already assigned to the team.'
+      );
     }
 
     throw new Error(error.message);

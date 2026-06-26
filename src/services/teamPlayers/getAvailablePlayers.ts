@@ -23,12 +23,11 @@ export async function getAvailablePlayers(
 
   let assignedQuery = supabase
     .from('team_players')
-    .select('player_id')
-    .eq('team_id', teamId);
+    .select('player_id');
 
   assignedQuery = eventId != null
     ? assignedQuery.eq('event_id', eventId)
-    : assignedQuery.is('event_id', null);
+    : assignedQuery.eq('team_id', teamId).is('event_id', null);
 
   const [{ data: players, error: playersError }, { data: teamPlayers, error: teamPlayersError }] =
     await Promise.all([
