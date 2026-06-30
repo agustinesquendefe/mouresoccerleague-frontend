@@ -23,6 +23,20 @@ type RoundRobinPair = {
   team2_id: number;
 };
 
+type MatchInsert = {
+  event_id: number;
+  pos: number;
+  num: number;
+  team1_id: number;
+  team2_id: number;
+  status: string;
+  date: string;
+  field_number: number | null;
+  field_id: number | null;
+  round_id: number | null;
+  round_number: number | null;
+};
+
 function getOrderedTeamIds(rows: EventTeamRow[]): number[] {
   const sortedRows = [...rows].sort((left, right) => {
     const leftIndex = left.order_index ?? Number.MAX_SAFE_INTEGER;
@@ -122,6 +136,40 @@ function generateRoundRobinRounds(teamIds: number[]): RoundRobinPair[][] {
   return rounds;
 }
 
+function getMatchupKey(team1Id: number, team2Id: number, cycles: number): string {
+  if (cycles > 1) {
+    return `${team1Id}:${team2Id}`;
+  }
+
+  const [left, right] = [team1Id, team2Id].sort((a, b) => a - b);
+  return `${left}:${right}`;
+}
+
+function buildRemainingRounds(pairs: RoundRobinPair[]): RoundRobinPair[][] {
+  const rounds: RoundRobinPair[][] = [];
+
+  pairs.forEach((pair) => {
+    const round = rounds.find((candidate) =>
+      candidate.every(
+        (existingPair) =>
+          existingPair.team1_id !== pair.team1_id &&
+          existingPair.team2_id !== pair.team1_id &&
+          existingPair.team1_id !== pair.team2_id &&
+          existingPair.team2_id !== pair.team2_id
+      )
+    );
+
+    if (round) {
+      round.push(pair);
+      return;
+    }
+
+    rounds.push([pair]);
+  });
+
+  return rounds;
+}
+
 export async function generateRoundRobinMatches(
   eventId: number
 ): Promise<void> {
@@ -214,6 +262,7 @@ export async function generateRoundRobinMatches(
   const futureMatchIds = (allMatches ?? [])
     .filter(m => m.round_number && m.round_number > lastPlayedRound && m.status !== 'played')
     .map(m => m.id);
+  const deletedFutureMatchIds = new Set(futureMatchIds);
   if (futureMatchIds.length > 0) {
     const { error: delError } = await supabase.from('matches').delete().in('id', futureMatchIds);
     if (delError) throw new Error(delError.message);
@@ -232,52 +281,88 @@ export async function generateRoundRobinMatches(
     eventConfig.match_day_of_week
   );
 
-  // 8. Generar solo los rounds futuros
-  const matchesToInsert: Array<{
-    event_id: number;
-    pos: number;
-    num: number;
-    team1_id: number;
-    team2_id: number;
-    status: string;
-    date: string;
-    field_number: number | null;
-    field_id: number | null;
-    round_id: number | null;
-    round_number: number | null;
-  }> = [];
-  let posCounter = 1;
-  let numCounter = 1;
-  let globalRoundIndex = 0;
-  for (let cycle = 1; cycle <= cycles; cycle++) {
-    for (const roundMatches of baseRounds) {
-      const roundNumber = globalRoundIndex + 1;
-      if (roundNumber > lastPlayedRound) {
-        const currentDate = addDays(firstMatchDate, globalRoundIndex * 7);
+  // 8. Generar partidos futuros. Si ya hay rondas jugadas, reacomoda los cruces pendientes
+  // desde la próxima jornada para que equipos agregados tarde no queden atrapados en rondas pasadas.
+  const matchesToInsert: MatchInsert[] = [];
+  let posCounter = Math.max(0, ...(allMatches ?? []).map((match: any) => Number(match.pos) || 0)) + 1;
+  let numCounter = Math.max(0, ...(allMatches ?? []).map((match: any) => Number(match.num) || 0)) + 1;
+
+  const pushMatch = (pair: RoundRobinPair, roundNumber: number, index: number) => {
+    const currentDate = addDays(firstMatchDate, (roundNumber - 1) * 7);
+    const fieldIndex = index % fields.length;
+    const assignedField = fields[fieldIndex] ?? null;
+
+    matchesToInsert.push({
+      event_id: eventId,
+      pos: posCounter,
+      num: numCounter,
+      team1_id: pair.team1_id,
+      team2_id: pair.team2_id,
+      status: 'scheduled',
+      date: formatDateToYYYYMMDD(currentDate),
+      field_number: fieldIndex + 1,
+      field_id: assignedField?.id ?? null,
+      round_id: null,
+      round_number: roundNumber,
+    });
+    posCounter += 1;
+    numCounter += 1;
+  };
+
+  if (lastPlayedRound === 0) {
+    let globalRoundIndex = 0;
+    for (let cycle = 1; cycle <= cycles; cycle++) {
+      for (const roundMatches of baseRounds) {
+        const roundNumber = globalRoundIndex + 1;
+        const invertHomeAway = cycle % 2 === 0;
+
         roundMatches.forEach((pair, index) => {
-          const fieldIndex = index % fields.length;
-          const assignedField = fields[fieldIndex] ?? null;
-          const invertHomeAway = cycle % 2 === 0;
-          matchesToInsert.push({
-            event_id: eventId,
-            pos: posCounter,
-            num: numCounter,
+          pushMatch(
+            {
+              team1_id: invertHomeAway ? pair.team2_id : pair.team1_id,
+              team2_id: invertHomeAway ? pair.team1_id : pair.team2_id,
+            },
+            roundNumber,
+            index
+          );
+        });
+
+        globalRoundIndex += 1;
+      }
+    }
+  } else {
+    const preservedMatchupKeys = new Set<string>();
+    (allMatches ?? []).forEach((match: any) => {
+      if (deletedFutureMatchIds.has(match.id) || match.status === 'cancelled') return;
+      preservedMatchupKeys.add(getMatchupKey(match.team1_id, match.team2_id, cycles));
+    });
+
+    const remainingPairs: RoundRobinPair[] = [];
+    for (let cycle = 1; cycle <= cycles; cycle++) {
+      const invertHomeAway = cycle % 2 === 0;
+
+      for (const roundMatches of baseRounds) {
+        roundMatches.forEach((pair) => {
+          const normalizedPair = {
             team1_id: invertHomeAway ? pair.team2_id : pair.team1_id,
             team2_id: invertHomeAway ? pair.team1_id : pair.team2_id,
-            status: 'scheduled',
-            date: formatDateToYYYYMMDD(currentDate),
-            field_number: fieldIndex + 1,
-            field_id: assignedField?.id ?? null,
-            round_id: null,
-            round_number: roundNumber, 
-          });
-          posCounter += 1;
-          numCounter += 1;
+          };
+          const matchupKey = getMatchupKey(normalizedPair.team1_id, normalizedPair.team2_id, cycles);
+
+          if (!preservedMatchupKeys.has(matchupKey)) {
+            remainingPairs.push(normalizedPair);
+          }
         });
       }
-      globalRoundIndex += 1;
     }
+
+    const remainingRounds = buildRemainingRounds(remainingPairs);
+    remainingRounds.forEach((roundMatches, roundIndex) => {
+      const roundNumber = lastPlayedRound + roundIndex + 1;
+      roundMatches.forEach((pair, index) => pushMatch(pair, roundNumber, index));
+    });
   }
+
   if (matchesToInsert.length > 0) {
     const { error: insertError } = await supabase
       .from('matches')
