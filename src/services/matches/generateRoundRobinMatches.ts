@@ -216,7 +216,8 @@ export async function generateRoundRobinMatches(
   if (eventTeamsError) throw new Error(eventTeamsError.message);
   const currentTeamIds = new Set((eventTeams ?? []).map((row: any) => row.team_id));
   // Equipos que aparecen en partidos futuros pero no están en event_teams
-  const futureMatches = (allMatches ?? []).filter(m => m.status !== 'played');
+  const fixtureMatches = (allMatches ?? []).filter(m => !m.is_extra);
+  const futureMatches = fixtureMatches.filter(m => m.status !== 'played');
   const futureTeamIds = new Set();
   for (const m of futureMatches) {
     if (!currentTeamIds.has(m.team1_id)) futureTeamIds.add(m.team1_id);
@@ -225,12 +226,12 @@ export async function generateRoundRobinMatches(
   // Equipos eliminados
   const eliminatedTeamIds = Array.from(futureTeamIds);
   // Equipos agregados
-  const allPastTeamIds = new Set((allMatches ?? []).flatMap(m => [m.team1_id, m.team2_id]));
+  const allPastTeamIds = new Set(fixtureMatches.flatMap(m => [m.team1_id, m.team2_id]));
   const addedTeamIds = Array.from(currentTeamIds).filter(id => !allPastTeamIds.has(id));
 
   // 4. Determinar el round actual (el último con algún partido jugado)
   let lastPlayedRound = 0;
-  for (const match of allMatches ?? []) {
+  for (const match of fixtureMatches) {
     if ((match.status === 'played' || match.status === 'in_progress') && match.round_number && match.round_number > lastPlayedRound) {
       lastPlayedRound = match.round_number;
     }
@@ -259,7 +260,7 @@ export async function generateRoundRobinMatches(
   }
 
   // 6. Eliminar partidos futuros (round_number > lastPlayedRound y status !== 'played')
-  const futureMatchIds = (allMatches ?? [])
+  const futureMatchIds = fixtureMatches
     .filter(m => m.round_number && m.round_number > lastPlayedRound && m.status !== 'played')
     .map(m => m.id);
   const deletedFutureMatchIds = new Set(futureMatchIds);
@@ -332,7 +333,7 @@ export async function generateRoundRobinMatches(
     }
   } else {
     const preservedMatchupKeys = new Set<string>();
-    (allMatches ?? []).forEach((match: any) => {
+    fixtureMatches.forEach((match: any) => {
       if (deletedFutureMatchIds.has(match.id) || match.status === 'cancelled') return;
       preservedMatchupKeys.add(getMatchupKey(match.team1_id, match.team2_id, cycles));
     });

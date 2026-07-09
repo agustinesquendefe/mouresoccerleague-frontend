@@ -53,12 +53,15 @@ export default function EventTeamsSection({ eventId }: Props) {
   const [draftDisplayName, setDraftDisplayName] = useState('');
   const [savingDisplayNameId, setSavingDisplayNameId] = useState<number | null>(null);
   const [rosterTeam, setRosterTeam] = useState<EventTeamRow | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingTeamRef = useRef<{ teamId: number } | null>(null);
 
   const loadTeams = async () => {
     try {
       setLoading(true);
+      setErrorMessage(null);
       const [data, locked, rosterResponse] = await Promise.all([
         getEventTeams(eventId),
         hasStartedLeagueMatches(eventId),
@@ -89,6 +92,7 @@ export default function EventTeamsSection({ eventId }: Props) {
       );
     } catch (err) {
       console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to load teams');
     } finally {
       setLoading(false);
     }
@@ -102,8 +106,10 @@ export default function EventTeamsSection({ eventId }: Props) {
     try {
       await removeTeamFromEvent(id);
       await loadTeams();
+      setSuccessMessage('Team removed from event.');
     } catch (err) {
       console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to remove team');
     }
   };
 
@@ -128,9 +134,10 @@ export default function EventTeamsSection({ eventId }: Props) {
       await updateEventTeamDisplayName(eventTeam.id, draftDisplayName);
       await loadTeams();
       cancelEditingDisplayName();
+      setSuccessMessage('Team name updated.');
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : 'Failed to update team name');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to update team name');
     } finally {
       setSavingDisplayNameId(null);
     }
@@ -174,9 +181,10 @@ export default function EventTeamsSection({ eventId }: Props) {
         }))
       );
       setReorderLocked(await hasStartedLeagueMatches(eventId));
+      setSuccessMessage('Team order saved.');
     } catch (error) {
       setTeams(currentTeams);
-      alert(error instanceof Error ? error.message : 'Failed to save team order');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to save team order');
     } finally {
       setReordering(false);
     }
@@ -202,9 +210,10 @@ export default function EventTeamsSection({ eventId }: Props) {
 
       await supabase.from('teams').update({ logo_url: publicUrl }).eq('id', teamId);
       await loadTeams();
+      setSuccessMessage('Team logo updated.');
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : 'Failed to upload image');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to upload image');
     } finally {
       setUploadingId(null);
     }
@@ -222,6 +231,18 @@ export default function EventTeamsSection({ eventId }: Props) {
       <Alert severity="info">
         Drag teams from the handle to define fixture order. The first team faces the last, the second faces the second-to-last, and so on.
       </Alert>
+
+      {errorMessage && (
+        <Alert severity="error" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
+      )}
+
+      {successMessage && (
+        <Alert severity="success" onClose={() => setSuccessMessage(null)}>
+          {successMessage}
+        </Alert>
+      )}
 
       {reorderLocked && (
         <Alert severity="warning">

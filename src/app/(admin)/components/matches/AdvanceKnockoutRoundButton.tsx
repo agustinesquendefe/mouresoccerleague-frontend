@@ -7,11 +7,15 @@ import { advanceKnockoutRound } from '@/services/matches';
 type Props = {
   eventId: number;
   onGenerated: () => Promise<void> | void;
+  onSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
 };
 
 export default function AdvanceKnockoutRoundButton({
   eventId,
   onGenerated,
+  onSuccess,
+  onError,
 }: Props) {
   const [loading, setLoading] = useState(false);
 
@@ -26,9 +30,10 @@ export default function AdvanceKnockoutRoundButton({
       setLoading(true);
       await advanceKnockoutRound(eventId);
       await onGenerated();
+      onSuccess?.('Next knockout round generated successfully');
     } catch (error) {
       console.error(error);
-      alert(
+      onError?.(
         error instanceof Error
           ? error.message
           : 'Failed to generate the next knockout round'

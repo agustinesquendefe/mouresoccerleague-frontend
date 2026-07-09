@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Box } from '@mui/material';
+import { Alert, Box } from '@mui/material';
 import EventTeamsSection from './EventTeamsSection';
 import EventFieldsSection from './EventFieldsSection';
 import EventMatchesSection from '../matches/EventMatchesSection';
@@ -22,6 +22,7 @@ export default function EventDetailClient({ eventId }: Props) {
   const [matchFormat, setMatchFormat] = useState<string | null>(null);
   const [eventName, setEventName] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -31,13 +32,20 @@ export default function EventDetailClient({ eventId }: Props) {
         .eq('id', eventId)
         .single(),
       getAppSettings(),
-    ]).then(([eventResult, appSettings]) => {
-      const data = eventResult.data;
-      setEventName(data?.name ?? null);
-      setFormatType(data?.format_type ?? null);
-      setMatchFormat(data?.match_format ?? null);
-      setSettings(appSettings);
-    });
+    ])
+      .then(([eventResult, appSettings]) => {
+        if (eventResult.error) throw new Error(eventResult.error.message);
+
+        const data = eventResult.data;
+        setEventName(data?.name ?? null);
+        setFormatType(data?.format_type ?? null);
+        setMatchFormat(data?.match_format ?? null);
+        setSettings(appSettings);
+        setLoadError(null);
+      })
+      .catch((error) => {
+        setLoadError(error instanceof Error ? error.message : 'Failed to load event details');
+      });
   }, [eventId]);
 
   const handleMatchUpdated = () => {
@@ -57,6 +65,8 @@ export default function EventDetailClient({ eventId }: Props) {
     >
       <h2>Event Detail</h2>
 
+      {loadError && <Alert severity="error" onClose={() => setLoadError(null)}>{loadError}</Alert>}
+
       <EventTeamsSection eventId={eventId} />
       <EventMembershipsSection eventId={eventId} />
       <EventFieldsSection eventId={eventId} eventFormat={matchFormat ?? undefined} />
@@ -66,6 +76,7 @@ export default function EventDetailClient({ eventId }: Props) {
       <EventMatchesSection
         eventId={eventId}
         eventName={eventName ?? `Event #${eventId}`}
+        eventFormat={formatType}
         printCompany={settings}
         onMatchUpdated={handleMatchUpdated}
       />

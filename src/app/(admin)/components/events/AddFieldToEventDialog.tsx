@@ -170,7 +170,7 @@ export default function AddFieldToEventDialog({
           const validFormats = ['5v5', '7v7', '11v11'];
           const format = validFormats.includes(eventFormat as string) ? eventFormat : undefined;
           if (!format) {
-            alert('Formato de partido inválido para crear field.');
+            setErrorMessage('Formato de partido inválido para crear field.');
             return;
           }
           const payload = { ...data, supported_formats: [format as FormatSupported] };

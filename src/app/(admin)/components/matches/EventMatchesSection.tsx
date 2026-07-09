@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { getMatchesByEvent, updateMatch, updateMatchesSchedule, type MatchScheduleUpdate } from '@/services/matches';
+import { createExtraMatch, deleteMatch, getMatchesByEvent, updateMatch, updateMatchesSchedule, type MatchScheduleUpdate } from '@/services/matches';
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
 import { getFieldsByEvent } from '@/services/eventFields/getFieldsByEvent';
 import type { Match, MatchFormData } from '@/models/match';
@@ -11,6 +11,7 @@ import GenerateFixtureButton from './GenerateFixtureButton';
 import GeneratePlayoffsButton from './GeneratePlayoffsButton';
 import GroupedMatchesTable from './GroupedMatchesTable';
 import MatchDialog from './MatchDialog';
+import ExtraMatchDialog from './ExtraMatchDialog';
 import AdvanceKnockoutRoundButton from './AdvanceKnockoutRoundButton';
 import RoundSchedulePlanner from './RoundSchedulePlanner';
 import { escapeHtml, printHtml } from '@/utils/printHtml';
@@ -33,11 +34,12 @@ type EventTeamRow = {
 type Props = {
   eventId: number;
   eventName?: string;
+  eventFormat?: string | null;
   printCompany?: Partial<AppSettings> | null;
   onMatchUpdated?: () => void;
 };
 
-export default function EventMatchesSection({ eventId, eventName, printCompany, onMatchUpdated }: Props) {
+export default function EventMatchesSection({ eventId, eventName, eventFormat, printCompany, onMatchUpdated }: Props) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [eventTeams, setEventTeams] = useState<EventTeamRow[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
@@ -45,7 +47,10 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [extraMatchRound, setExtraMatchRound] = useState<number | null>(null);
+  const [extraMatchDialogOpen, setExtraMatchDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [extraMatchSaving, setExtraMatchSaving] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
 
   const [selectedLeagueTab, setSelectedLeagueTab] = useState('all');
@@ -61,6 +66,14 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
     message: '',
     severity: 'success',
   });
+
+  const showToast = (message: string, severity: 'success' | 'error' = 'success') => {
+    setToast({
+      open: true,
+      message,
+      severity,
+    });
+  };
 
   const loadData = async () => {
     try {
@@ -199,6 +212,17 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
     setSelectedMatch(null);
   };
 
+  const handleAddExtraMatch = (roundNumber: number) => {
+    setExtraMatchRound(roundNumber);
+    setExtraMatchDialogOpen(true);
+  };
+
+  const handleCloseExtraMatchDialog = () => {
+    if (extraMatchSaving) return;
+    setExtraMatchDialogOpen(false);
+    setExtraMatchRound(null);
+  };
+
   const handleSubmit = async (values: MatchFormData) => {
     if (!selectedMatch) return;
 
@@ -228,6 +252,62 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSubmitExtraMatch = async (values: MatchFormData) => {
+    if (!extraMatchRound) return;
+
+    try {
+      setExtraMatchSaving(true);
+      const created = await createExtraMatch(eventId, extraMatchRound, values);
+
+      setMatches((prev) => [...prev, created].sort((left, right) => {
+        const leftRound = left.round_number ?? Number.MAX_SAFE_INTEGER;
+        const rightRound = right.round_number ?? Number.MAX_SAFE_INTEGER;
+        if (leftRound !== rightRound) return leftRound - rightRound;
+        return left.id - right.id;
+      }));
+
+      onMatchUpdated?.();
+      setToast({
+        open: true,
+        message: 'Extra match added successfully',
+        severity: 'success',
+      });
+      setExtraMatchDialogOpen(false);
+      setExtraMatchRound(null);
+    } catch (error) {
+      setToast({
+        open: true,
+        message: error instanceof Error ? error.message : 'Failed to add extra match',
+        severity: 'error',
+      });
+    } finally {
+      setExtraMatchSaving(false);
+    }
+  };
+
+  const handleDeleteExtraMatch = async (match: Match) => {
+    if (!match.is_extra) return;
+    const confirmed = window.confirm('Delete this extra match? If it has a result, the standings will update automatically.');
+    if (!confirmed) return;
+
+    try {
+      await deleteMatch(match.id);
+      setMatches((prev) => prev.filter((item) => item.id !== match.id));
+      onMatchUpdated?.();
+      setToast({
+        open: true,
+        message: 'Extra match deleted successfully',
+        severity: 'success',
+      });
+    } catch (error) {
+      setToast({
+        open: true,
+        message: error instanceof Error ? error.message : 'Failed to delete extra match',
+        severity: 'error',
+      });
     }
   };
 
@@ -377,7 +457,13 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
       <Stack spacing={2}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
           <Typography variant="h6">League Matches</Typography>
-          <GenerateFixtureButton eventId={eventId} onGenerated={loadData} />
+          <GenerateFixtureButton
+            eventId={eventId}
+            eventFormat={eventFormat}
+            onGenerated={loadData}
+            onSuccess={(message) => showToast(message, 'success')}
+            onError={(message) => showToast(message, 'error')}
+          />
         </Stack>
 
         {!loading && leagueMatches.length > 0 && (
@@ -452,9 +538,14 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
         {!loading && selectedLeagueTab !== 'all' && visibleLeagueMatches.length > 0 && (
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="flex-end">
-              <Button variant="outlined" onClick={handlePrintLeagueMatches}>
-                Print Round
-              </Button>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Button variant="contained" color="success" onClick={() => handleAddExtraMatch(Number(selectedLeagueTab))}>
+                  Add Extra Match
+                </Button>
+                <Button variant="outlined" onClick={handlePrintLeagueMatches}>
+                  Print Round
+                </Button>
+              </Stack>
             </Stack>
             <RoundSchedulePlanner
               roundLabel={`Round ${selectedLeagueTab}`}
@@ -474,6 +565,8 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
               teamMap={teamMap}
               fields={fields}
               onEdit={handleEdit}
+              onAddExtraMatch={selectedLeagueTab === 'all' ? handleAddExtraMatch : undefined}
+              onDeleteExtraMatch={handleDeleteExtraMatch}
               groupByDate={selectedLeagueTab !== 'all'}
               groupByRound={selectedLeagueTab === 'all'}
               compact={selectedLeagueTab === 'all'}
@@ -489,8 +582,18 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
           <Typography variant="h6">Playoffs</Typography>
 
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <GeneratePlayoffsButton eventId={eventId} onGenerated={loadData} />
-            <AdvanceKnockoutRoundButton eventId={eventId} onGenerated={loadData} />
+            <GeneratePlayoffsButton
+              eventId={eventId}
+              onGenerated={loadData}
+              onSuccess={(message) => showToast(message, 'success')}
+              onError={(message) => showToast(message, 'error')}
+            />
+            <AdvanceKnockoutRoundButton
+              eventId={eventId}
+              onGenerated={loadData}
+              onSuccess={(message) => showToast(message, 'success')}
+              onError={(message) => showToast(message, 'error')}
+            />
           </Stack>
         </Stack>
 
@@ -524,6 +627,16 @@ export default function EventMatchesSection({ eventId, eventName, printCompany, 
         fields={fields}
         onClose={handleCloseDialog}
         onSubmit={handleSubmit}
+      />
+
+      <ExtraMatchDialog
+        open={extraMatchDialogOpen}
+        roundNumber={extraMatchRound}
+        loading={extraMatchSaving}
+        teamMap={teamMap}
+        fields={fields}
+        onClose={handleCloseExtraMatchDialog}
+        onSubmit={handleSubmitExtraMatch}
       />
 
       <Snackbar

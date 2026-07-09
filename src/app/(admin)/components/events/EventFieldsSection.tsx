@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   Button,
   Chip,
+  Alert,
   IconButton,
   Paper,
   Stack,
@@ -24,14 +25,17 @@ export default function EventFieldsSection({ eventId, eventFormat }: Props) {
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadFields = async () => {
     try {
       setLoading(true);
+      setErrorMessage(null);
       const data = await getFieldsByEvent(eventId);
       setFields((data ?? []) as Field[]);
     } catch (error) {
       console.error(error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load fields');
     } finally {
       setLoading(false);
     }
@@ -47,6 +51,7 @@ export default function EventFieldsSection({ eventId, eventFormat }: Props) {
       await loadFields();
     } catch (error) {
       console.error(error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to remove field');
     }
   };
 
@@ -58,6 +63,12 @@ export default function EventFieldsSection({ eventId, eventFormat }: Props) {
           Add Field
         </Button>
       </Stack>
+
+      {errorMessage && (
+        <Alert severity="error" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
+      )}
 
       {loading && <Typography>Loading fields...</Typography>}
 

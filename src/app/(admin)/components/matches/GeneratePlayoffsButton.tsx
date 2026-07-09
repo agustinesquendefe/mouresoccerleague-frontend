@@ -10,9 +10,11 @@ import {
 type Props = {
   eventId: number;
   onGenerated: () => Promise<void> | void;
+  onSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
 };
 
-export default function GeneratePlayoffsButton({ eventId, onGenerated }: Props) {
+export default function GeneratePlayoffsButton({ eventId, onGenerated, onSuccess, onError }: Props) {
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
@@ -22,7 +24,7 @@ export default function GeneratePlayoffsButton({ eventId, onGenerated }: Props) 
       const validation = await canGeneratePlayoffs(eventId);
 
       if (!validation.canGenerate) {
-        alert(validation.reason ?? 'Playoffs cannot be generated yet.');
+        onError?.(validation.reason ?? 'Playoffs cannot be generated yet.');
         return;
       }
 
@@ -34,9 +36,10 @@ export default function GeneratePlayoffsButton({ eventId, onGenerated }: Props) 
 
       await generateKnockoutMatches(eventId);
       await onGenerated();
+      onSuccess?.('Playoff matches generated successfully');
     } catch (error) {
       console.error(error);
-      alert(
+      onError?.(
         error instanceof Error
           ? error.message
           : 'Failed to generate playoffs'

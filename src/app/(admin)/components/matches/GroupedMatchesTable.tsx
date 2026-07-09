@@ -17,6 +17,8 @@ type Props = {
   teamMap: Record<number, string>;
   fields: Field[];
   onEdit: (match: Match) => void;
+  onAddExtraMatch?: (roundNumber: number) => void;
+  onDeleteExtraMatch?: (match: Match) => void;
   groupByDate?: boolean;
   groupByRound?: boolean;
   compact?: boolean;
@@ -27,6 +29,8 @@ export default function GroupedMatchesTable({
   teamMap,
   fields,
   onEdit,
+  onAddExtraMatch,
+  onDeleteExtraMatch,
   groupByDate = true,
   groupByRound = false,
   compact = false,
@@ -152,6 +156,9 @@ export default function GroupedMatchesTable({
           {match.rescheduled_from_date && (
             <Chip label="Rescheduled" size="small" color="warning" />
           )}
+          {match.is_extra && (
+            <Chip label="Extra" size="small" color="secondary" />
+          )}
           <Button
             variant="outlined"
             size="small"
@@ -159,6 +166,11 @@ export default function GroupedMatchesTable({
           >
             Edit
           </Button>
+          {match.is_extra && onDeleteExtraMatch && (
+            <Button variant="outlined" color="error" size="small" onClick={() => onDeleteExtraMatch(match)}>
+              Delete
+            </Button>
+          )}
         </Stack>
       </Stack>
     </Paper>
@@ -170,9 +182,16 @@ export default function GroupedMatchesTable({
         <Paper key={groupKey} sx={{ p: 2, width: '100%', minWidth: 0 }}>
           <Stack spacing={2}>
             {groupByRound && (
-              <Typography variant="subtitle1" fontWeight={700}>
-                {groupKey === 'No Round' ? 'No Round' : `Round ${groupKey}`}
-              </Typography>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  {groupKey === 'No Round' ? 'No Round' : `Round ${groupKey}`}
+                </Typography>
+                {groupKey !== 'No Round' && onAddExtraMatch && (
+                  <Button variant="contained" color="success" size="small" onClick={() => onAddExtraMatch(Number(groupKey))}>
+                    Add Extra Match
+                  </Button>
+                )}
+              </Stack>
             )}
 
             {groupByDate && groupKey !== 'all' && (
@@ -212,6 +231,11 @@ export default function GroupedMatchesTable({
             <Typography variant="subtitle1" fontWeight={700}>
               {groupKey === 'No Round' ? 'No Round' : `Round ${groupKey}`}
             </Typography>
+            {groupKey !== 'No Round' && onAddExtraMatch && (
+              <Button variant="contained" color="success" size="small" onClick={() => onAddExtraMatch(Number(groupKey))}>
+                Add Extra Match
+              </Button>
+            )}
             {grouped[groupKey].map(renderMatch)}
           </Stack>
         </Paper>

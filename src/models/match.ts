@@ -50,6 +50,7 @@ export type Match = {
   stage_type: MatchStageType | string | null;
   bracket_round: MatchBracketRound | string | null;
   leg_number: number | null;
+  is_extra?: boolean | null;
   created_at: string;
   updated_at: string;
 };
