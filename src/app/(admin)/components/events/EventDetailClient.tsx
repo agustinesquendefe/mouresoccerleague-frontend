@@ -8,6 +8,7 @@ import EventMatchesSection from '../matches/EventMatchesSection';
 import EventStandingsSection from '../standings/EventStandingsSection';
 import EventGroupsSection from './EventGroupsSection';
 import EventMembershipsSection from './EventMembershipsSection';
+import EventPlayerRecordsSection from './EventPlayerRecordsSection';
 import { supabase } from '@/lib/supabaseClient';
 import { getAppSettings } from '@/services/settings/settings.service';
 import type { AppSettings } from '@/models/appSettings';
@@ -18,6 +19,7 @@ type Props = {
 
 export default function EventDetailClient({ eventId }: Props) {
   const [standingsRefreshKey, setStandingsRefreshKey] = useState(0);
+  const [playerRecordsRefreshKey, setPlayerRecordsRefreshKey] = useState(0);
   const [formatType, setFormatType] = useState<string | null>(null);
   const [matchFormat, setMatchFormat] = useState<string | null>(null);
   const [eventName, setEventName] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export default function EventDetailClient({ eventId }: Props) {
 
   const handleMatchUpdated = () => {
     setStandingsRefreshKey((prev) => prev + 1);
+    setPlayerRecordsRefreshKey((prev) => prev + 1);
   };
 
   return (
@@ -67,8 +70,17 @@ export default function EventDetailClient({ eventId }: Props) {
 
       {loadError && <Alert severity="error" onClose={() => setLoadError(null)}>{loadError}</Alert>}
 
-      <EventTeamsSection eventId={eventId} />
+      <EventTeamsSection
+        eventId={eventId}
+        onPlayerRecordsChanged={() => setPlayerRecordsRefreshKey((prev) => prev + 1)}
+      />
       <EventMembershipsSection eventId={eventId} />
+      <EventPlayerRecordsSection
+        eventId={eventId}
+        eventName={eventName ?? `Event #${eventId}`}
+        printCompany={settings}
+        refreshKey={playerRecordsRefreshKey}
+      />
       <EventFieldsSection eventId={eventId} eventFormat={matchFormat ?? undefined} />
 
       {formatType === 'groups' && <EventGroupsSection eventId={eventId} />}

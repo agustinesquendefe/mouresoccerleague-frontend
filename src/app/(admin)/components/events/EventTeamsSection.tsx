@@ -37,11 +37,12 @@ type EventTeamRow = {
 
 type Props = {
   eventId: number;
+  onPlayerRecordsChanged?: () => Promise<void> | void;
 };
 
 const ACCEPTED = 'image/png,image/webp,image/svg+xml';
 
-export default function EventTeamsSection({ eventId }: Props) {
+export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: Props) {
   const [teams, setTeams] = useState<EventTeamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
@@ -106,6 +107,7 @@ export default function EventTeamsSection({ eventId }: Props) {
     try {
       await removeTeamFromEvent(id);
       await loadTeams();
+      await onPlayerRecordsChanged?.();
       setSuccessMessage('Team removed from event.');
     } catch (err) {
       console.error(err);
@@ -133,6 +135,7 @@ export default function EventTeamsSection({ eventId }: Props) {
       setSavingDisplayNameId(eventTeam.id);
       await updateEventTeamDisplayName(eventTeam.id, draftDisplayName);
       await loadTeams();
+      await onPlayerRecordsChanged?.();
       cancelEditingDisplayName();
       setSuccessMessage('Team name updated.');
     } catch (err) {
@@ -210,6 +213,7 @@ export default function EventTeamsSection({ eventId }: Props) {
 
       await supabase.from('teams').update({ logo_url: publicUrl }).eq('id', teamId);
       await loadTeams();
+      await onPlayerRecordsChanged?.();
       setSuccessMessage('Team logo updated.');
     } catch (err) {
       console.error(err);
@@ -409,7 +413,10 @@ export default function EventTeamsSection({ eventId }: Props) {
         open={openDialog}
         onClose={() => setOpenDialog(false)}
         eventId={eventId}
-        onAdded={loadTeams}
+        onAdded={async () => {
+          await loadTeams();
+          await onPlayerRecordsChanged?.();
+        }}
       />
 
       <Dialog
@@ -428,7 +435,10 @@ export default function EventTeamsSection({ eventId }: Props) {
               eventId={eventId}
               teamName={rosterTeam.display_name ?? rosterTeam.teams?.name ?? `Team #${rosterTeam.team_id}`}
               teamLogoUrl={rosterTeam.teams?.logo_url ?? null}
-              onRosterChanged={loadTeams}
+              onRosterChanged={async () => {
+                await loadTeams();
+                await onPlayerRecordsChanged?.();
+              }}
             />
           )}
         </DialogContent>
