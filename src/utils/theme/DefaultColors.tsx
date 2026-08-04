@@ -136,8 +136,12 @@ const baselightTheme = createTheme({
     MuiTableContainer: {
       styleOverrides: {
         root: {
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
           overflowX: "auto",
           WebkitOverflowScrolling: "touch",
+          overscrollBehaviorX: "contain",
         },
       },
     },

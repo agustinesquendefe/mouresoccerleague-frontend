@@ -62,8 +62,13 @@ export default function EventDetailClient({ eventId }: Props) {
         maxWidth: '100%',
         minWidth: 0,
         display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr)',
         gap: 3,
         overflowX: 'hidden',
+        '& > *': {
+          minWidth: 0,
+          maxWidth: '100%',
+        },
       }}
     >
       <h2>Event Detail</h2>

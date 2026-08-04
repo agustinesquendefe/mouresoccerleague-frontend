@@ -224,10 +224,20 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
   };
 
   return (
-    <Stack spacing={2}>
-      <Stack direction="row" justifyContent="space-between">
+    <Stack spacing={2} sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        gap={1}
+        flexWrap="wrap"
+      >
         <Typography variant="h6">Teams</Typography>
-        <Button variant="contained" onClick={() => setOpenDialog(true)}>
+        <Button
+          variant="contained"
+          onClick={() => setOpenDialog(true)}
+          sx={{ flexShrink: 0 }}
+        >
           Add Team
         </Button>
       </Stack>
@@ -292,6 +302,9 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
           }}
           onDragEnd={() => setDraggingTeamId(null)}
           sx={{
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
             borderColor: draggingTeamId === et.team_id ? 'primary.main' : undefined,
             bgcolor: draggingTeamId === et.team_id ? 'action.hover' : undefined,
           }}
@@ -300,9 +313,11 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
             direction="row"
             justifyContent="space-between"
             alignItems="center"
-            sx={{ px: 1.5, py: 1 }}
+            gap={1}
+            flexWrap="wrap"
+            sx={{ px: 1.5, py: 1, minWidth: 0 }}
           >
-            <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
               <Tooltip
                 title={
                   reorderLocked

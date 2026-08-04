@@ -1,7 +1,10 @@
+'use client';
 
-import { useMediaQuery, Box, Drawer, Avatar, Typography, Divider } from "@mui/material";
-import SidebarItems from "./SidebarItems";
+import { Box, Drawer, Avatar, Typography, Divider } from "@mui/material";
+import dynamic from "next/dynamic";
 import { useState } from "react";
+
+const SidebarItems = dynamic(() => import("./SidebarItems"), { ssr: false });
 
 interface ItemType {
   isMobileSidebarOpen: boolean;
@@ -15,7 +18,6 @@ const MSidebar = ({
   onSidebarClose,
   isSidebarOpen,
 }: ItemType) => {
-  const lgUp = useMediaQuery((theme: any) => theme.breakpoints.up("lg"));
   const sidebarWidth = "270px";
   const scrollbarStyles = {
     '&::-webkit-scrollbar': {
@@ -46,9 +48,15 @@ const MSidebar = ({
     </Box>
   );
 
-  if (lgUp) {
-    return (
-      <Box sx={{ width: sidebarWidth, flexShrink: 0 }}>
+  return (
+    <>
+      <Box
+        sx={{
+          display: { xs: "none", lg: "block" },
+          width: sidebarWidth,
+          flexShrink: 0,
+        }}
+      >
         <Drawer
           anchor="left"
           open={isSidebarOpen}
@@ -68,35 +76,30 @@ const MSidebar = ({
           </Box>
         </Drawer>
       </Box>
-    );
-  }
-
-  return (
-    <Drawer
-      anchor="left"
-      open={isMobileSidebarOpen}
-      onClose={onSidebarClose}
-      variant="temporary"
-      slotProps={{
-        paper: {
-          sx: {
-            boxShadow: (theme) => theme.shadows[8],
-            ...scrollbarStyles,
-          },
-        }
-      }}
-    >
-      {SidebarHeader}
-      <Box>
-        <SidebarItems />
-      </Box>
-    </Drawer>
+      <Drawer
+        anchor="left"
+        open={isMobileSidebarOpen}
+        onClose={onSidebarClose}
+        variant="temporary"
+        sx={{ display: { xs: "block", lg: "none" } }}
+        slotProps={{
+          paper: {
+            sx: {
+              boxShadow: (theme) => theme.shadows[8],
+              ...scrollbarStyles,
+            },
+          }
+        }}
+      >
+        {SidebarHeader}
+        <Box>
+          <SidebarItems />
+        </Box>
+      </Drawer>
+    </>
   );
 };
 
 export default MSidebar;
-
-
-
 
 
