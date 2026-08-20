@@ -3,17 +3,20 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Box,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Chip,
   Stack,
   TextField,
+  Typography,
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import type { Player } from '@/models/player';
-import { addPlayerToTeam, getAvailablePlayers } from '@/services/teamPlayers';
+import { addPlayersToTeam, getAvailablePlayers } from '@/services/teamPlayers';
 
 type Props = {
   open: boolean;
@@ -31,60 +34,72 @@ export default function AddPlayerToTeamDialog({
   onAdded,
 }: Props) {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
   const [searchValue, setSearchValue] = useState('');
-  const [jerseyNumber, setJerseyNumber] = useState<number | ''>('');
+  const [jerseyNumbers, setJerseyNumbers] = useState<Record<number, number | ''>>({});
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    let active = true;
 
     const loadPlayers = async () => {
-      if (selectedPlayer) {
-        return;
-      }
-
       try {
         setLoadingPlayers(true);
         setErrorMessage(null);
 
         const data = await getAvailablePlayers(teamId, searchValue, eventId);
-        setPlayers(data);
+        if (active) {
+          setPlayers(data);
+        }
       } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : 'Failed to load players'
-        );
+        if (active) {
+          setErrorMessage(
+            error instanceof Error ? error.message : 'Failed to load players'
+          );
+        }
       } finally {
-        setLoadingPlayers(false);
+        if (active) {
+          setLoadingPlayers(false);
+        }
       }
     };
 
     const timeout = setTimeout(loadPlayers, searchValue ? 300 : 0);
 
-    return () => clearTimeout(timeout);
-  }, [open, teamId, eventId, searchValue, selectedPlayer]);
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [open, teamId, eventId, searchValue]);
 
   useEffect(() => {
     if (!open) return;
-    setSelectedPlayer(null);
+    setSelectedPlayers([]);
     setSearchValue('');
-    setJerseyNumber('');
-  }, [open, teamId]);
+    setJerseyNumbers({});
+    setErrorMessage(null);
+  }, [open, teamId, eventId]);
 
   const handleAdd = async () => {
-    if (!selectedPlayer) return;
+    if (selectedPlayers.length === 0) return;
 
     try {
       setAddingPlayer(true);
       setErrorMessage(null);
 
-      await addPlayerToTeam({
-        playerId: selectedPlayer.id,
+      await addPlayersToTeam({
         teamId,
         eventId,
-        jerseyNumber: jerseyNumber === '' ? null : Number(jerseyNumber),
+        players: selectedPlayers.map((player) => ({
+          playerId: player.id,
+          jerseyNumber:
+            jerseyNumbers[player.id] === '' || jerseyNumbers[player.id] == null
+              ? null
+              : Number(jerseyNumbers[player.id]),
+        })),
       });
 
       await onAdded();
@@ -93,7 +108,7 @@ export default function AddPlayerToTeamDialog({
       setErrorMessage(
         error instanceof Error ? error.message : 'Failed to add player'
       );
-  } finally {
+    } finally {
       setAddingPlayer(false);
     }
   };
@@ -101,34 +116,43 @@ export default function AddPlayerToTeamDialog({
   const getPlayerName = (player: Player) =>
     player.full_name || `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim() || `Player #${player.id}`;
 
+  const availableOptions = [
+    ...selectedPlayers,
+    ...players.filter(
+      (player) => !selectedPlayers.some((selected) => selected.id === player.id)
+    ),
+  ];
+
   return (
     <Dialog open={open} onClose={addingPlayer ? undefined : onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Add Player to Team</DialogTitle>
+      <DialogTitle>Add Players to Team</DialogTitle>
 
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
 
           <Autocomplete
-            options={players}
+            multiple
+            filterSelectedOptions
+            options={availableOptions}
+            loading={loadingPlayers}
             disabled={addingPlayer}
             getOptionLabel={(option) => `${getPlayerName(option)} (${option.document_id || 'Sin documento'})`}
-            value={selectedPlayer}
+            value={selectedPlayers}
             onChange={(_event, newValue) => {
-              setSelectedPlayer(newValue);
-              setSearchValue(newValue ? `${getPlayerName(newValue)} (${newValue.document_id || 'Sin documento'})` : '');
+              setSelectedPlayers(newValue);
+              setSearchValue('');
+              setJerseyNumbers((current) =>
+                Object.fromEntries(
+                  newValue.map((player) => [player.id, current[player.id] ?? ''])
+                )
+              );
             }}
             inputValue={searchValue}
             onInputChange={(_event, newInputValue, reason) => {
-              if (reason === 'reset') {
-                return;
+              if (reason === 'input' || reason === 'clear') {
+                setSearchValue(newInputValue);
               }
-
-              if (reason === 'input') {
-                setSelectedPlayer(null);
-              }
-
-              setSearchValue(newInputValue);
             }}
             renderOption={(props, option) => {
               const { key, ...rest } = props;
@@ -149,30 +173,82 @@ export default function AddPlayerToTeamDialog({
                     ? 'Searching available players...'
                     : players.length === 0
                     ? 'Type a name, email, or document ID to search available players.'
-                    : 'Search and select an available player'
+                    : 'Search and select one or more available players'
                 }
               />
             )}
+            renderTags={() => null}
             isOptionEqualToValue={(option, value) => option.id === value.id}
             noOptionsText={searchValue ? 'No players found' : 'Type to search players'}
           />
 
-          {selectedPlayer && (
-            <Alert severity="info">
-              Selected player: {getPlayerName(selectedPlayer)}
-              {selectedPlayer.document_id ? ` (${selectedPlayer.document_id})` : ''}
-            </Alert>
+          {selectedPlayers.length > 0 && (
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle2">
+                Selected players ({selectedPlayers.length})
+              </Typography>
+              <Box
+                sx={{
+                  maxHeight: 280,
+                  overflowY: 'auto',
+                  pr: 0.5,
+                }}
+              >
+                <Stack spacing={1}>
+                  {selectedPlayers.map((player) => (
+                    <Stack
+                      key={player.id}
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems={{ xs: 'stretch', sm: 'center' }}
+                      sx={{
+                        p: 1,
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Chip
+                        label={getPlayerName(player)}
+                        onDelete={() => {
+                          setSelectedPlayers((current) =>
+                            current.filter((selected) => selected.id !== player.id)
+                          );
+                          setJerseyNumbers((current) => {
+                            const next = { ...current };
+                            delete next[player.id];
+                            return next;
+                          });
+                        }}
+                        disabled={addingPlayer}
+                        sx={{
+                          flex: 1,
+                          justifyContent: 'space-between',
+                          minWidth: 0,
+                        }}
+                      />
+                      <TextField
+                        label="Jersey number"
+                        type="number"
+                        size="small"
+                        value={jerseyNumbers[player.id] ?? ''}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setJerseyNumbers((current) => ({
+                            ...current,
+                            [player.id]: value === '' ? '' : Number(value),
+                          }));
+                        }}
+                        disabled={addingPlayer}
+                        slotProps={{ htmlInput: { min: 0 } }}
+                        sx={{ width: { xs: '100%', sm: 150 }, flexShrink: 0 }}
+                      />
+                    </Stack>
+                  ))}
+                </Stack>
+              </Box>
+            </Stack>
           )}
-
-          <TextField
-            label="Jersey Number (Optional)"
-            type="number"
-            value={jerseyNumber}
-            onChange={(e) =>
-              setJerseyNumber(e.target.value === '' ? '' : Number(e.target.value))
-            }
-            fullWidth
-          />
         </Stack>
       </DialogContent>
 
@@ -183,9 +259,13 @@ export default function AddPlayerToTeamDialog({
         <Button
           variant="contained"
           onClick={handleAdd}
-          disabled={addingPlayer || !selectedPlayer}
+          disabled={addingPlayer || selectedPlayers.length === 0}
         >
-          {addingPlayer ? 'Adding...' : 'Add'}
+          {addingPlayer
+            ? 'Adding...'
+            : selectedPlayers.length > 0
+              ? `Add ${selectedPlayers.length} Player${selectedPlayers.length === 1 ? '' : 's'}`
+              : 'Add Players'}
         </Button>
       </DialogActions>
     </Dialog>

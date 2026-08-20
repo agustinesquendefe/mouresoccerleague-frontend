@@ -184,7 +184,7 @@ export default function TeamPlayersSection({
             {printing ? 'Preparing...' : 'Print'}
           </Button>
           <Button variant="contained" onClick={() => setDialogOpen(true)}>
-            Add Player
+            Add Players
           </Button>
         </Stack>
       </Stack>
