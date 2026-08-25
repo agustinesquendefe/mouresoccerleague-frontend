@@ -107,7 +107,7 @@ export default function EventGroupsSection({ eventId }: Props) {
       setBusy(true);
       setError(null);
       await generateGroupStageMatches(eventId);
-      setSuccess('Group stage matches generated successfully.');
+      setSuccess('Group fixture updated safely. Existing matches were preserved.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate matches');
     } finally {
@@ -162,7 +162,7 @@ export default function EventGroupsSection({ eventId }: Props) {
                 onClick={handleGenerateMatches}
                 disabled={busy || !allGroupsHaveTeams}
               >
-                Generate Matches
+                Update Fixture
               </Button>
             </>
           )}

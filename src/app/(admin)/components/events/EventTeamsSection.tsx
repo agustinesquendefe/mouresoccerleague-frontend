@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Avatar, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { Alert, Avatar, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Paper, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import EditIcon from '@mui/icons-material/Edit';
@@ -9,14 +9,14 @@ import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadIcon from '@mui/icons-material/Upload';
 import GroupsIcon from '@mui/icons-material/Groups';
+import BlockIcon from '@mui/icons-material/Block';
+import ReplayIcon from '@mui/icons-material/Replay';
 
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
 import { removeTeamFromEvent } from '@/services/eventTeams/removeTeamFromEvent';
-import {
-  hasStartedLeagueMatches,
-  updateEventTeamsOrder,
-} from '@/services/eventTeams/updateEventTeamsOrder';
+import { updateEventTeamsOrder } from '@/services/eventTeams/updateEventTeamsOrder';
 import { updateEventTeamDisplayName } from '@/services/eventTeams/updateEventTeamDisplayName';
+import { updateEventTeamStatus } from '@/services/eventTeams/updateEventTeamStatus';
 import { uploadImage } from '@/services/storage/uploadImage';
 import { supabase } from '@/lib/supabaseClient';
 import AddTeamToEventDialog from './AddTeamToEventDialog';
@@ -27,6 +27,7 @@ type EventTeamRow = {
   team_id: number;
   display_name: string | null;
   order_index: number;
+  status: 'active' | 'disqualified';
   player_count?: number;
   teams?: {
     id: number;
@@ -49,7 +50,7 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
   const [openDialog, setOpenDialog] = useState(false);
   const [draggingTeamId, setDraggingTeamId] = useState<number | null>(null);
   const [reordering, setReordering] = useState(false);
-  const [reorderLocked, setReorderLocked] = useState(false);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<number | null>(null);
   const [editingEventTeamId, setEditingEventTeamId] = useState<number | null>(null);
   const [draftDisplayName, setDraftDisplayName] = useState('');
   const [savingDisplayNameId, setSavingDisplayNameId] = useState<number | null>(null);
@@ -63,9 +64,8 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
     try {
       setLoading(true);
       setErrorMessage(null);
-      const [data, locked, rosterResponse] = await Promise.all([
+      const [data, rosterResponse] = await Promise.all([
         getEventTeams(eventId),
-        hasStartedLeagueMatches(eventId),
         supabase
           .from('team_players')
           .select('team_id')
@@ -81,7 +81,6 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
         playerCounts.set(row.team_id, (playerCounts.get(row.team_id) ?? 0) + 1);
       });
 
-      setReorderLocked(locked);
       setTeams(
         ((data ?? []) as any[]).map((eventTeam) => ({
           ...eventTeam,
@@ -112,6 +111,26 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
     } catch (err) {
       console.error(err);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to remove team');
+    }
+  };
+
+  const handleStatusChange = async (eventTeam: EventTeamRow) => {
+    const disqualifying = eventTeam.status !== 'disqualified';
+    const confirmed = window.confirm(disqualifying
+      ? 'Disqualify Team?\n\nThis team will remain in the tournament and its previous results will be preserved, but it will be moved to the bottom of the standings.'
+      : 'Reinstate Team?\n\nThe team will become active again. Existing results will not be changed.');
+    if (!confirmed) return;
+    try {
+      setStatusUpdatingId(eventTeam.id);
+      setErrorMessage(null);
+      await updateEventTeamStatus(eventId, eventTeam.id, disqualifying ? 'disqualified' : 'active');
+      await loadTeams();
+      await onPlayerRecordsChanged?.();
+      setSuccessMessage(disqualifying ? 'Team disqualified.' : 'Team reinstated.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update team status');
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -147,10 +166,6 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
   };
 
   const moveTeam = async (draggedTeamId: number, targetTeamId: number) => {
-    if (reorderLocked) {
-      return;
-    }
-
     if (draggedTeamId === targetTeamId) {
       return;
     }
@@ -183,7 +198,6 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
           order_index: team.order_index,
         }))
       );
-      setReorderLocked(await hasStartedLeagueMatches(eventId));
       setSuccessMessage('Team order saved.');
     } catch (error) {
       setTeams(currentTeams);
@@ -258,12 +272,6 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
         </Alert>
       )}
 
-      {reorderLocked && (
-        <Alert severity="warning">
-          Team order is locked because this event already has a league match in progress or played.
-        </Alert>
-      )}
-
       {loading && <Typography>Loading...</Typography>}
 
       {!loading && teams.length === 0 && (
@@ -274,9 +282,9 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
         <Paper
           key={et.id}
           variant="outlined"
-          draggable={!reorderLocked && !reordering}
+          draggable={!reordering}
           onDragStart={(event) => {
-            if (reorderLocked || reordering) {
+            if (reordering) {
               event.preventDefault();
               return;
             }
@@ -285,14 +293,14 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
             setDraggingTeamId(et.team_id);
           }}
           onDragOver={(event) => {
-            if (reorderLocked || reordering) {
+            if (reordering) {
               return;
             }
             event.preventDefault();
             event.dataTransfer.dropEffect = 'move';
           }}
           onDrop={(event) => {
-            if (reorderLocked || reordering) {
+            if (reordering) {
               return;
             }
             event.preventDefault();
@@ -320,16 +328,14 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
             <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
               <Tooltip
                 title={
-                  reorderLocked
-                    ? 'Team order is locked after the first league match starts.'
-                    : 'Drag to reorder teams'
+                  'Drag to reorder teams. Existing matches are never changed.'
                 }
               >
                 <span>
                   <IconButton
                     size="small"
-                    sx={{ cursor: reordering ? 'progress' : reorderLocked ? 'not-allowed' : 'grab' }}
-                    disabled={reordering || reorderLocked}
+                    sx={{ cursor: reordering ? 'progress' : 'grab' }}
+                    disabled={reordering}
                   >
                     <DragIndicatorIcon fontSize="small" />
                   </IconButton>
@@ -373,6 +379,7 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
                 <Stack spacing={0.25}>
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     <Typography>{et.display_name ?? et.teams?.name}</Typography>
+                    {et.status === 'disqualified' && <Chip label="Disqualified" color="error" size="small" />}
                     <Tooltip title="Rename only in this event">
                       <IconButton size="small" onClick={() => startEditingDisplayName(et)}>
                         <EditIcon fontSize="small" />
@@ -389,6 +396,16 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
             </Stack>
 
             <Stack direction="row" spacing={0.5} alignItems="center">
+              <Button
+                size="small"
+                color={et.status === 'disqualified' ? 'success' : 'error'}
+                variant="outlined"
+                startIcon={et.status === 'disqualified' ? <ReplayIcon /> : <BlockIcon />}
+                disabled={statusUpdatingId === et.id}
+                onClick={() => handleStatusChange(et)}
+              >
+                {et.status === 'disqualified' ? 'Reinstate' : 'Disqualify'}
+              </Button>
               <Tooltip title="Manage roster for this event">
                 <Button
                   size="small"

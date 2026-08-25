@@ -5,6 +5,10 @@ export type StandingMode = 'general' | 'home' | 'away';
 export type StandingRow = {
   team_id: number;
   team_name: string;
+  team_key: string;
+  team_logo: string | null;
+  status: 'active' | 'disqualified';
+  is_disqualified: boolean;
   played: number;
   won: number;
   drawn: number;
@@ -26,9 +30,12 @@ type MatchRow = {
 type EventTeamRow = {
   team_id: number;
   display_name: string | null;
+  status: 'active' | 'disqualified' | null;
   teams?: {
     name: string;
-  } | Array<{ name: string }>;
+    key: string;
+    logo_url: string | null;
+  } | Array<{ name: string; key: string; logo_url: string | null }>;
 };
 
 
@@ -62,7 +69,7 @@ export async function getEventStandings(
   // Build event_teams query — when filtering by group, only include teams in that group
   let teamsQuery = supabase
     .from('event_teams')
-    .select('team_id, display_name, teams(name)')
+    .select('team_id, display_name, status, teams(name, key, logo_url)')
     .eq('event_id', eventId);
 
   if (groupId != null) {
@@ -83,6 +90,10 @@ export async function getEventStandings(
     standingsMap.set(row.team_id, {
       team_id: row.team_id,
       team_name: row.display_name?.trim() || team?.name || `#${row.team_id}`,
+      team_key: team?.key || String(row.team_id),
+      team_logo: team?.logo_url ?? null,
+      status: row.status === 'disqualified' ? 'disqualified' : 'active',
+      is_disqualified: row.status === 'disqualified',
       played: 0,
       won: 0,
       drawn: 0,
@@ -175,6 +186,7 @@ export async function getEventStandings(
   }));
 
   rows.sort((a, b) => {
+    if (a.is_disqualified !== b.is_disqualified) return a.is_disqualified ? 1 : -1;
     if (b.points !== a.points) return b.points - a.points;
     if (b.goal_difference !== a.goal_difference) {
       return b.goal_difference - a.goal_difference;

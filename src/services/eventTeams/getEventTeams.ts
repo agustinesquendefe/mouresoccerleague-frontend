@@ -8,6 +8,7 @@ export async function getEventTeams(eventId: number) {
       team_id,
       display_name,
       order_index,
+      status,
       teams (
         id,
         name,

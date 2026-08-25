@@ -262,6 +262,7 @@ export default function MatchesView({ events, initialEventId, matchesByEvent }: 
                               <Typography fontSize={13} className="font-filson-bold" textAlign="right">
                                 {row.team1_name}
                               </Typography>
+                              {row.team1_disqualified && <Chip label="Disqualified" color="error" size="small" sx={{ fontSize: 9, height: 18 }} />}
                               <Image
                                 src={row.team1_logo ?? '/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg'}
                                 width={28}
@@ -302,6 +303,7 @@ export default function MatchesView({ events, initialEventId, matchesByEvent }: 
                               <Typography fontSize={13} className="font-filson-bold">
                                 {row.team2_name}
                               </Typography>
+                              {row.team2_disqualified && <Chip label="Disqualified" color="error" size="small" sx={{ fontSize: 9, height: 18 }} />}
                             </Stack>
                           </Stack>
 

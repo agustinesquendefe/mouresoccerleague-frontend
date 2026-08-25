@@ -25,10 +25,6 @@ export async function updateEventTeamsOrder(eventId: number, teams: EventTeamOrd
     return;
   }
 
-  if (await hasStartedLeagueMatches(eventId)) {
-    throw new Error('You cannot reorder teams after a league match has started or been played.');
-  }
-
   const temporaryUpdates = await Promise.all(
     teams.map((team, index) =>
       supabase

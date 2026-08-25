@@ -8,6 +8,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Chip,
 } from '@mui/material';
 import type { StandingRow } from '@/services/standings/getEventStandings';
 
@@ -38,7 +39,10 @@ export default function EventStandingsTable({ standings }: Props) {
           {standings.map((row, index) => (
             <TableRow key={row.team_id} hover>
               <TableCell>{index + 1}</TableCell>
-              <TableCell>{row.team_name}</TableCell>
+              <TableCell>
+                {row.team_name}{' '}
+                {row.is_disqualified && <Chip label="Disqualified" color="error" size="small" />}
+              </TableCell>
               <TableCell>{row.played}</TableCell>
               <TableCell>{row.won}</TableCell>
               <TableCell>{row.drawn}</TableCell>

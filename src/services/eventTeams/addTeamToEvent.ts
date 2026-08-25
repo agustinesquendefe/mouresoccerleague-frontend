@@ -20,6 +20,7 @@ export async function addTeamToEvent(eventId: number, teamId: number) {
         event_id: eventId,
         team_id: teamId,
         order_index: (lastEventTeam?.order_index ?? -1) + 1,
+        status: 'active',
       },
     ]);
 

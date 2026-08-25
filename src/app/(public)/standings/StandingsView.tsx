@@ -11,6 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import Image from 'next/image';
+import Link from 'next/link';
 import type { Event } from '@/models/event';
 import type { StandingRow } from '@/services/standings/getEventStandings';
 import type { PublicMatchRow } from '@/services/matches/getPublicMatches';
@@ -129,7 +130,15 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
                   >
                     <td className="px-4 py-3 text-gray-400 font-filson-regular text-sm">{i + 1}</td>
                     <td className="px-4 py-3">
-                      <span className="font-filson-bold text-gray-900 text-sm">{row.team_name}</span>
+                      <span className="inline-flex items-center gap-2">
+                        <Link
+                          href={`/events/${selectedEventId}/teams/${encodeURIComponent(row.team_key)}`}
+                          className="font-filson-bold text-gray-900 text-sm hover:underline"
+                        >
+                          {row.team_name}
+                        </Link>
+                        {row.is_disqualified && <Chip label="Disqualified" color="error" size="small" />}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-center text-gray-600 font-filson-regular text-sm">{row.played}</td>
                     <td className="px-4 py-3 text-center text-gray-600 font-filson-regular text-sm">{row.won}</td>
@@ -188,6 +197,7 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
                           {/* Team 1 */}
                           <div className="flex items-center gap-2 flex-1 justify-end">
                             <span className="font-filson-bold text-gray-900 text-sm text-right">{m.team1_name}</span>
+                            {m.team1_disqualified && <Chip label="Disqualified" color="error" size="small" sx={{ fontSize: 9, height: 18 }} />}
                             <Image
                               src="/Imagotipo-Principal-Vertical-Sin-Fondo-Azul-MPL.svg"
                               width={26}
@@ -224,6 +234,7 @@ export default function StandingsView({ events, initialEventId, standingsByEvent
                               alt={m.team2_name}
                             />
                             <span className="font-filson-bold text-gray-900 text-sm">{m.team2_name}</span>
+                            {m.team2_disqualified && <Chip label="Disqualified" color="error" size="small" sx={{ fontSize: 9, height: 18 }} />}
                           </div>
                         </div>
                       );

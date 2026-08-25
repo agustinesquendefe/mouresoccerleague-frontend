@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabaseClient';
 export async function removeTeamFromEvent(eventTeamId: number) {
   const { data: eventTeam, error: eventTeamError } = await supabase
     .from('event_teams')
-    .select('event_id, order_index')
+    .select('event_id, team_id, order_index')
     .eq('id', eventTeamId)
     .maybeSingle();
 
@@ -13,6 +13,17 @@ export async function removeTeamFromEvent(eventTeamId: number) {
 
   if (!eventTeam) {
     throw new Error('Event team not found.');
+  }
+
+  const { count: matchCount, error: matchesError } = await supabase
+    .from('matches')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventTeam.event_id)
+    .or(`team1_id.eq.${eventTeam.team_id},team2_id.eq.${eventTeam.team_id}`);
+
+  if (matchesError) throw new Error(matchesError.message);
+  if ((matchCount ?? 0) > 0) {
+    throw new Error('This team has event matches and cannot be removed. Disqualify it instead.');
   }
 
   const { error } = await supabase

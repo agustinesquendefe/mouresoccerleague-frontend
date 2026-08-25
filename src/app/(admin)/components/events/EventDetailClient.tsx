@@ -77,7 +77,10 @@ export default function EventDetailClient({ eventId }: Props) {
 
       <EventTeamsSection
         eventId={eventId}
-        onPlayerRecordsChanged={() => setPlayerRecordsRefreshKey((prev) => prev + 1)}
+        onPlayerRecordsChanged={() => {
+          setPlayerRecordsRefreshKey((prev) => prev + 1);
+          setStandingsRefreshKey((prev) => prev + 1);
+        }}
       />
       <EventMembershipsSection eventId={eventId} />
       <EventPlayerRecordsSection
