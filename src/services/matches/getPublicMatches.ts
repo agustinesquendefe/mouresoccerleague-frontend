@@ -17,6 +17,8 @@ export type PublicMatchRow = {
   team1_logo: string | null;
   team2_name: string;
   team2_logo: string | null;
+  team1_disqualified: boolean;
+  team2_disqualified: boolean;
   field_name: string | null;
 };
 
@@ -118,7 +120,7 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
     teamIds.length > 0
       ? supabase
         .from('event_teams')
-        .select('event_id, team_id, display_name')
+        .select('event_id, team_id, display_name, status')
         .eq('event_id', eventId)
         .in('team_id', teamIds)
       : Promise.resolve({ data: [], error: null }),
@@ -135,9 +137,14 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
     ((teamRes.data ?? []) as { id: number; name: string; logo_url: string | null }[]).map((t) => [t.id, t])
   );
   const eventTeamDisplayNameByKey = new Map<string, string>(
-    ((eventTeamRes.data ?? []) as { event_id: number; team_id: number; display_name: string | null }[])
+    ((eventTeamRes.data ?? []) as { event_id: number; team_id: number; display_name: string | null; status: string | null }[])
       .filter((row) => Boolean(row.display_name?.trim()))
       .map((row) => [getEventTeamKey(row.event_id, row.team_id), row.display_name!.trim()])
+  );
+  const disqualifiedTeamIds = new Set(
+    ((eventTeamRes.data ?? []) as { team_id: number; status: string | null }[])
+      .filter((row) => row.status === 'disqualified')
+      .map((row) => row.team_id)
   );
   const fieldById = new Map<number, string>(
     ((fieldRes.data ?? []) as { id: number; name: string }[]).map((f) => [f.id, f.name])
@@ -165,6 +172,8 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
     team1_logo: m.team1_id != null ? (teamById.get(m.team1_id)?.logo_url ?? null) : null,
     team2_name: getTeamName(m.team2_id),
     team2_logo: m.team2_id != null ? (teamById.get(m.team2_id)?.logo_url ?? null) : null,
+    team1_disqualified: m.team1_id != null && disqualifiedTeamIds.has(m.team1_id),
+    team2_disqualified: m.team2_id != null && disqualifiedTeamIds.has(m.team2_id),
     field_name: m.field_id != null ? (fieldById.get(m.field_id) ?? null) : null,
   }));
 }

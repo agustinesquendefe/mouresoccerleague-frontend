@@ -9,8 +9,9 @@ import {
   TableHead,
   TableRow,
   Typography,
+  Chip,
 } from '@mui/material';
-import type { StandingRow } from '@/models/standing';
+import type { StandingRow } from '@/services/standings/getEventStandings';
 
 type Props = {
   rows: StandingRow[];
@@ -50,17 +51,20 @@ export default function StandingsTable({ rows }: Props) {
 
         <TableBody>
           {rows.map((row, index) => (
-            <TableRow key={row.id ?? `${row.event_id}-${row.team_id}`}>
-              <TableCell>{row.position ?? index + 1}</TableCell>
-              <TableCell>{row.team_name ?? `#${row.team_id}`}</TableCell>
-              <TableCell>{row.played ?? 0}</TableCell>
-              <TableCell>{row.wins ?? 0}</TableCell>
-              <TableCell>{row.draws ?? 0}</TableCell>
-              <TableCell>{row.losses ?? 0}</TableCell>
-              <TableCell>{row.goals_for ?? 0}</TableCell>
-              <TableCell>{row.goals_against ?? 0}</TableCell>
-              <TableCell>{row.goal_difference ?? 0}</TableCell>
-              <TableCell>{row.points ?? 0}</TableCell>
+            <TableRow key={row.team_id}>
+              <TableCell>{index + 1}</TableCell>
+              <TableCell>
+                {row.team_name}
+                {row.is_disqualified && <Chip label="Disqualified" color="error" size="small" sx={{ ml: 1 }} />}
+              </TableCell>
+              <TableCell>{row.played}</TableCell>
+              <TableCell>{row.won}</TableCell>
+              <TableCell>{row.drawn}</TableCell>
+              <TableCell>{row.lost}</TableCell>
+              <TableCell>{row.goals_for}</TableCell>
+              <TableCell>{row.goals_against}</TableCell>
+              <TableCell>{row.goal_difference}</TableCell>
+              <TableCell>{row.points}</TableCell>
             </TableRow>
           ))}
         </TableBody>

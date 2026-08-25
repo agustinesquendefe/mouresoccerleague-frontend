@@ -109,7 +109,7 @@ export async function generateKnockoutMatches(eventId: number): Promise<void> {
   }
 
   // 5. Obtener standings y equipos
-  const standings = await getEventStandings(eventId, 'general');
+  const standings = (await getEventStandings(eventId, 'general')).filter((team) => !team.is_disqualified);
   if (standings.length < playoffTeamsCount) throw new Error(`This event needs at least ${playoffTeamsCount} ranked teams to generate playoffs.`);
   const qualifiedTeams = standings.slice(0, playoffTeamsCount);
   const bracketRound = getBracketRoundName(playoffTeamsCount);

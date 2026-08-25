@@ -19,7 +19,7 @@ export default function GenerateFixtureButton({ eventId, eventFormat, onGenerate
 
   const handleGenerate = async () => {
     const confirmed = window.confirm(
-      'Are you sure you want to generate the fixture for this event?'
+      'Update the fixture? Existing matches, scores, dates, and results will be preserved. Only missing matchups will be added.'
     );
 
     if (!confirmed) return;
@@ -32,7 +32,7 @@ export default function GenerateFixtureButton({ eventId, eventFormat, onGenerate
         await generateRoundRobinMatches(eventId);
       }
       await onGenerated();
-      onSuccess?.('Fixture generated successfully');
+      onSuccess?.('Fixture updated safely. Existing matches were preserved.');
     } catch (error) {
       console.error(error);
       onError?.(error instanceof Error ? error.message : 'Failed to generate fixture');
@@ -43,7 +43,7 @@ export default function GenerateFixtureButton({ eventId, eventFormat, onGenerate
 
   return (
     <Button variant="contained" onClick={handleGenerate} disabled={loading}>
-      {loading ? 'Generating...' : 'Generate Fixture'}
+      {loading ? 'Updating...' : 'Update Fixture'}
     </Button>
   );
 }
