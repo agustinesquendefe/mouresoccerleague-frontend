@@ -73,6 +73,14 @@ function formatDateTime(value?: string | null) {
   return date.toLocaleString();
 }
 
+function getLocalDateKey() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function getPlayerInitials(name: string) {
   const words = name.trim().split(/\s+/).filter(Boolean);
   const first = words[0]?.[0] ?? '';
@@ -188,14 +196,24 @@ export default function AdminScannerClient({
 
   useEffect(() => {
     const storedContext = readPersistedScannerContext(storageKey);
+    if (initialContext.activeEvent) {
+      const activeEventId = String(initialContext.activeEvent.id);
+      setSelectedEventId(activeEventId);
+      setPersistedContext(storedContext?.eventId === activeEventId ? storedContext : null);
+      return;
+    }
+
     if (!storedContext) return;
 
     const eventStillExists = initialContext.events.some((event) => String(event.id) === storedContext.eventId);
-    if (!eventStillExists) return;
+    if (!eventStillExists) {
+      setPersistedContext(null);
+      return;
+    }
 
     setPersistedContext(storedContext);
     setSelectedEventId(storedContext.eventId);
-  }, [initialContext.events, storageKey]);
+  }, [initialContext.activeEvent, initialContext.events, storageKey]);
 
   useEffect(() => {
     if (!selectedEventId) return;
@@ -219,16 +237,30 @@ export default function AdminScannerClient({
         return current;
       }
 
+      const today = getLocalDateKey();
+      const todayMatches = eventMatches.filter((match) => {
+        const status = String(match.status ?? '').toLowerCase();
+        return match.date === today && status !== 'played' && status !== 'cancelled';
+      });
+
+      if (todayMatches.length === 1) {
+        return String(todayMatches[0].id);
+      }
+
       if (
         persistedContext?.eventId === selectedEventId &&
-        eventMatches.some((match) => String(match.id) === persistedContext.matchId)
+        todayMatches.some((match) => String(match.id) === persistedContext.matchId)
       ) {
         return persistedContext.matchId;
       }
 
+      if (restrictToInitialContext && eventMatches.length === 1) {
+        return String(eventMatches[0].id);
+      }
+
       return '';
     });
-  }, [eventMatches, persistedContext, selectedEvent, selectedEventId]);
+  }, [eventMatches, persistedContext, restrictToInitialContext, selectedEvent, selectedEventId]);
 
   useEffect(() => {
     if (!selectedMatch) {
@@ -353,8 +385,8 @@ export default function AdminScannerClient({
   }, [selectedMatchId, selectedTeamId]);
 
   const handleScan = async (barcode: string) => {
-    if (!selectedEvent?.id || !selectedMatch || !selectedTeamId) {
-      setErrorMessage('Select an active match and team before scanning.');
+    if (!selectedEvent?.id || !selectedMatch) {
+      setErrorMessage('Select a match before scanning. The player team will be detected automatically.');
       return;
     }
 
@@ -371,7 +403,6 @@ export default function AdminScannerClient({
           barcode,
           eventId: selectedEvent.id,
           matchId: selectedMatch.id,
-          teamId: Number(selectedTeamId),
         }),
       });
 
@@ -381,16 +412,21 @@ export default function AdminScannerClient({
         throw new Error(payload?.error ?? 'Validation did not return a result.');
       }
 
-      setResult(payload.data as ScannerValidationResponse);
+      const validationResult = payload.data as ScannerValidationResponse;
+      const resolvedTeamId = validationResult.context.teamId;
+      setResult(validationResult);
 
-      if (payload.data?.approved) {
-        await loadCheckedInPlayers(selectedMatch.id, Number(selectedTeamId));
-        await loadDeniedPlayers(selectedMatch.id, Number(selectedTeamId));
-      } else {
-        const deniedResult = payload.data as ScannerValidationResponse;
+      if (resolvedTeamId) {
+        setSelectedTeamId(String(resolvedTeamId));
+      }
+
+      if (validationResult.approved && resolvedTeamId) {
+        await loadCheckedInPlayers(selectedMatch.id, resolvedTeamId);
+        await loadDeniedPlayers(selectedMatch.id, resolvedTeamId);
+      } else if (resolvedTeamId) {
         await loadDeniedPlayers(
-          deniedResult.context.matchId ?? selectedMatch.id,
-          deniedResult.context.teamId ?? Number(selectedTeamId)
+          validationResult.context.matchId ?? selectedMatch.id,
+          resolvedTeamId
         );
       }
 
@@ -405,7 +441,7 @@ export default function AdminScannerClient({
   };
 
   const scanner = useBarcodeScannerInput({
-    enabled: Boolean(selectedEvent?.id && selectedMatch && selectedTeamId) && !loading,
+    enabled: Boolean(selectedEvent?.id && selectedMatch) && !loading,
     submitOnIdle,
     idleMs: Math.max(Number(idleMs) || 180, 50),
     onScan: handleScan,
@@ -427,7 +463,7 @@ export default function AdminScannerClient({
           ) : null}
 
           {initialContext.events.length > 0 && !selectedEvent ? (
-            <Alert severity="info">Choose an event first. Match, team, and scanner validation will unlock after that selection.</Alert>
+            <Alert severity="info">Choose an event first. Match and scanner validation will unlock after that selection.</Alert>
           ) : null}
 
           {selectedEvent && eventMatches.length === 0 ? (
@@ -520,38 +556,15 @@ export default function AdminScannerClient({
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 id="scanner-team"
-                select
-                label="Team"
-                value={selectedTeamId}
-                onChange={(event) => {
-                  setPersistedContext(null);
-                  setSelectedTeamId(event.target.value);
-                  setResult(null);
-                  setErrorMessage(null);
-                }}
+                label="Detected team"
+                value={selectedMatch && selectedTeamId
+                  ? teamOptions.find((team) => String(team.id) === selectedTeamId)?.name ?? `Team #${selectedTeamId}`
+                  : ''}
                 fullWidth
-                disabled={!selectedEvent || !selectedMatch || loading || loadingMatches}
-                helperText={
-                  !selectedEvent
-                    ? 'Choose an event first.'
-                    : loadingMatches
-                      ? 'Loading teams for the selected match...'
-                    : !selectedMatch
-                      ? 'Choose a match first.'
-                      : 'The scanned player must belong to this team for the selected event.'
-                }
-                InputLabelProps={{ shrink: true }}
-                SelectProps={{ displayEmpty: true }}
-              >
-                <MenuItem value="">
-                  Select a team
-                </MenuItem>
-                {teamOptions.map((team) => (
-                  <MenuItem key={team.id} value={String(team.id)}>
-                    {team.name}
-                  </MenuItem>
-                ))}
-              </TextField>
+                placeholder={selectedMatch ? 'Detected after scanning' : 'Select a match first'}
+                helperText="The document ID automatically resolves the player's event roster team."
+                slotProps={{ input: { readOnly: true } }}
+              />
             </Grid>
           </Grid>
 
@@ -561,15 +574,15 @@ export default function AdminScannerClient({
                 id="scanner-document-input"
                 inputRef={scanner.inputRef}
                 label="Scanner input"
-                placeholder="Example: 000005700"
+                placeholder="Example: 00005700"
                 value={scanner.value}
                 onChange={(event) => scanner.handleChange(event.target.value)}
                 onKeyDown={scanner.handleKeyDown}
                 onBlur={scanner.handleBlur}
                 autoFocus
                 fullWidth
-                disabled={!selectedEvent || !selectedMatch || !selectedTeamId || loading || loadingMatches}
-                helperText="Leading zeros are preserved. You can test manually by typing into this field and pressing Enter."
+                disabled={!selectedEvent || !selectedMatch || loading || loadingMatches}
+                helperText="Leading zeros are preserved. The player team is detected automatically from the event roster."
                 slotProps={{
                   input: {
                     startAdornment: <QrCodeScannerIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
@@ -589,7 +602,7 @@ export default function AdminScannerClient({
                 <Button
                   variant="text"
                   onClick={scanner.focusInput}
-                  disabled={loading || loadingMatches || !selectedEvent || !selectedMatch || !selectedTeamId}
+                  disabled={loading || loadingMatches || !selectedEvent || !selectedMatch}
                 >
                   Refocus Scanner
                 </Button>
@@ -623,9 +636,10 @@ export default function AdminScannerClient({
 
           {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
-          <Alert severity="info">
-            Current assumptions: Eyoyo EY-039 behaves like a USB keyboard, writes the raw `document_id`, preserves leading zeros, and optionally sends Enter when the scan ends.
-          </Alert>
+          {/* <Alert severity="info">
+            Eyoyo EY-039 writes the raw `document_id`. The active event and a single match scheduled for today are selected automatically; each scan detects the player's team from that event roster.
+          </Alert> */}
+          
         </Stack>
       </Paper>
 
@@ -709,13 +723,13 @@ export default function AdminScannerClient({
           <Box>
             <Typography variant="h6" fontWeight={700}>Approved Players</Typography>
             <Typography variant="body2" color="text.secondary">
-              Players scanned and approved for the selected match and team.
+              Players scanned and approved for the selected match and last detected team.
             </Typography>
           </Box>
 
           {!selectedMatch || !selectedTeamId ? (
             <Typography color="text.secondary">
-              Select a match and team to see approved check-ins.
+              Select a match and scan a player to see approved check-ins for the detected team.
             </Typography>
           ) : checkedInPlayers.length === 0 ? (
             <Typography color="text.secondary">
@@ -785,13 +799,13 @@ export default function AdminScannerClient({
           <Box>
             <Typography variant="h6" fontWeight={700}>Denied Players</Typography>
             <Typography variant="body2" color="text.secondary">
-              Players scanned for the selected match and team who were not cleared to play.
+              Players scanned for the selected match and last detected team who were not cleared to play.
             </Typography>
           </Box>
 
           {!selectedMatch || !selectedTeamId ? (
             <Typography color="text.secondary">
-              Select a match and team to see denied scans.
+              Select a match and scan a player to see denied scans for the detected team.
             </Typography>
           ) : deniedPlayers.length === 0 ? (
             <Typography color="text.secondary">

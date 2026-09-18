@@ -1,5 +1,12 @@
 import { supabase } from '@/lib/supabaseClient';
 
+export class TeamHasEventMatchesError extends Error {
+  constructor() {
+    super('This team has event matches and cannot be removed. Disqualify it instead.');
+    this.name = 'TeamHasEventMatchesError';
+  }
+}
+
 export async function removeTeamFromEvent(eventTeamId: number) {
   const { data: eventTeam, error: eventTeamError } = await supabase
     .from('event_teams')
@@ -23,7 +30,7 @@ export async function removeTeamFromEvent(eventTeamId: number) {
 
   if (matchesError) throw new Error(matchesError.message);
   if ((matchCount ?? 0) > 0) {
-    throw new Error('This team has event matches and cannot be removed. Disqualify it instead.');
+    throw new TeamHasEventMatchesError();
   }
 
   const { error } = await supabase

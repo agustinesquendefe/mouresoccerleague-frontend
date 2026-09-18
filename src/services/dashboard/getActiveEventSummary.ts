@@ -64,6 +64,11 @@ export async function getActiveEventSummary(): Promise<ActiveEventSummary | null
   const playedMatches =
     matches?.filter((match) => String(match.status ?? '').toLowerCase() === 'played')
       .length ?? 0;
+  const pendingMatches =
+    matches?.filter((match) => {
+      const status = String(match.status ?? '').toLowerCase();
+      return status !== 'played' && status !== 'cancelled';
+    }).length ?? 0;
 
   return {
     id: event.id,
@@ -74,6 +79,6 @@ export async function getActiveEventSummary(): Promise<ActiveEventSummary | null
     end_date: event.end_date,
     totalMatches,
     playedMatches,
-    pendingMatches: totalMatches - playedMatches,
+    pendingMatches,
   };
 }

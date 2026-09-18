@@ -347,6 +347,50 @@ async function resolveTeam(client: SupabaseClient, teamId?: number | null): Prom
   return data as TeamRow;
 }
 
+async function resolvePlayerTeamForMatch(
+  client: SupabaseClient,
+  playerId: number,
+  eventId: number,
+  match: MatchRow
+): Promise<TeamRow | null> {
+  const matchTeamIds = [match.team1_id, match.team2_id];
+  const [{ data: playerRosterRows, error: playerRosterError }, { data: eventRosterRows, error: eventRosterError }] =
+    await Promise.all([
+      client
+        .from('team_players')
+        .select('team_id, event_id')
+        .eq('player_id', playerId)
+        .in('team_id', matchTeamIds)
+        .eq('is_active', true),
+      client
+        .from('team_players')
+        .select('team_id')
+        .eq('event_id', eventId)
+        .in('team_id', matchTeamIds)
+        .eq('is_active', true),
+    ]);
+
+  if (playerRosterError) throw new Error(playerRosterError.message);
+  if (eventRosterError) throw new Error(eventRosterError.message);
+
+  const teamsWithEventRoster = new Set(
+    (eventRosterRows ?? []).map((row) => Number(row.team_id))
+  );
+  const eligibleTeamIds = Array.from(new Set(
+    (playerRosterRows ?? [])
+      .filter((row) => {
+        const teamId = Number(row.team_id);
+        return teamsWithEventRoster.has(teamId)
+          ? Number(row.event_id) === eventId
+          : row.event_id == null || Number(row.event_id) === eventId;
+      })
+      .map((row) => Number(row.team_id))
+  ));
+
+  if (eligibleTeamIds.length !== 1) return null;
+  return resolveTeam(client, eligibleTeamIds[0]);
+}
+
 export async function validatePlayerBarcode(
   client: SupabaseClient,
   request: ScannerValidationRequest
@@ -359,9 +403,27 @@ export async function validatePlayerBarcode(
     ]);
   }
 
-  const event = await resolveEvent(client, request.eventId ?? null);
-  const match = await resolveMatch(client, request.matchId ?? null);
-  const team = await resolveTeam(client, request.teamId ?? null);
+  const [event, match, playerResult] = await Promise.all([
+    resolveEvent(client, request.eventId ?? null),
+    resolveMatch(client, request.matchId ?? null),
+    client
+      .from('players')
+      .select('id, full_name, document_id, photo_url, paid_membership, is_active')
+      .eq('document_id', barcode)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (playerResult.error) {
+    throw new Error(playerResult.error.message);
+  }
+
+  const player = playerResult.data;
+  const team = request.teamId
+    ? await resolveTeam(client, request.teamId)
+    : event && match && player
+      ? await resolvePlayerTeamForMatch(client, Number(player.id), Number(event.id), match)
+      : null;
 
   const eventCheck = buildCheck(
     'active_event',
@@ -389,17 +451,26 @@ export async function validatePlayerBarcode(
 
   const teamCheck = buildCheck(
     'team_context',
-    'Team context selected',
+    request.teamId ? 'Team context selected' : 'Team automatically detected',
     teamContextPassed,
     !team
-      ? 'A team must be selected before scanning.'
+      ? player && match
+        ? 'The player is not registered with either team in the selected match.'
+        : 'The player team could not be detected for the selected match.'
       : !match || teamContextPassed
-        ? `Validating against ${normalizeName(team.name, `Team #${team.id}`)}.`
+        ? `${request.teamId ? 'Validating against' : 'Automatically matched to'} ${normalizeName(team.name, `Team #${team.id}`)}.`
         : 'Selected team is not part of the selected match.'
   );
 
-  if (!eventCheck.passed || !matchCheck.passed || !teamCheck.passed) {
-    return buildDeniedResponse(barcode, [eventCheck, matchCheck, teamCheck], {
+  const playerExistsCheck = buildCheck(
+    'player_exists',
+    'Player exists',
+    Boolean(player),
+    player ? `Player found for barcode ${barcode}.` : `No player was found for barcode ${barcode}.`
+  );
+
+  if (!eventCheck.passed || !matchCheck.passed || !playerExistsCheck.passed || !teamCheck.passed) {
+    return buildDeniedResponse(barcode, [eventCheck, matchCheck, playerExistsCheck, teamCheck], {
       context: {
         scannerMode: 'keyboard_wedge',
         scannedCode: barcode,
@@ -415,53 +486,12 @@ export async function validatePlayerBarcode(
     });
   }
 
-  if (!event || !team) {
+  if (!event || !team || !player) {
     throw new Error('Scanner validation context is incomplete.');
   }
 
   const resolvedEvent = event;
   const resolvedTeam = team;
-
-  const { data: player, error: playerError } = await client
-    .from('players')
-    .select('id, full_name, document_id, photo_url, paid_membership, is_active')
-    .eq('document_id', barcode)
-    .limit(1)
-    .maybeSingle();
-
-  if (playerError) {
-    throw new Error(playerError.message);
-  }
-
-  const playerExistsCheck = buildCheck(
-    'player_exists',
-    'Player exists',
-    Boolean(player),
-    player ? `Player found for barcode ${barcode}.` : `No player was found for barcode ${barcode}.`
-  );
-
-  if (!player) {
-    const response = buildDeniedResponse(barcode, [eventCheck, matchCheck, teamCheck, playerExistsCheck], {
-      context: {
-        scannerMode: 'keyboard_wedge',
-        scannedCode: barcode,
-        eventId: resolvedEvent.id,
-        eventName: normalizeName(resolvedEvent.name, `Event #${resolvedEvent.id}`),
-        matchId: match?.id ?? null,
-        matchLabel: match
-          ? `${normalizeName(match.team1_name, `Team #${match.team1_id}`)} vs ${normalizeName(match.team2_name, `Team #${match.team2_id}`)}`
-          : null,
-        teamId: resolvedTeam.id,
-        teamName: normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`),
-      },
-    });
-
-    const deniedScan = await registerDeniedScan(client, response);
-    return {
-      ...response,
-      deniedScan,
-    };
-  }
 
   const playerActiveCheck = buildCheck(
     'player_active',

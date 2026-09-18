@@ -31,6 +31,11 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   const playedMatches =
     matches?.filter((match) => String(match.status ?? '').toLowerCase() === 'played')
       .length ?? 0;
+  const pendingMatches =
+    matches?.filter((match) => {
+      const status = String(match.status ?? '').toLowerCase();
+      return status !== 'played' && status !== 'cancelled';
+    }).length ?? 0;
 
   return {
     totalTeams: totalTeams ?? 0,
@@ -38,6 +43,6 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     totalEvents: totalEvents ?? 0,
     totalMatches,
     playedMatches,
-    pendingMatches: totalMatches - playedMatches,
+    pendingMatches,
   };
 }

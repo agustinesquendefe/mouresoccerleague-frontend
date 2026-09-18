@@ -13,7 +13,7 @@ import BlockIcon from '@mui/icons-material/Block';
 import ReplayIcon from '@mui/icons-material/Replay';
 
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
-import { removeTeamFromEvent } from '@/services/eventTeams/removeTeamFromEvent';
+import { removeTeamFromEvent, TeamHasEventMatchesError } from '@/services/eventTeams/removeTeamFromEvent';
 import { updateEventTeamsOrder } from '@/services/eventTeams/updateEventTeamsOrder';
 import { updateEventTeamDisplayName } from '@/services/eventTeams/updateEventTeamDisplayName';
 import { updateEventTeamStatus } from '@/services/eventTeams/updateEventTeamStatus';
@@ -102,13 +102,42 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
     loadTeams();
   }, [eventId]);
 
-  const handleRemove = async (id: number) => {
+  const handleRemove = async (eventTeam: EventTeamRow) => {
     try {
-      await removeTeamFromEvent(id);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      await removeTeamFromEvent(eventTeam.id);
       await loadTeams();
       await onPlayerRecordsChanged?.();
       setSuccessMessage('Team removed from event.');
     } catch (err) {
+      if (err instanceof TeamHasEventMatchesError) {
+        const confirmed = window.confirm(
+          'This team already has event matches and cannot be deleted without losing its history.\n\n' +
+          'Disqualify it instead? Played results will be preserved and its scheduled matches will be cancelled.'
+        );
+        if (!confirmed) return;
+
+        try {
+          setStatusUpdatingId(eventTeam.id);
+          const result = await updateEventTeamStatus(eventId, eventTeam.id, 'disqualified');
+          await loadTeams();
+          await onPlayerRecordsChanged?.();
+          const cancelledCount = result.cancelled_match_count;
+          setSuccessMessage(
+            cancelledCount > 0
+              ? `Team disqualified. ${cancelledCount} scheduled ${cancelledCount === 1 ? 'match was' : 'matches were'} cancelled.`
+              : 'Team disqualified. Played results were preserved.'
+          );
+        } catch (statusError) {
+          console.error(statusError);
+          setErrorMessage(statusError instanceof Error ? statusError.message : 'Failed to disqualify team');
+        } finally {
+          setStatusUpdatingId(null);
+        }
+        return;
+      }
+
       console.error(err);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to remove team');
     }
@@ -117,16 +146,20 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
   const handleStatusChange = async (eventTeam: EventTeamRow) => {
     const disqualifying = eventTeam.status !== 'disqualified';
     const confirmed = window.confirm(disqualifying
-      ? 'Disqualify Team?\n\nThis team will remain in the tournament and its previous results will be preserved, but it will be moved to the bottom of the standings.'
-      : 'Reinstate Team?\n\nThe team will become active again. Existing results will not be changed.');
+      ? 'Disqualify Team?\n\nPlayed results will be preserved, scheduled matches will be cancelled, and the team will be moved to the bottom of the standings.'
+      : 'Reinstate Team?\n\nThe team will become active again. Cancelled matches will not be restored automatically.');
     if (!confirmed) return;
     try {
       setStatusUpdatingId(eventTeam.id);
       setErrorMessage(null);
-      await updateEventTeamStatus(eventId, eventTeam.id, disqualifying ? 'disqualified' : 'active');
+      const result = await updateEventTeamStatus(eventId, eventTeam.id, disqualifying ? 'disqualified' : 'active');
       await loadTeams();
       await onPlayerRecordsChanged?.();
-      setSuccessMessage(disqualifying ? 'Team disqualified.' : 'Team reinstated.');
+      setSuccessMessage(disqualifying
+        ? result.cancelled_match_count > 0
+          ? `Team disqualified. ${result.cancelled_match_count} scheduled ${result.cancelled_match_count === 1 ? 'match was' : 'matches were'} cancelled.`
+          : 'Team disqualified. Played results were preserved.'
+        : 'Team reinstated. Cancelled matches must be rescheduled manually.');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to update team status');
     } finally {
@@ -425,9 +458,16 @@ export default function EventTeamsSection({ eventId, onPlayerRecordsChanged }: P
                   </IconButton>
                 </Tooltip>
               )}
-              <IconButton onClick={() => handleRemove(et.id)}>
-                <DeleteIcon />
-              </IconButton>
+              <Tooltip title="Remove from event">
+                <span>
+                  <IconButton
+                    onClick={() => handleRemove(et)}
+                    disabled={statusUpdatingId === et.id}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
             </Stack>
           </Stack>
         </Paper>
