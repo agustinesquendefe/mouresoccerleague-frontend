@@ -51,7 +51,7 @@ export async function syncEventStripePrice({
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data?.error ?? 'Failed to create Stripe price.');
+    throw new Error(data?.error ?? 'Failed to create the card payment price.');
   }
 
   return data as StripePriceResponse;

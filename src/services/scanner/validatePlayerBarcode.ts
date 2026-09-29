@@ -354,36 +354,17 @@ async function resolvePlayerTeamForMatch(
   match: MatchRow
 ): Promise<TeamRow | null> {
   const matchTeamIds = [match.team1_id, match.team2_id];
-  const [{ data: playerRosterRows, error: playerRosterError }, { data: eventRosterRows, error: eventRosterError }] =
-    await Promise.all([
-      client
-        .from('team_players')
-        .select('team_id, event_id')
-        .eq('player_id', playerId)
-        .in('team_id', matchTeamIds)
-        .eq('is_active', true),
-      client
-        .from('team_players')
-        .select('team_id')
-        .eq('event_id', eventId)
-        .in('team_id', matchTeamIds)
-        .eq('is_active', true),
-    ]);
+  const { data: playerRosterRows, error: playerRosterError } = await client
+    .from('team_players')
+    .select('team_id')
+    .eq('player_id', playerId)
+    .eq('event_id', eventId)
+    .in('team_id', matchTeamIds)
+    .eq('is_active', true);
 
   if (playerRosterError) throw new Error(playerRosterError.message);
-  if (eventRosterError) throw new Error(eventRosterError.message);
-
-  const teamsWithEventRoster = new Set(
-    (eventRosterRows ?? []).map((row) => Number(row.team_id))
-  );
   const eligibleTeamIds = Array.from(new Set(
     (playerRosterRows ?? [])
-      .filter((row) => {
-        const teamId = Number(row.team_id);
-        return teamsWithEventRoster.has(teamId)
-          ? Number(row.event_id) === eventId
-          : row.event_id == null || Number(row.event_id) === eventId;
-      })
       .map((row) => Number(row.team_id))
   ));
 
@@ -500,51 +481,29 @@ export async function validatePlayerBarcode(
     player.is_active ? 'Player is active.' : 'Player is inactive and cannot be validated.'
   );
 
-  const [teamMembershipResult, eventRosterResult] = await Promise.all([
-    client
-      .from('team_players')
-      .select('id, team_id, event_id, is_active')
-      .eq('player_id', player.id)
-      .eq('team_id', resolvedTeam.id)
-      .eq('is_active', true),
-    client
-      .from('team_players')
-      .select('id')
-      .eq('team_id', resolvedTeam.id)
-      .eq('event_id', resolvedEvent.id)
-      .eq('is_active', true)
-      .limit(1),
-  ]);
+  const teamMembershipResult = await client
+    .from('team_players')
+    .select('id, team_id, event_id, is_active')
+    .eq('player_id', player.id)
+    .eq('team_id', resolvedTeam.id)
+    .eq('event_id', resolvedEvent.id)
+    .eq('is_active', true);
 
   const { data: teamMembershipRows, error: teamMembershipError } = teamMembershipResult;
-  const { data: eventRosterRows, error: eventRosterError } = eventRosterResult;
 
   if (teamMembershipError) {
     throw new Error(teamMembershipError.message);
   }
 
-  if (eventRosterError) {
-    throw new Error(eventRosterError.message);
-  }
-
-  const hasEventRoster = (eventRosterRows ?? []).length > 0;
-
-  const belongsToTeam = (teamMembershipRows ?? []).some(
-    (row: any) =>
-      hasEventRoster
-        ? Number(row.event_id) === Number(resolvedEvent.id)
-        : row.event_id == null || Number(row.event_id) === Number(resolvedEvent.id)
-  );
+  const belongsToTeam = (teamMembershipRows ?? []).length > 0;
 
   const teamMembershipCheck = buildCheck(
     'team_membership',
     'Belongs to selected team',
     belongsToTeam,
     belongsToTeam
-      ? `Player belongs to ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)}${hasEventRoster ? ' on the selected event roster' : ''}.`
-      : hasEventRoster
-        ? `Player is not on ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)}'s roster for the selected event.`
-        : `Player does not belong to ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)} for the selected event.`
+      ? `Player belongs to ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)} on the selected event roster.`
+      : `Player is not on ${normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`)}'s roster for the selected event.`
   );
 
   const memberships = await getEventMemberships(resolvedEvent.id, client, {

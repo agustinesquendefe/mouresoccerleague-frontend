@@ -33,6 +33,16 @@ export async function removeTeamFromEvent(eventTeamId: number) {
     throw new TeamHasEventMatchesError();
   }
 
+  const { error: rosterError } = await supabase
+    .from('team_players')
+    .delete()
+    .eq('event_id', eventTeam.event_id)
+    .eq('team_id', eventTeam.team_id);
+
+  if (rosterError) {
+    throw new Error(rosterError.message);
+  }
+
   const { error } = await supabase
     .from('event_teams')
     .delete()

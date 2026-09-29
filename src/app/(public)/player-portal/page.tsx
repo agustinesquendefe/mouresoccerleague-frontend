@@ -280,7 +280,7 @@ export default function PlayerPortalPage() {
       }
 
       if (!data.checkout_url) {
-        throw new Error("Stripe did not return a checkout URL.");
+        throw new Error("Card checkout did not return a checkout URL.");
       }
 
       window.location.href = data.checkout_url;

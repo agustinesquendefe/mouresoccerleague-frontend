@@ -8,7 +8,12 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
   MenuItem,
+  Radio,
+  RadioGroup,
   TextField,
   Typography,
 } from '@mui/material';
@@ -16,7 +21,10 @@ import {
 import { supabase } from '@/lib/supabaseClient';
 import type { Category } from '@/models/category';
 import { getCategories } from '@/services/categories';
-import { addTeamToEvent } from '@/services/eventTeams/addTeamToEvent';
+import {
+  addTeamToEvent,
+  type EventRosterImportMode,
+} from '@/services/eventTeams/addTeamToEvent';
 import { WEEKDAY_OPTIONS, getWeekdayLabel } from '@/utils/weekdays';
 
 type TeamOption = {
@@ -55,6 +63,7 @@ export default function AddTeamToEventDialog({
   const [categoryFilter, setCategoryFilter] = useState<number | ''>('');
   const [dayFilter, setDayFilter] = useState<number | ''>('');
   const [filtersReady, setFiltersReady] = useState(false);
+  const [rosterImportMode, setRosterImportMode] = useState<EventRosterImportMode>('empty');
 
   useEffect(() => {
     if (!open) return;
@@ -85,6 +94,7 @@ export default function AddTeamToEventDialog({
         setDayFilter(matchDay ?? '');
         setCategories(categoriesResponse);
         setSelectedTeam('');
+        setRosterImportMode('empty');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to load teams';
         setErrorMessage(message);
@@ -168,7 +178,7 @@ export default function AddTeamToEventDialog({
       setErrorMessage(null);
       setLoading(true);
 
-      await addTeamToEvent(eventId, Number(selectedTeam));
+      await addTeamToEvent(eventId, Number(selectedTeam), rosterImportMode);
       await onAdded();
       onClose();
       setSelectedTeam('');
@@ -282,6 +292,31 @@ export default function AddTeamToEventDialog({
             </MenuItem>
           ))}
         </TextField>
+
+        <FormControl sx={{ mt: 2 }} disabled={loading || !selectedTeam}>
+          <FormLabel>Event roster</FormLabel>
+          <RadioGroup
+            value={rosterImportMode}
+            onChange={(event) => setRosterImportMode(event.target.value as EventRosterImportMode)}
+          >
+            <FormControlLabel
+              value="empty"
+              control={<Radio />}
+              label="Start with an empty roster"
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 4, mt: -0.75, mb: 0.5 }}>
+              Add only the players selected for this event later from the Roster button.
+            </Typography>
+            <FormControlLabel
+              value="copy_default"
+              control={<Radio />}
+              label="Copy the team’s default players"
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 4, mt: -0.75 }}>
+              Creates an independent event roster from the players currently assigned in Teams.
+            </Typography>
+          </RadioGroup>
+        </FormControl>
 
         {availableTeams.length === 0 && !loading && (eventCategoryId !== null || eventMatchDay !== null) && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>

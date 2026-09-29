@@ -549,7 +549,7 @@ export default function MatchDialog({
       }
 
       if (!result.checkout_url) {
-        throw new Error('Stripe did not return a checkout URL.');
+        throw new Error('Card checkout did not return a checkout URL.');
       }
 
       setCheckoutBySlot((prev) => ({
@@ -592,7 +592,7 @@ export default function MatchDialog({
       }
 
       if (!result.paid) {
-        setErrorMessage('Stripe has not marked this checkout as paid yet.');
+        setErrorMessage('The card payment has not been confirmed yet.');
         return;
       }
 
@@ -977,7 +977,7 @@ export default function MatchDialog({
                               >
                                 <Box
                                   component="img"
-                                  alt="Stripe checkout QR"
+                                  alt="Card checkout QR"
                                   src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(checkout.checkoutUrl)}`}
                                   sx={{
                                     width: 180,
@@ -994,7 +994,7 @@ export default function MatchDialog({
                                     Scan to pay with card
                                   </Typography>
                                   <Typography variant="body2" color="text.secondary">
-                                    The payer can scan this QR and complete Stripe Checkout on their phone. After payment, confirm it here.
+                                    The payer can scan this QR and complete the card checkout on their phone. After payment, confirm it here.
                                   </Typography>
                                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                                     <Button

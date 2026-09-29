@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { registerExternalPayment, type ExternalPaymentMethod } from '@/lib/externalPayments';
+import {
+  assertPlayerCanPayForEvent,
+  EventPaymentNotAllowedError,
+} from '@/lib/eventPaymentEligibility';
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -45,6 +49,8 @@ export async function PATCH(request: Request, { params }: Params) {
     const { data: membership, error: membershipError } = await supabaseAdmin
       .from('event_memberships')
       .select(`
+        event_id,
+        player_id,
         amount_paid,
         appearances_count,
         event:events (
@@ -56,6 +62,12 @@ export async function PATCH(request: Request, { params }: Params) {
       .single();
 
     if (membershipError) throw new Error(membershipError.message);
+
+    await assertPlayerCanPayForEvent(
+      supabaseAdmin,
+      Number(membership.event_id),
+      Number(membership.player_id)
+    );
 
     if (body.action === 'add_payment') {
       const amount = Number(body.amount);
@@ -111,6 +123,9 @@ export async function PATCH(request: Request, { params }: Params) {
 
     return NextResponse.json({ error: 'Unsupported action.' }, { status: 400 });
   } catch (error) {
+    if (error instanceof EventPaymentNotAllowedError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unable to update event membership.' },
       { status: 500 }

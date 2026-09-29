@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { assertPlayerCanPayForEvent } from '@/lib/eventPaymentEligibility';
 
 export type ExternalPaymentMethod = 'cash' | 'zelle' | 'venmo' | 'cashapp';
 export type ExternalPaymentSource = 'admin' | 'player_portal';
@@ -172,6 +173,12 @@ export async function registerExternalPayment({
   const eventPrice = Number(eventRow?.event_price ?? eventRow?.membership_price ?? 0);
   const currentAmountPaid = Number(membership.amount_paid ?? 0);
   const balanceDue = Math.max(eventPrice - currentAmountPaid, 0);
+
+  await assertPlayerCanPayForEvent(
+    supabaseAdmin,
+    Number(membership.event_id),
+    Number(membership.player_id)
+  );
 
   if (amount > balanceDue) {
     throw new Error(`Payment amount cannot be greater than $${balanceDue.toFixed(2)}.`);

@@ -1,5 +1,20 @@
 export type FixturePair = { team1_id: number; team2_id: number };
 
+export type ExistingFixtureMatch = FixturePair & {
+  round_number: number | null;
+  status?: string | null;
+  date?: string | null;
+};
+
+export type FixtureRoundAssignment<T extends FixturePair = FixturePair> = {
+  roundNumber: number;
+  pair: T;
+};
+
+export type ReassignableFixturePair = FixturePair & {
+  round_number: number | null;
+};
+
 export function generateRoundRobinRounds(teamIds: number[]): FixturePair[][] {
   const teams = [...teamIds];
   if (teams.length % 2 !== 0) teams.push(-1);
@@ -64,6 +79,134 @@ export function packIntoRounds(pairs: FixturePair[]): FixturePair[][] {
     else rounds.push([pair]);
   });
   return rounds;
+}
+
+function hasTeam(pair: FixturePair, teamId: number): boolean {
+  return pair.team1_id === teamId || pair.team2_id === teamId;
+}
+
+/**
+ * Returns existing rounds that have not started yet. A round is considered
+ * started as soon as one of its matches is played/in progress or scheduled
+ * for today (or an earlier date).
+ */
+export function getOpenRoundNumbers(
+  existingMatches: ExistingFixtureMatch[],
+  today: string
+): number[] {
+  const matchesByRound = new Map<number, ExistingFixtureMatch[]>();
+
+  existingMatches.forEach((match) => {
+    const roundNumber = Number(match.round_number);
+    if (!Number.isInteger(roundNumber) || roundNumber < 1) return;
+    const roundMatches = matchesByRound.get(roundNumber) ?? [];
+    roundMatches.push(match);
+    matchesByRound.set(roundNumber, roundMatches);
+  });
+
+  return Array.from(matchesByRound.entries())
+    .filter(([, matches]) => !matches.some((match) =>
+      match.status === 'played' ||
+      match.status === 'in_progress' ||
+      Boolean(match.date && match.date <= today)))
+    .map(([roundNumber]) => roundNumber)
+    .sort((left, right) => left - right);
+}
+
+/**
+ * Spreads missing matchups across open rounds. Conflicts between a new matchup
+ * and an existing match are intentionally allowed: adding a team can require
+ * an existing team to play twice in that round, and administrators can adjust
+ * that schedule afterwards. We only prevent the newly inserted matchups from
+ * repeating the same team in one round.
+ */
+export function assignPairsToRounds<T extends FixturePair>(
+  pairs: T[],
+  existingMatches: ExistingFixtureMatch[],
+  openRoundNumbers: number[]
+): FixtureRoundAssignment<T>[] {
+  const assignedPairsByRound = new Map<number, FixturePair[]>();
+  const existingRoundNumbers = existingMatches
+    .map((match) => Number(match.round_number))
+    .filter((roundNumber) => Number.isInteger(roundNumber) && roundNumber > 0);
+
+  const candidateRounds = Array.from(new Set(openRoundNumbers))
+    .filter((roundNumber) => Number.isInteger(roundNumber) && roundNumber > 0)
+    .sort((left, right) => left - right);
+  let nextRound = Math.max(0, ...existingRoundNumbers) + 1;
+  const assignments: FixtureRoundAssignment<T>[] = [];
+
+  pairs.forEach((pair) => {
+    let roundNumber = candidateRounds.find((candidate) => {
+      const assignedPairs = assignedPairsByRound.get(candidate) ?? [];
+      return assignedPairs.every((assigned) =>
+        !hasTeam(assigned, pair.team1_id) && !hasTeam(assigned, pair.team2_id));
+    });
+
+    if (roundNumber == null) {
+      roundNumber = nextRound;
+      nextRound += 1;
+      candidateRounds.push(roundNumber);
+    }
+
+    const roundPairs = assignedPairsByRound.get(roundNumber) ?? [];
+    roundPairs.push(pair);
+    assignedPairsByRound.set(roundNumber, roundPairs);
+    assignments.push({ roundNumber, pair });
+  });
+
+  return assignments;
+}
+
+/**
+ * Compacts already-created matchups into the earliest editable rounds. Teams
+ * identified as late additions cannot be repeated against retained matches;
+ * other existing-team conflicts are allowed so the schedule can be shortened.
+ */
+export function reassignPairsToEarlierRounds<T extends ReassignableFixturePair>(
+  pairs: T[],
+  retainedMatches: ExistingFixtureMatch[],
+  destinationRoundNumbers: number[],
+  lateTeamIds: Set<number>
+): FixtureRoundAssignment<T>[] {
+  const retainedByRound = new Map<number, ExistingFixtureMatch[]>();
+  retainedMatches.forEach((match) => {
+    const roundNumber = Number(match.round_number);
+    if (!Number.isInteger(roundNumber) || roundNumber < 1) return;
+    const roundMatches = retainedByRound.get(roundNumber) ?? [];
+    roundMatches.push(match);
+    retainedByRound.set(roundNumber, roundMatches);
+  });
+
+  const assignedByRound = new Map<number, FixturePair[]>();
+  const destinationRounds = Array.from(new Set(destinationRoundNumbers))
+    .filter((roundNumber) => Number.isInteger(roundNumber) && roundNumber > 0)
+    .sort((left, right) => left - right);
+
+  return pairs.map((pair) => {
+    const protectedTeams = [pair.team1_id, pair.team2_id]
+      .filter((teamId) => lateTeamIds.has(teamId));
+    const roundNumber = destinationRounds.find((candidate) => {
+      const newlyAssigned = assignedByRound.get(candidate) ?? [];
+      if (newlyAssigned.some((assigned) =>
+        hasTeam(assigned, pair.team1_id) || hasTeam(assigned, pair.team2_id))) {
+        return false;
+      }
+
+      const retained = retainedByRound.get(candidate) ?? [];
+      return protectedTeams.every((teamId) =>
+        retained.every((match) => !hasTeam(match, teamId)));
+    });
+
+    if (roundNumber == null) {
+      throw new Error('The extended matches could not be redistributed without repeating the added team.');
+    }
+
+    const assigned = assignedByRound.get(roundNumber) ?? [];
+    assigned.push(pair);
+    assignedByRound.set(roundNumber, assigned);
+    return { roundNumber, pair };
+  });
 }
 
 export function addDays(date: Date, days: number): Date {

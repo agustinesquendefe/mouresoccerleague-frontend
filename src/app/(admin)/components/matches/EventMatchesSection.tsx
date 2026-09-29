@@ -14,6 +14,7 @@ import MatchDialog from './MatchDialog';
 import ExtraMatchDialog from './ExtraMatchDialog';
 import AdvanceKnockoutRoundButton from './AdvanceKnockoutRoundButton';
 import RoundSchedulePlanner from './RoundSchedulePlanner';
+import CompactFixtureButton from './CompactFixtureButton';
 import { escapeHtml, printHtml } from '@/utils/printHtml';
 import { formatTime12Hour } from '@/utils/formatTime';
 import type { AppSettings } from '@/models/appSettings';
@@ -457,13 +458,23 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
       <Stack spacing={2}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
           <Typography variant="h6">League Matches</Typography>
-          <GenerateFixtureButton
-            eventId={eventId}
-            eventFormat={eventFormat}
-            onGenerated={loadData}
-            onSuccess={(message) => showToast(message, 'success')}
-            onError={(message) => showToast(message, 'error')}
-          />
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {(eventFormat === 'round_robin' || eventFormat === 'groups') && (
+              <CompactFixtureButton
+                eventId={eventId}
+                onCompacted={loadData}
+                onSuccess={(message) => showToast(message, 'success')}
+                onError={(message) => showToast(message, 'error')}
+              />
+            )}
+            <GenerateFixtureButton
+              eventId={eventId}
+              eventFormat={eventFormat}
+              onGenerated={loadData}
+              onSuccess={(message) => showToast(message, 'success')}
+              onError={(message) => showToast(message, 'error')}
+            />
+          </Stack>
         </Stack>
 
         {!loading && leagueMatches.length > 0 && (

@@ -20,6 +20,7 @@ type Props = {
 export default function EventDetailClient({ eventId }: Props) {
   const [standingsRefreshKey, setStandingsRefreshKey] = useState(0);
   const [playerRecordsRefreshKey, setPlayerRecordsRefreshKey] = useState(0);
+  const [membershipsRefreshKey, setMembershipsRefreshKey] = useState(0);
   const [formatType, setFormatType] = useState<string | null>(null);
   const [matchFormat, setMatchFormat] = useState<string | null>(null);
   const [eventName, setEventName] = useState<string | null>(null);
@@ -80,9 +81,10 @@ export default function EventDetailClient({ eventId }: Props) {
         onPlayerRecordsChanged={() => {
           setPlayerRecordsRefreshKey((prev) => prev + 1);
           setStandingsRefreshKey((prev) => prev + 1);
+          setMembershipsRefreshKey((prev) => prev + 1);
         }}
       />
-      <EventMembershipsSection eventId={eventId} />
+      <EventMembershipsSection eventId={eventId} refreshKey={membershipsRefreshKey} />
       <EventPlayerRecordsSection
         eventId={eventId}
         eventName={eventName ?? `Event #${eventId}`}

@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { calculatePaymentFees, getPaymentFeeSettings } from '@/lib/paymentFees';
+import {
+  assertPlayerCanPayForEvent,
+  EventPaymentNotAllowedError,
+} from '@/lib/eventPaymentEligibility';
 
 type RequestBody = {
   eventId?: number;
@@ -44,7 +48,7 @@ async function stripeRequest<T>(
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data?.error?.message ?? 'Stripe checkout request failed.');
+    throw new Error(data?.error?.message ?? 'Card checkout request failed.');
   }
 
   return data as T;
@@ -112,6 +116,8 @@ export async function POST(request: Request) {
     if (!player) {
       return NextResponse.json({ error: 'Player profile not found.' }, { status: 404 });
     }
+
+    await assertPlayerCanPayForEvent(supabaseAdmin, eventId, Number(player.id));
 
     const eventPrice = Number(event.event_price ?? event.membership_price ?? 0);
 
@@ -186,7 +192,7 @@ export async function POST(request: Request) {
       );
       checkoutBody.set(
         `line_items[${lineItemIndex}][price_data][product_data][name]`,
-        'Stripe processing fee'
+        'Card processing fee'
       );
       checkoutBody.set(`line_items[${lineItemIndex}][quantity]`, '1');
       lineItemIndex += 1;
@@ -213,6 +219,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ checkout_url: session.url, session_id: session.id });
   } catch (error) {
+    if (error instanceof EventPaymentNotAllowedError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unable to create checkout session.' },
       { status: 500 }

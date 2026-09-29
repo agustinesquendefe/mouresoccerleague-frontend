@@ -507,7 +507,7 @@ export default function FinancialsPage() {
                     sx={{ minWidth: 220 }}
                   >
                     <MenuItem value="all">All methods</MenuItem>
-                    <MenuItem value="stripe">Card / Stripe</MenuItem>
+                    <MenuItem value="stripe">Card</MenuItem>
                     <MenuItem value="cash">Cash</MenuItem>
                     <MenuItem value="zelle">Zelle</MenuItem>
                     <MenuItem value="venmo">Venmo</MenuItem>

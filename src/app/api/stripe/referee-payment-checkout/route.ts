@@ -86,7 +86,7 @@ async function stripeRequest<T>(
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data?.error?.message ?? 'Stripe checkout request failed.');
+    throw new Error(data?.error?.message ?? 'Card checkout request failed.');
   }
 
   return data as T;
@@ -198,7 +198,7 @@ export async function POST(request: Request) {
       );
       checkoutBody.set(
         `line_items[${lineItemIndex}][price_data][product_data][name]`,
-        'Stripe processing fee'
+        'Card processing fee'
       );
       checkoutBody.set(`line_items[${lineItemIndex}][quantity]`, '1');
       lineItemIndex += 1;
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
     );
 
     if (!session.url) {
-      return NextResponse.json({ error: 'Stripe did not return a checkout URL.' }, { status: 500 });
+      return NextResponse.json({ error: 'Card checkout did not return a checkout URL.' }, { status: 500 });
     }
 
     const code = createShortCode();

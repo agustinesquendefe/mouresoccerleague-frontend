@@ -25,6 +25,7 @@ import type { EventMembershipSummary } from '@/models/eventMembership';
 
 type Props = {
   eventId: number;
+  refreshKey?: number;
 };
 
 const PAGE_SIZE = 25;
@@ -43,7 +44,7 @@ function getControlStatus(membership: EventMembershipSummary) {
   return { label: 'pending', color: 'primary' as const };
 }
 
-export default function EventMembershipsSection({ eventId }: Props) {
+export default function EventMembershipsSection({ eventId, refreshKey = 0 }: Props) {
   const [memberships, setMemberships] = useState<EventMembershipSummary[]>([]);
   const [paymentByMembership, setPaymentByMembership] = useState<Record<number, string>>({});
   const [methodByMembership, setMethodByMembership] = useState<Record<number, string>>({});
@@ -140,7 +141,7 @@ export default function EventMembershipsSection({ eventId }: Props) {
 
   useEffect(() => {
     loadData();
-  }, [eventId]);
+  }, [eventId, refreshKey]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -237,7 +238,7 @@ export default function EventMembershipsSection({ eventId }: Props) {
       }
 
       if (!result.checkout_url) {
-        throw new Error('Stripe did not return a checkout URL.');
+        throw new Error('Card checkout did not return a checkout URL.');
       }
 
       window.location.href = result.checkout_url;
@@ -415,7 +416,7 @@ export default function EventMembershipsSection({ eventId }: Props) {
                                 helperText=" "
                                 sx={{ width: 120 }}
                               >
-                                <MenuItem value="stripe">Stripe</MenuItem>
+                                <MenuItem value="stripe">Card</MenuItem>
                                 <MenuItem value="cash">Cash</MenuItem>
                                 <MenuItem value="zelle">Zelle</MenuItem>
                                 <MenuItem value="venmo">Venmo</MenuItem>

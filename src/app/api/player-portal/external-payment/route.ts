@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { registerExternalPayment, type ExternalPaymentMethod } from '@/lib/externalPayments';
+import { EventPaymentNotAllowedError } from '@/lib/eventPaymentEligibility';
 
 type RequestBody = {
   eventId?: number;
@@ -107,6 +108,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof EventPaymentNotAllowedError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unable to record payment.' },
       { status: 500 }

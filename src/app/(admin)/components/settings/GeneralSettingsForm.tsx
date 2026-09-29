@@ -289,7 +289,7 @@ export default function GeneralSettingsForm() {
 
       <SectionCard
         title="Payment Fees"
-        description="Configure Stripe and operating-state fees that are added to online checkout payments."
+        description="Configure card-processing and operating-state fees added to online checkout payments."
       >
         <Stack spacing={2.5}>
           <FormControlLabel
@@ -322,14 +322,14 @@ export default function GeneralSettingsForm() {
                 placeholder="payments@league.com"
                 value={form.payment_order_email ?? ''}
                 onChange={(e) => handleChange('payment_order_email', e.target.value)}
-                helperText="Internal email that receives Stripe payment order backups. If empty, Contact Email is used."
+                helperText="Internal email that receives card payment order backups. If empty, Contact Email is used."
               />
             </Grid>
 
             <Grid>
               <TextField
                 fullWidth
-                label="Stripe Fee Percentage"
+                label="Card Fee Percentage"
                 type="number"
                 inputProps={{ min: 0, step: 0.001 }}
                 value={form.stripe_fee_percentage ?? 2.9}
@@ -341,7 +341,7 @@ export default function GeneralSettingsForm() {
             <Grid>
               <TextField
                 fullWidth
-                label="Stripe Fixed Fee"
+                label="Card Fixed Fee"
                 type="number"
                 inputProps={{ min: 0, step: 0.01 }}
                 value={form.stripe_fee_fixed_amount ?? 0.3}

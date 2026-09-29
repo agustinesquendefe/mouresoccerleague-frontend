@@ -48,6 +48,7 @@ type EventTeamRow = {
   event_id: number;
   team_id: number;
   display_name: string | null;
+  status: string | null;
 };
 
 type PortalEventRow = {
@@ -114,8 +115,11 @@ export async function getPlayerPortalData(
   }
 
   const playerTeamRows = (teamPlayers ?? []) as TeamPlayerRow[];
+  const eventPlayerTeamRows = playerTeamRows.filter(
+    (row): row is TeamPlayerRow & { event_id: number } => row.event_id != null
+  );
 
-  if (playerTeamRows.length === 0) {
+  if (eventPlayerTeamRows.length === 0) {
     return {
       player,
       payment_methods: {},
@@ -123,28 +127,24 @@ export async function getPlayerPortalData(
     };
   }
 
-  const teamIds = Array.from(new Set(playerTeamRows.map((row) => row.team_id)));
-  const explicitEventIds = playerTeamRows
-    .map((row) => row.event_id)
-    .filter((eventId): eventId is number => eventId != null);
+  const teamIds = Array.from(new Set(eventPlayerTeamRows.map((row) => row.team_id)));
 
   const { data: eventTeams, error: eventTeamsError } = await client
     .from('event_teams')
-    .select('event_id, team_id, display_name')
-    .in('team_id', teamIds);
+    .select('event_id, team_id, display_name, status')
+    .in('team_id', teamIds)
+    .eq('status', 'active');
 
   if (eventTeamsError) {
     throw new Error(eventTeamsError.message);
   }
 
   const eventTeamRows = ((eventTeams ?? []) as EventTeamRow[]).filter((row) => {
-    const matchingTeamPlayer = playerTeamRows.find((teamPlayer) => teamPlayer.team_id === row.team_id);
-    return !matchingTeamPlayer?.event_id || matchingTeamPlayer.event_id === row.event_id;
+    return eventPlayerTeamRows.some((teamPlayer) =>
+      teamPlayer.team_id === row.team_id && teamPlayer.event_id === row.event_id);
   });
 
-  const eventIds = Array.from(
-    new Set([...explicitEventIds, ...eventTeamRows.map((row) => row.event_id)])
-  );
+  const eventIds = Array.from(new Set(eventTeamRows.map((row) => row.event_id)));
 
   if (eventIds.length === 0) {
     return {
@@ -232,11 +232,7 @@ export async function getPlayerPortalData(
     ])
   );
 
-  const eventTeamPairs = eventTeamRows.length
-    ? eventTeamRows
-    : playerTeamRows
-        .filter((row): row is TeamPlayerRow & { event_id: number } => row.event_id != null)
-        .map((row) => ({ event_id: row.event_id, team_id: row.team_id }));
+  const eventTeamPairs = eventTeamRows;
 
   const uniquePairs = Array.from(
     new Map(eventTeamPairs.map((row) => [`${row.event_id}:${row.team_id}`, row])).values()
@@ -258,10 +254,10 @@ export async function getPlayerPortalData(
         const paidAmount = Number(membership?.amount_paid ?? 0);
         const appearancesCount = Number(membership?.appearances_count ?? 0);
         const balanceDue = Math.max(eventPrice - paidAmount, 0);
-        const teamPlayer = playerTeamRows.find(
+        const teamPlayer = eventPlayerTeamRows.find(
           (item) =>
             item.team_id === row.team_id &&
-            (!item.event_id || item.event_id === row.event_id)
+            item.event_id === row.event_id
         );
 
         const upcomingMatches = matches

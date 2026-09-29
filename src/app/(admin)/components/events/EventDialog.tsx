@@ -680,7 +680,7 @@ export default function EventDialog({
               }
               fullWidth
               inputProps={{ min: 0, step: '0.01' }}
-              helperText="Fixed price that will be created in Stripe for player payments."
+              helperText="Fixed price that will be used for online card payments."
             />
 
             <FormControlLabel

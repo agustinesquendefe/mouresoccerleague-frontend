@@ -60,6 +60,7 @@ export async function getEventMemberships(
         .from('event_teams')
         .select('team_id, display_name, teams(name)')
         .eq('event_id', eventId)
+        .eq('status', 'active')
     ]);
 
   if (eventError) throw new Error(eventError.message);
@@ -83,22 +84,12 @@ export async function getEventMemberships(
     .from('team_players')
     .select('player_id, team_id, event_id, is_active')
     .in('team_id', teamIds)
+    .eq('event_id', eventId)
     .eq('is_active', true);
 
   if (teamPlayersError) throw new Error(teamPlayersError.message);
 
-  const teamsWithEventRoster = new Set(
-    (teamPlayers ?? [])
-      .filter((row: any) => Number(row.event_id) === eventId)
-      .map((row: any) => Number(row.team_id))
-  );
-
-  const rosterRows = (teamPlayers ?? []).filter((row: any) => {
-    const teamId = Number(row.team_id);
-    return teamsWithEventRoster.has(teamId)
-      ? Number(row.event_id) === eventId
-      : row.event_id == null || Number(row.event_id) === eventId;
-  });
+  const rosterRows = teamPlayers ?? [];
 
   const playerIds = Array.from(new Set(rosterRows.map((row: any) => Number(row.player_id))));
 

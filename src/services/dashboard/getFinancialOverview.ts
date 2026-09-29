@@ -132,7 +132,7 @@ function getPaymentStatus(amountPaid: number, balanceDue: number): PaymentStatus
 
 function getPaymentMethodLabel(method: PaymentMethod) {
   const labels: Record<PaymentMethod, string> = {
-    stripe: 'Stripe',
+    stripe: 'Card',
     cash: 'Cash',
     zelle: 'Zelle',
     venmo: 'Venmo',
