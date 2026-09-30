@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { Button } from '@mui/material';
-import {
-  compactFutureFixture,
-  previewFutureFixtureCompaction,
-} from '@/services/matches/compactFutureFixture';
+import { generateRoundRobinMatches } from '@/services/matches/generateRoundRobinMatches';
+import { generateGroupStageMatches } from '@/services/matches/generateGroupStageMatches';
+import type { EventFormatType } from '@/models/event';
 
 type Props = {
   eventId: number;
+  eventFormat?: EventFormatType | string | null;
   onCompacted: () => Promise<void> | void;
   onSuccess?: (message: string) => void;
   onError?: (message: string) => void;
@@ -16,6 +16,7 @@ type Props = {
 
 export default function CompactFixtureButton({
   eventId,
+  eventFormat,
   onCompacted,
   onSuccess,
   onError,
@@ -25,25 +26,18 @@ export default function CompactFixtureButton({
   const handleCompact = async () => {
     try {
       setLoading(true);
-      const preview = await previewFutureFixtureCompaction(eventId);
-      if (preview.matchesToMove === 0) {
-        onSuccess?.('There are no editable extended rounds to redistribute.');
-        return;
-      }
-
       const confirmed = window.confirm(
-        `Redistribute ${preview.matchesToMove} scheduled match${preview.matchesToMove === 1 ? '' : 'es'} ` +
-        `from the extended rounds? The fixture will be reduced from round ${preview.roundsBefore} ` +
-        `to round ${preview.roundsAfter}. Played, in-progress, extra, and past matches will not be changed.`
+        'Rebalance all pending rounds? Played, in-progress, and extra matches will not be changed. Scheduled matches may move to another round or date.'
       );
       if (!confirmed) return;
 
-      const result = await compactFutureFixture(eventId);
+      if (eventFormat === 'groups') {
+        await generateGroupStageMatches(eventId);
+      } else {
+        await generateRoundRobinMatches(eventId);
+      }
       await onCompacted();
-      onSuccess?.(
-        `Future fixture compacted: ${result.matchesToMove} match${result.matchesToMove === 1 ? '' : 'es'} ` +
-        `redistributed and ${result.roundsRemoved} round${result.roundsRemoved === 1 ? '' : 's'} removed.`
-      );
+      onSuccess?.('Pending rounds rebalanced successfully.');
     } catch (error) {
       console.error(error);
       onError?.(error instanceof Error ? error.message : 'Failed to compact future rounds');
@@ -54,7 +48,7 @@ export default function CompactFixtureButton({
 
   return (
     <Button variant="outlined" onClick={handleCompact} disabled={loading}>
-      {loading ? 'Checking...' : 'Compact Future Rounds'}
+      {loading ? 'Balancing...' : 'Compact Future Rounds'}
     </Button>
   );
 }

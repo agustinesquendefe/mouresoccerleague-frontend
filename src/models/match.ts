@@ -36,6 +36,7 @@ export type Match = {
   team2_id: number;
   round_id: number | null;
   round_number: number | null;
+  group_id?: number | null;
   status: MatchStatus | string | null;
   score1: number | null;
   score2: number | null;

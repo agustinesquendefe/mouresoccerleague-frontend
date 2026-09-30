@@ -9,3 +9,4 @@ export * from './createExtraMatch';
 export * from './deleteMatch';
 export * from './getAllMatches';
 export * from './compactFutureFixture';
+export * from './changeRoundRestingTeam';

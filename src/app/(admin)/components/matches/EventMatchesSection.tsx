@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { createExtraMatch, deleteMatch, getMatchesByEvent, updateMatch, updateMatchesSchedule, type MatchScheduleUpdate } from '@/services/matches';
+import { changeRoundRestingTeam, createExtraMatch, deleteMatch, getMatchesByEvent, updateMatch, updateMatchesSchedule, type MatchScheduleUpdate } from '@/services/matches';
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
 import { getFieldsByEvent } from '@/services/eventFields/getFieldsByEvent';
 import type { Match, MatchFormData } from '@/models/match';
@@ -25,6 +25,8 @@ type EventTeamRow = {
   id: number;
   team_id: number;
   display_name?: string | null;
+  group_id?: number | null;
+  status?: 'active' | 'disqualified' | null;
   teams?: Array<{
     id: number;
     name: string;
@@ -53,6 +55,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
   const [saving, setSaving] = useState(false);
   const [extraMatchSaving, setExtraMatchSaving] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [restingTeamChangingRound, setRestingTeamChangingRound] = useState<number | null>(null);
 
   const [selectedLeagueTab, setSelectedLeagueTab] = useState('all');
   const [teamSearch, setTeamSearch] = useState('');
@@ -118,6 +121,15 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
     }, {});
   }, [eventTeams]);
 
+  const activeEventTeams = useMemo(() =>
+    eventTeams.filter((team) => team.status !== 'disqualified'),
+  [eventTeams]);
+
+  const restingTeamOptions = useMemo(() => activeEventTeams.map((team) => ({
+    id: team.team_id,
+    name: teamMap[team.team_id] ?? `#${team.team_id}`,
+  })), [activeEventTeams, teamMap]);
+
   const leagueMatches = useMemo(() => {
     return matches.filter((match) => match.stage_type === 'league' || !match.stage_type);
   }, [matches]);
@@ -135,6 +147,38 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
       )
     ).sort((a, b) => a - b);
   }, [leagueMatches]);
+
+  const restingTeamIdsByRound = useMemo(() => {
+    const result: Record<number, number[]> = {};
+    uniqueLeagueRounds.forEach((roundNumber) => {
+      const activeRoundMatches = leagueMatches.filter((match) =>
+        match.round_number === roundNumber &&
+        match.status !== 'cancelled' &&
+        !match.is_extra);
+      if (activeRoundMatches.length === 0) return;
+      const playingTeamIds = new Set(activeRoundMatches.flatMap((match) =>
+        [match.team1_id, match.team2_id]));
+      result[roundNumber] = activeEventTeams
+        .map((team) => team.team_id)
+        .filter((teamId) => !playingTeamIds.has(teamId));
+    });
+    return result;
+  }, [activeEventTeams, leagueMatches, uniqueLeagueRounds]);
+
+  const editableRestingTeamIds = useMemo(() => Array.from(new Set(
+    Object.entries(restingTeamIdsByRound).flatMap(([roundNumber, restingTeamIds]) => {
+      const activeRoundMatches = leagueMatches.filter((match) =>
+        match.round_number === Number(roundNumber) &&
+        match.status !== 'cancelled' &&
+        !match.is_extra);
+      return activeRoundMatches.length > 0 &&
+        !leagueMatches.some((match) =>
+          match.round_number === Number(roundNumber) && match.is_extra) &&
+        activeRoundMatches.every((match) => match.status === 'scheduled')
+        ? restingTeamIds
+        : [];
+    })
+  )), [leagueMatches, restingTeamIdsByRound]);
 
   const visibleLeagueMatches = useMemo(() => {
     const tabMatches = selectedLeagueTab === 'all'
@@ -339,6 +383,26 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
     }
   };
 
+  const handleChangeRestingTeam = async (roundNumber: number, teamId: number) => {
+    const teamName = teamMap[teamId] ?? `#${teamId}`;
+    const confirmed = window.confirm(
+      `Make ${teamName} rest in round ${roundNumber}? Its pending round will be exchanged with this one.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setRestingTeamChangingRound(roundNumber);
+      await changeRoundRestingTeam(eventId, roundNumber, teamId);
+      await loadData();
+      onMatchUpdated?.();
+      showToast(`${teamName} will rest in round ${roundNumber}.`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to change the resting team', 'error');
+    } finally {
+      setRestingTeamChangingRound(null);
+    }
+  };
+
   const formatBracketTitle = (value: string) => {
     switch (value) {
       case 'round_of_16':
@@ -462,6 +526,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
             {(eventFormat === 'round_robin' || eventFormat === 'groups') && (
               <CompactFixtureButton
                 eventId={eventId}
+                eventFormat={eventFormat}
                 onCompacted={loadData}
                 onSuccess={(message) => showToast(message, 'success')}
                 onError={(message) => showToast(message, 'error')}
@@ -581,6 +646,15 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
               groupByDate={selectedLeagueTab !== 'all'}
               groupByRound={selectedLeagueTab === 'all'}
               compact={selectedLeagueTab === 'all'}
+              restingTeamIdsByRound={restingTeamIdsByRound}
+              restingTeamOptions={restingTeamOptions}
+              editableRestingTeamIds={editableRestingTeamIds}
+              restingTeamChangingRound={restingTeamChangingRound}
+              onChangeRestingTeam={
+                selectedLeagueTab === 'all' && quickFilter === 'all' && !teamSearch.trim()
+                  ? handleChangeRestingTeam
+                  : undefined
+              }
             />
           ) : (
             <Alert severity="info">No matches found for the selected filters.</Alert>

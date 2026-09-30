@@ -4,8 +4,10 @@ import {
   Button,
   Chip,
   Box,
+  MenuItem,
   Paper,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import type { Match } from '@/models/match';
@@ -22,6 +24,11 @@ type Props = {
   groupByDate?: boolean;
   groupByRound?: boolean;
   compact?: boolean;
+  restingTeamIdsByRound?: Record<number, number[]>;
+  restingTeamOptions?: Array<{ id: number; name: string }>;
+  editableRestingTeamIds?: number[];
+  restingTeamChangingRound?: number | null;
+  onChangeRestingTeam?: (roundNumber: number, teamId: number) => void;
 };
 
 export default function GroupedMatchesTable({
@@ -34,6 +41,11 @@ export default function GroupedMatchesTable({
   groupByDate = true,
   groupByRound = false,
   compact = false,
+  restingTeamIdsByRound = {},
+  restingTeamOptions = [],
+  editableRestingTeamIds = [],
+  restingTeamChangingRound = null,
+  onChangeRestingTeam,
 }: Props) {
   const fieldMap = fields.reduce<Record<number, string>>((acc, field, index) => {
     acc[field.id] = `${field.name} (#${index + 1})`;
@@ -176,6 +188,53 @@ export default function GroupedMatchesTable({
     </Paper>
   );
 
+  const renderRestingTeams = (groupKey: string) => {
+    if (groupKey === 'No Round') return null;
+    const roundNumber = Number(groupKey);
+    const restingTeamIds = restingTeamIdsByRound[roundNumber] ?? [];
+    if (restingTeamIds.length === 0) return null;
+
+    const roundMatches = grouped[groupKey] ?? [];
+    const editable = roundMatches.length > 0 && roundMatches.every((match) =>
+      match.status === 'scheduled' || match.status === 'cancelled') &&
+      !roundMatches.some((match) => match.is_extra);
+    const candidates = restingTeamOptions.filter((team) =>
+      !restingTeamIds.includes(team.id) &&
+      editableRestingTeamIds.includes(team.id) &&
+      Object.entries(restingTeamIdsByRound).some(([otherRound, teamIds]) =>
+        Number(otherRound) !== roundNumber && teamIds.includes(team.id)));
+
+    return (
+      <Stack spacing={1}>
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+          {restingTeamIds.map((teamId) => (
+            <Chip
+              key={teamId}
+              label={`Resting: ${teamMap[teamId] ?? `#${teamId}`}`}
+              size="small"
+              color="warning"
+              variant="outlined"
+            />
+          ))}
+        </Stack>
+        {editable && candidates.length > 0 && onChangeRestingTeam && (
+          <TextField
+            select
+            label="Change resting team"
+            value=""
+            size="small"
+            disabled={restingTeamChangingRound !== null}
+            onChange={(event) => onChangeRestingTeam(roundNumber, Number(event.target.value))}
+          >
+            {candidates.map((team) => (
+              <MenuItem key={team.id} value={team.id}>{team.name}</MenuItem>
+            ))}
+          </TextField>
+        )}
+      </Stack>
+    );
+  };
+
   const content = (
     <Stack spacing={3} sx={{ width: '100%', minWidth: 0 }}>
       {sortedGroups.map((groupKey, index) => (
@@ -193,6 +252,7 @@ export default function GroupedMatchesTable({
                 )}
               </Stack>
             )}
+            {groupByRound && renderRestingTeams(groupKey)}
 
             {groupByDate && groupKey !== 'all' && (
               <Typography variant="h6" fontWeight={700}>
@@ -236,6 +296,7 @@ export default function GroupedMatchesTable({
                 Add Extra Match
               </Button>
             )}
+            {renderRestingTeams(groupKey)}
             {grouped[groupKey].map(renderMatch)}
           </Stack>
         </Paper>

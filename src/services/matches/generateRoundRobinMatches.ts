@@ -2,12 +2,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { getFieldsByEvent } from '@/services/eventFields/getFieldsByEvent';
 import {
   addDays,
-  assignPairsToRounds,
+  buildPendingFixturePairs,
   buildDesiredRounds,
-  findMissingPairs,
   formatDate,
   getFirstMatchDate,
-  getOpenRoundNumbers,
+  packIntoRounds,
 } from './incrementalFixture';
 
 export async function generateRoundRobinMatches(eventId: number): Promise<void> {
@@ -27,34 +26,40 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
   if (fields.length === 0) throw new Error('This event has no fields assigned.');
 
   const teamIds = Array.from(new Set((teamsResult.data ?? []).map((row) => row.team_id)));
-  if (teamIds.length < 2) throw new Error('At least 2 active teams are required to generate a fixture.');
   const allMatches = matchesResult.data ?? [];
-  const fixtureMatches = allMatches.filter((match) => !match.is_extra);
   const cycles = event.round_robin_cycles || 1;
-  const missingPairs = findMissingPairs(
-    buildDesiredRounds(teamIds, cycles),
-    fixtureMatches.map((match) => ({ team1_id: match.team1_id, team2_id: match.team2_id })),
+  const activeTeamIds = new Set(teamIds);
+  const lockedRoundNumbers = new Set(allMatches
+    .filter((match) => match.status === 'played' || match.status === 'in_progress')
+    .map((match) => Number(match.round_number))
+    .filter((roundNumber) => Number.isInteger(roundNumber) && roundNumber > 0));
+  const isActiveFixtureMatch = (match: typeof allMatches[number]) =>
+    !match.is_extra &&
+    activeTeamIds.has(match.team1_id) &&
+    activeTeamIds.has(match.team2_id);
+  const fixedMatches = allMatches.filter((match) =>
+    isActiveFixtureMatch(match) &&
+    (match.status === 'played' ||
+      match.status === 'in_progress' ||
+      (match.status === 'scheduled' && lockedRoundNumbers.has(Number(match.round_number)))));
+  const reusableMatches = allMatches.filter((match) =>
+    isActiveFixtureMatch(match) &&
+    match.status === 'scheduled' &&
+    !lockedRoundNumbers.has(Number(match.round_number)));
+  type PendingMatch = { team1_id: number; team2_id: number; id?: number };
+  const desiredRounds: PendingMatch[][] = buildDesiredRounds(teamIds, cycles);
+  const pendingMatches = buildPendingFixturePairs(
+    desiredRounds,
+    fixedMatches,
+    reusableMatches,
     cycles
   );
-  if (missingPairs.length === 0) return;
-
-  const today = formatDate(new Date());
-  const assignments = assignPairsToRounds(
-    missingPairs,
-    allMatches,
-    getOpenRoundNumbers(allMatches, today)
-  );
+  const firstPendingRound = Math.max(0, ...lockedRoundNumbers) + 1;
+  const assignments = packIntoRounds(pendingMatches).flatMap((round, roundIndex) =>
+    round.map((pair) => ({ pair, roundNumber: firstPendingRound + roundIndex })));
   let pos = Math.max(0, ...allMatches.map((match) => Number(match.pos) || 0)) + 1;
   let num = Math.max(0, ...allMatches.map((match) => Number(match.num) || 0)) + 1;
   const firstDate = getFirstMatchDate(event.start_date, event.match_day_of_week);
-  const insertedCountByRound = new Map<number, number>();
-  const existingCountByRound = allMatches.reduce((counts, match) => {
-    const roundNumber = Number(match.round_number);
-    if (Number.isInteger(roundNumber) && roundNumber > 0) {
-      counts.set(roundNumber, (counts.get(roundNumber) ?? 0) + 1);
-    }
-    return counts;
-  }, new Map<number, number>());
   const existingDateByRound = new Map<number, string>();
   allMatches.forEach((match) => {
     const roundNumber = Number(match.round_number);
@@ -62,18 +67,59 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
       existingDateByRound.set(roundNumber, match.date);
     }
   });
-  const inserts = assignments.map(({ pair, roundNumber }) => {
-    const matchIndex = (existingCountByRound.get(roundNumber) ?? 0) + (insertedCountByRound.get(roundNumber) ?? 0);
-    insertedCountByRound.set(roundNumber, (insertedCountByRound.get(roundNumber) ?? 0) + 1);
+  const plannedMatches = assignments.map(({ pair, roundNumber }, matchIndex) => {
+    const roundMatchIndex = assignments
+      .slice(0, matchIndex)
+      .filter((assignment) => assignment.roundNumber === roundNumber)
+      .length;
     return {
-      event_id: eventId, pos: pos++, num: num++, ...pair,
-      status: 'scheduled',
+      ...pair,
+      roundNumber,
       date: existingDateByRound.get(roundNumber) ?? formatDate(addDays(firstDate, (roundNumber - 1) * 7)),
-      field_number: (matchIndex % fields.length) + 1,
-      field_id: fields[matchIndex % fields.length]?.id ?? null,
-      round_id: null, round_number: roundNumber, stage_type: 'league',
+      field_number: (roundMatchIndex % fields.length) + 1,
+      field_id: fields[roundMatchIndex % fields.length]?.id ?? null,
     };
   });
-  const { error } = await supabase.from('matches').insert(inserts);
-  if (error) throw new Error(error.message);
+  const reusedIds = new Set(plannedMatches.flatMap((match) => match.id == null ? [] : [match.id]));
+  const obsoleteIds = allMatches
+    .filter((match) =>
+      !match.is_extra &&
+      match.status === 'scheduled' &&
+      !lockedRoundNumbers.has(Number(match.round_number)) &&
+      !reusedIds.has(match.id))
+    .map((match) => match.id);
+  const updates = plannedMatches.filter((match) => match.id != null);
+  const inserts = plannedMatches.filter((match) => match.id == null).map((match) => ({
+    event_id: eventId, pos: pos++, num: num++,
+    team1_id: match.team1_id, team2_id: match.team2_id,
+    status: 'scheduled', date: match.date,
+    field_number: match.field_number, field_id: match.field_id,
+    round_id: null, round_number: match.roundNumber, stage_type: 'league',
+  }));
+
+  const updateResults = await Promise.all(updates.map((match) => supabase
+    .from('matches')
+    .update({
+      round_number: match.roundNumber,
+      date: match.date,
+      field_number: match.field_number,
+      field_id: match.field_id,
+    })
+    .eq('id', match.id!)
+    .eq('status', 'scheduled')
+    .select('id')));
+  const failedUpdate = updateResults.find((result) => result.error);
+  if (failedUpdate?.error) throw new Error(failedUpdate.error.message);
+  if (updateResults.some((result) => (result.data?.length ?? 0) !== 1)) {
+    throw new Error('The fixture changed while it was being generated. Reload it and try again.');
+  }
+
+  if (obsoleteIds.length > 0) {
+    const { error } = await supabase.from('matches').update({ status: 'cancelled' }).in('id', obsoleteIds);
+    if (error) throw new Error(error.message);
+  }
+  if (inserts.length > 0) {
+    const { error } = await supabase.from('matches').insert(inserts);
+    if (error) throw new Error(error.message);
+  }
 }

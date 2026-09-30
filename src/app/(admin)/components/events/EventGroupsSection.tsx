@@ -103,11 +103,16 @@ export default function EventGroupsSection({ eventId }: Props) {
   };
 
   const handleGenerateMatches = async () => {
+    const confirmed = window.confirm(
+      'Generate the group fixture? Played and in-progress matches will be preserved. Scheduled matches may be moved to balance the remaining rounds for the active teams.'
+    );
+    if (!confirmed) return;
+
     try {
       setBusy(true);
       setError(null);
       await generateGroupStageMatches(eventId);
-      setSuccess('Group fixture updated safely. Existing matches were preserved.');
+      setSuccess('Group fixture generated. Completed matches were preserved and pending rounds were balanced.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate matches');
     } finally {
@@ -162,7 +167,7 @@ export default function EventGroupsSection({ eventId }: Props) {
                 onClick={handleGenerateMatches}
                 disabled={busy || !allGroupsHaveTeams}
               >
-                Update Fixture
+                Generate Fixture
               </Button>
             </>
           )}

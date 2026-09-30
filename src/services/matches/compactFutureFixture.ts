@@ -126,12 +126,22 @@ async function buildFixtureCompactionPlan(eventId: number): Promise<FixtureCompa
   const today = formatDate(new Date());
   const openRoundNumbers = getOpenRoundNumbers(matches, today);
   const openRoundSet = new Set(openRoundNumbers);
-  const movableMatches = matches.filter((match) => {
+  const extendedMatches = matches.filter((match) => {
     const roundNumber = Number(match.round_number);
     return !match.is_extra &&
       match.status === 'scheduled' &&
       roundNumber > expectedRoundCount &&
       openRoundSet.has(roundNumber);
+  });
+  const lateTeamIds = findLateTeamIds(extendedMatches);
+  const movableMatches = matches.filter((match) => {
+    const roundNumber = Number(match.round_number);
+    return !match.is_extra &&
+      match.status === 'scheduled' &&
+      openRoundSet.has(roundNumber) &&
+      (roundNumber > expectedRoundCount ||
+        lateTeamIds.has(match.team1_id) ||
+        lateTeamIds.has(match.team2_id));
   });
   const movableIds = new Set(movableMatches.map((match) => match.id));
   const retainedMatches = matches.filter((match) => !movableIds.has(match.id));
@@ -139,7 +149,7 @@ async function buildFixtureCompactionPlan(eventId: number): Promise<FixtureCompa
     movableMatches,
     retainedMatches,
     openRoundNumbers,
-    findLateTeamIds(movableMatches)
+    lateTeamIds
   );
 
   const dateByRound = new Map<number, string>();
@@ -198,9 +208,14 @@ export async function compactFutureFixture(eventId: number): Promise<FixtureComp
       .eq('id', update.id)
       .eq('status', 'scheduled')
       .eq('round_number', update.fromRound)
+      .select('id')
   ));
   const failed = results.find((result) => result.error);
   if (failed?.error) throw new Error(failed.error.message);
+  const skipped = results.find((result) => (result.data?.length ?? 0) !== 1);
+  if (skipped) {
+    throw new Error('The fixture changed while it was being compacted. Reload it and try again.');
+  }
 
   const { updates: _updates, ...preview } = plan;
   return preview;

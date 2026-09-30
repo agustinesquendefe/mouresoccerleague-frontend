@@ -48,7 +48,7 @@ export function buildDesiredRounds(teamIds: number[], cycles: number): FixturePa
   return desired;
 }
 
-function matchupKey(pair: FixturePair, cycles: number): string {
+export function fixtureMatchupKey(pair: FixturePair, cycles: number): string {
   if (cycles > 1) return `${pair.team1_id}:${pair.team2_id}`;
   return [pair.team1_id, pair.team2_id].sort((a, b) => a - b).join(':');
 }
@@ -56,12 +56,12 @@ function matchupKey(pair: FixturePair, cycles: number): string {
 export function findMissingPairs(desiredRounds: FixturePair[][], existing: FixturePair[], cycles: number): FixturePair[] {
   const counts = new Map<string, number>();
   existing.forEach((pair) => {
-    const key = matchupKey(pair, cycles);
+    const key = fixtureMatchupKey(pair, cycles);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   });
   const missing: FixturePair[] = [];
   desiredRounds.flat().forEach((pair) => {
-    const key = matchupKey(pair, cycles);
+    const key = fixtureMatchupKey(pair, cycles);
     const remaining = counts.get(key) ?? 0;
     if (remaining > 0) counts.set(key, remaining - 1);
     else missing.push(pair);
@@ -69,8 +69,43 @@ export function findMissingPairs(desiredRounds: FixturePair[][], existing: Fixtu
   return missing;
 }
 
-export function packIntoRounds(pairs: FixturePair[]): FixturePair[][] {
-  const rounds: FixturePair[][] = [];
+export function buildPendingFixturePairs<T extends FixturePair>(
+  desiredRounds: T[][],
+  fixedMatches: FixturePair[],
+  reusableMatches: T[],
+  cycles: number
+): T[] {
+  const fixedCounts = new Map<string, number>();
+  fixedMatches.forEach((match) => {
+    const key = fixtureMatchupKey(match, cycles);
+    fixedCounts.set(key, (fixedCounts.get(key) ?? 0) + 1);
+  });
+
+  const reusableByMatchup = new Map<string, T[]>();
+  reusableMatches.forEach((match) => {
+    const key = fixtureMatchupKey(match, cycles);
+    const matches = reusableByMatchup.get(key) ?? [];
+    matches.push(match);
+    reusableByMatchup.set(key, matches);
+  });
+
+  const pending: T[] = [];
+  desiredRounds.flat().forEach((pair) => {
+    const key = fixtureMatchupKey(pair, cycles);
+    const fixedCount = fixedCounts.get(key) ?? 0;
+    if (fixedCount > 0) {
+      fixedCounts.set(key, fixedCount - 1);
+      return;
+    }
+
+    const reusable = reusableByMatchup.get(key)?.shift();
+    pending.push(reusable ?? pair);
+  });
+  return pending;
+}
+
+export function packIntoRounds<T extends FixturePair>(pairs: T[]): T[][] {
+  const rounds: T[][] = [];
   pairs.forEach((pair) => {
     const available = rounds.find((round) => round.every((current) =>
       current.team1_id !== pair.team1_id && current.team2_id !== pair.team1_id &&
@@ -87,12 +122,13 @@ function hasTeam(pair: FixturePair, teamId: number): boolean {
 
 /**
  * Returns existing rounds that have not started yet. A round is considered
- * started as soon as one of its matches is played/in progress or scheduled
- * for today (or an earlier date).
+ * started as soon as one of its matches is played or in progress. A scheduled
+ * match remains editable even when its date has passed, since delayed fixtures
+ * still need to accept newly added teams.
  */
 export function getOpenRoundNumbers(
   existingMatches: ExistingFixtureMatch[],
-  today: string
+  _today: string
 ): number[] {
   const matchesByRound = new Map<number, ExistingFixtureMatch[]>();
 
@@ -107,8 +143,7 @@ export function getOpenRoundNumbers(
   return Array.from(matchesByRound.entries())
     .filter(([, matches]) => !matches.some((match) =>
       match.status === 'played' ||
-      match.status === 'in_progress' ||
-      Boolean(match.date && match.date <= today)))
+      match.status === 'in_progress'))
     .map(([roundNumber]) => roundNumber)
     .sort((left, right) => left - right);
 }
