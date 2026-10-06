@@ -10,14 +10,21 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
+  Typography,
 } from '@mui/material';
 import type { Event } from '@/models/event';
-
-type EventRow = Event & { season_name?: string | null; category_name?: string | null };
+import type { EventListRow } from '@/services/events';
+import { formatStoredDate } from '@/utils/dateOnly';
+import { getWeekdayLabel } from '@/utils/weekdays';
 
 type EventsTableProps = {
-  events: EventRow[];
+  events: EventListRow[];
+  count: number;
+  page: number;
+  rowsPerPage: number;
+  onPageChange: (page: number) => void;
   onEdit: (event: Event) => void;
   onDelete: (event: Event) => void;
   onView: (event: Event) => void;
@@ -25,13 +32,18 @@ type EventsTableProps = {
 
 export default function EventsTable({
   events,
+  count,
+  page,
+  rowsPerPage,
+  onPageChange,
   onEdit,
   onDelete,
   onView,
 }: EventsTableProps) {
   return (
-    <TableContainer component={Paper}>
-      <Table>
+    <Paper>
+      <TableContainer>
+        <Table sx={{ minWidth: 1150 }}>
         <TableHead>
           <TableRow>
             <TableCell>ID</TableCell>
@@ -42,13 +54,23 @@ export default function EventsTable({
             <TableCell>Match Type</TableCell>
             <TableCell>Price</TableCell>
             <TableCell>Start</TableCell>
+            <TableCell>Event day</TableCell>
             <TableCell>Status</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
 
         <TableBody>
-          {events.map((event) => (
+          {events.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={11}>
+                <Typography variant="h6" fontWeight={600}>No events found</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Try adjusting your search or filters, or create a new event.
+                </Typography>
+              </TableCell>
+            </TableRow>
+          ) : events.map((event) => (
             <TableRow key={event.id} hover>
               <TableCell>{event.id}</TableCell>
               <TableCell>
@@ -63,7 +85,8 @@ export default function EventsTable({
               </TableCell>
               <TableCell>{event.match_format ?? '-'}</TableCell>
               <TableCell>${Number(event.event_price ?? event.membership_price ?? 0).toFixed(2)}</TableCell>
-              <TableCell>{event.start_date}</TableCell>
+              <TableCell>{formatStoredDate(event.start_date)}</TableCell>
+              <TableCell>{getWeekdayLabel(event.match_day_of_week)}</TableCell>
               <TableCell>
                 <Chip label={event.status ?? 'draft'} size="small" />
               </TableCell>
@@ -85,7 +108,16 @@ export default function EventsTable({
             </TableRow>
           ))}
         </TableBody>
-      </Table>
-    </TableContainer>
+        </Table>
+      </TableContainer>
+      <TablePagination
+        component="div"
+        count={count}
+        page={page}
+        onPageChange={(_, newPage) => onPageChange(newPage)}
+        rowsPerPage={rowsPerPage}
+        rowsPerPageOptions={[rowsPerPage]}
+      />
+    </Paper>
   );
 }
