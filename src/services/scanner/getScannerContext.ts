@@ -17,6 +17,31 @@ function buildMatchLabel(match: ScannerMatchOption) {
   return `${match.team1.name} vs ${match.team2.name} · ${matchDate}`;
 }
 
+export async function getScannerEventOptions(
+  client: SupabaseClient,
+  search = '',
+  limit = 20
+): Promise<ScannerEventOption[]> {
+  let query = client
+    .from('events')
+    .select('id, name, status')
+    .order('start_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(Math.min(Math.max(limit, 1), 50));
+
+  const term = search.trim();
+  if (term) query = query.ilike('name', `%${term}%`);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as any[]).map((event) => ({
+    id: Number(event.id),
+    name: normalizeEventName(Number(event.id), event.name ?? null),
+    status: event.status ?? null,
+  }));
+}
+
 export async function getScannerMatchesForEvent(
   client: SupabaseClient,
   eventId: number
@@ -80,26 +105,10 @@ export async function getScannerContext(client: SupabaseClient): Promise<Scanner
     throw new Error(activeEventError.message);
   }
 
-  const { data: allEvents, error: allEventsError } = await client
-    .from('events')
-    .select('id, name, status')
-    .order('start_date', { ascending: false })
-    .order('created_at', { ascending: false });
-
-  if (allEventsError) {
-    throw new Error(allEventsError.message);
-  }
-
-  const eventOptions = ((allEvents ?? []) as any[]).map((event) => ({
-    id: Number(event.id),
-    name: normalizeEventName(Number(event.id), event.name ?? null),
-    status: event.status ?? null,
-  })) satisfies ScannerEventOption[];
-
   let activeEvent = activeEvents?.[0] ?? null;
 
   if (!activeEvent) {
-    activeEvent = allEvents?.[0] ?? null;
+    activeEvent = (await getScannerEventOptions(client, '', 1))[0] ?? null;
   }
 
   if (!activeEvent) {
@@ -117,7 +126,11 @@ export async function getScannerContext(client: SupabaseClient): Promise<Scanner
       name: normalizeEventName(Number(activeEvent.id), activeEvent.name ?? null),
       status: activeEvent.status ?? null,
     },
-    events: eventOptions,
+    events: [{
+      id: Number(activeEvent.id),
+      name: normalizeEventName(Number(activeEvent.id), activeEvent.name ?? null),
+      status: activeEvent.status ?? null,
+    }],
     matches: matchOptions,
   };
 }

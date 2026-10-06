@@ -15,6 +15,9 @@ type EventRow = {
 type MatchRow = {
   id: number;
   event_id: number;
+  date: string | null;
+  time: string | null;
+  status: string | null;
   team1_id: number;
   team2_id: number;
   team1_name: string | null;
@@ -44,6 +47,16 @@ function normalizeName(value: string | null | undefined, fallback: string) {
   return trimmed ? trimmed : fallback;
 }
 
+function getPlayerDisplayName(player: {
+  id: number;
+  full_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+}) {
+  const firstLastName = `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim();
+  return normalizeName(player.full_name, firstLastName || `Player #${player.id}`);
+}
+
 function buildDeniedResponse(
   scannedCode: string,
   checks: ScannerValidationCheck[],
@@ -60,10 +73,12 @@ function buildDeniedResponse(
     context: {
       scannerMode: 'keyboard_wedge',
       scannedCode,
+      playerName: null,
       eventId: null,
       eventName: null,
       matchId: null,
       matchLabel: null,
+      matchDate: null,
       teamId: null,
       teamName: null,
       ...(overrides.context ?? {}),
@@ -191,11 +206,12 @@ async function registerScannerCheckIn(
 
 async function registerDeniedScan(
   client: SupabaseClient,
-  response: ScannerValidationResponse
+  response: ScannerValidationResponse,
+  playerIdOverride?: number | null
 ): Promise<NonNullable<ScannerValidationResponse['deniedScan']> | null> {
   const { context, player, checks, summary, validatedAt } = response;
 
-  if (!context.matchId || !context.teamId || !context.scannedCode) {
+  if (!context.matchId || !context.scannedCode) {
     return null;
   }
 
@@ -206,7 +222,6 @@ async function registerDeniedScan(
     .from('scanner_denied_scans')
     .select('id')
     .eq('match_id', context.matchId)
-    .eq('team_id', context.teamId)
     .eq('scanned_code', context.scannedCode)
     .limit(1)
     .maybeSingle();
@@ -219,7 +234,7 @@ async function registerDeniedScan(
     event_id: context.eventId,
     match_id: context.matchId,
     team_id: context.teamId,
-    player_id: player?.id ?? null,
+    player_id: playerIdOverride ?? player?.id ?? null,
     scanned_code: context.scannedCode,
     reason,
     summary,
@@ -307,6 +322,9 @@ async function resolveMatch(client: SupabaseClient, matchId?: number | null): Pr
     .select(`
       id,
       event_id,
+      date,
+      time,
+      status,
       team1_id,
       team2_id,
       team1:teams!matches_team1_id_fkey ( name ),
@@ -324,6 +342,9 @@ async function resolveMatch(client: SupabaseClient, matchId?: number | null): Pr
   return {
     id: Number(row.id),
     event_id: Number(row.event_id),
+    date: row.date ?? null,
+    time: row.time ?? null,
+    status: row.status ?? null,
     team1_id: Number(row.team1_id),
     team2_id: Number(row.team2_id),
     team1_name: row.team1?.name ?? null,
@@ -372,6 +393,96 @@ async function resolvePlayerTeamForMatch(
   return resolveTeam(client, eligibleTeamIds[0]);
 }
 
+async function resolvePlayerContextForDate(
+  client: SupabaseClient,
+  params: {
+    playerId: number;
+    eventId: number;
+    matchDate: string;
+    candidateMatchIds?: number[];
+  }
+): Promise<{ team: TeamRow | null; match: MatchRow | null }> {
+  const { playerId, eventId, matchDate, candidateMatchIds = [] } = params;
+  const allowedMatchIds = candidateMatchIds
+    .map(Number)
+    .filter((matchId) => Number.isInteger(matchId) && matchId > 0);
+  const { data: rosterRows, error: rosterError } = await client
+    .from('team_players')
+    .select('team_id')
+    .eq('player_id', playerId)
+    .eq('event_id', eventId)
+    .eq('is_active', true);
+
+  if (rosterError) throw new Error(rosterError.message);
+
+  const rosterTeamIds = Array.from(
+    new Set((rosterRows ?? []).map((row) => Number(row.team_id)).filter(Number.isFinite))
+  );
+
+  if (rosterTeamIds.length === 0) return { team: null, match: null };
+  const fallbackTeam = rosterTeamIds.length === 1
+    ? await resolveTeam(client, rosterTeamIds[0])
+    : null;
+
+  if (Array.isArray(params.candidateMatchIds) && allowedMatchIds.length === 0) {
+    return { team: fallbackTeam, match: null };
+  }
+
+  let matchQuery = client
+    .from('matches')
+    .select(`
+      id,
+      event_id,
+      date,
+      time,
+      status,
+      team1_id,
+      team2_id,
+      team1:teams!matches_team1_id_fkey ( name ),
+      team2:teams!matches_team2_id_fkey ( name )
+    `)
+    .eq('event_id', eventId)
+    .eq('date', matchDate)
+    .or(`team1_id.in.(${rosterTeamIds.join(',')}),team2_id.in.(${rosterTeamIds.join(',')})`)
+    .order('time', { ascending: true })
+    .order('id', { ascending: true });
+
+  if (allowedMatchIds.length > 0) {
+    matchQuery = matchQuery.in('id', allowedMatchIds);
+  }
+
+  const { data: matches, error: matchesError } = await matchQuery;
+  if (matchesError) throw new Error(matchesError.message);
+
+  const availableMatches = ((matches ?? []) as any[]).filter(
+    (match) => String(match.status ?? '').toLowerCase() !== 'cancelled'
+  );
+  const matchRow = availableMatches.find(
+    (match) => String(match.status ?? '').toLowerCase() !== 'played'
+  ) ?? availableMatches[0] ?? null;
+
+  if (!matchRow) return { team: fallbackTeam, match: null };
+
+  const scheduledTeamIds = [Number(matchRow.team1_id), Number(matchRow.team2_id)];
+  const matchingTeamIds = rosterTeamIds.filter((teamId) => scheduledTeamIds.includes(teamId));
+  if (matchingTeamIds.length !== 1) return { team: fallbackTeam, match: null };
+
+  return {
+    team: await resolveTeam(client, matchingTeamIds[0]),
+    match: {
+      id: Number(matchRow.id),
+      event_id: Number(matchRow.event_id),
+      date: matchRow.date ?? null,
+      time: matchRow.time ?? null,
+      status: matchRow.status ?? null,
+      team1_id: Number(matchRow.team1_id),
+      team2_id: Number(matchRow.team2_id),
+      team1_name: matchRow.team1?.name ?? null,
+      team2_name: matchRow.team2?.name ?? null,
+    },
+  };
+}
+
 export async function validatePlayerBarcode(
   client: SupabaseClient,
   request: ScannerValidationRequest
@@ -384,12 +495,12 @@ export async function validatePlayerBarcode(
     ]);
   }
 
-  const [event, match, playerResult] = await Promise.all([
+  const [event, requestedMatch, playerResult] = await Promise.all([
     resolveEvent(client, request.eventId ?? null),
     resolveMatch(client, request.matchId ?? null),
     client
       .from('players')
-      .select('id, full_name, document_id, photo_url, paid_membership, is_active')
+      .select('id, full_name, first_name, last_name, document_id, photo_url, paid_membership, is_active')
       .eq('document_id', barcode)
       .limit(1)
       .maybeSingle(),
@@ -400,11 +511,21 @@ export async function validatePlayerBarcode(
   }
 
   const player = playerResult.data;
-  const team = request.teamId
-    ? await resolveTeam(client, request.teamId)
-    : event && match && player
-      ? await resolvePlayerTeamForMatch(client, Number(player.id), Number(event.id), match)
-      : null;
+  let match = requestedMatch;
+  let team = request.teamId ? await resolveTeam(client, request.teamId) : null;
+
+  if (!team && event && match && player) {
+    team = await resolvePlayerTeamForMatch(client, Number(player.id), Number(event.id), match);
+  } else if (!team && event && player && request.matchDate) {
+    const resolvedContext = await resolvePlayerContextForDate(client, {
+      playerId: Number(player.id),
+      eventId: Number(event.id),
+      matchDate: request.matchDate,
+      candidateMatchIds: request.candidateMatchIds,
+    });
+    team = resolvedContext.team;
+    match = resolvedContext.match;
+  }
 
   const eventCheck = buildCheck(
     'active_event',
@@ -413,18 +534,29 @@ export async function validatePlayerBarcode(
     event ? `Validating against ${normalizeName(event.name, `Event #${event.id}`)}.` : 'No active event is available for validation.'
   );
 
-  const matchContextPassed =
-    !match || !event ? false : Number(match.event_id) === Number(event.id);
+  const matchStatus = String(match?.status ?? '').toLowerCase();
+  const matchContextPassed = Boolean(
+    match &&
+    event &&
+    Number(match.event_id) === Number(event.id) &&
+    (!request.matchDate || match.date === request.matchDate) &&
+    matchStatus !== 'played' &&
+    matchStatus !== 'cancelled'
+  );
 
   const matchCheck = buildCheck(
     'match_context',
-    'Match belongs to event',
-    match ? matchContextPassed : true,
+    request.matchDate ? 'Match detected for selected date' : 'Match belongs to event',
+    match ? matchContextPassed : !request.matchDate,
     match
       ? matchContextPassed
-        ? 'Selected match belongs to the target event.'
-        : 'Selected match does not belong to the chosen event.'
-      : 'No match selected. Validation will use only event and team context.'
+        ? request.matchDate
+          ? `Player match was detected for ${request.matchDate}.`
+          : 'Selected match belongs to the target event.'
+        : 'Selected match is not pending for the chosen event and date.'
+      : request.matchDate
+        ? `No match was found for the player's team on ${request.matchDate}.`
+        : 'No match selected. Validation will use only event and team context.'
   );
 
   const teamContextPassed =
@@ -436,8 +568,12 @@ export async function validatePlayerBarcode(
     teamContextPassed,
     !team
       ? player && match
-        ? 'The player is not registered with either team in the selected match.'
-        : 'The player team could not be detected for the selected match.'
+        ? request.matchDate
+          ? `The player is not registered with a team playing on ${request.matchDate}.`
+          : 'The player is not registered with either team in the selected match.'
+        : request.matchDate
+          ? `The player team could not be detected for ${request.matchDate}.`
+          : 'The player team could not be detected for the selected match.'
       : !match || teamContextPassed
         ? `${request.teamId ? 'Validating against' : 'Automatically matched to'} ${normalizeName(team.name, `Team #${team.id}`)}.`
         : 'Selected team is not part of the selected match.'
@@ -451,20 +587,31 @@ export async function validatePlayerBarcode(
   );
 
   if (!eventCheck.passed || !matchCheck.passed || !playerExistsCheck.passed || !teamCheck.passed) {
-    return buildDeniedResponse(barcode, [eventCheck, matchCheck, playerExistsCheck, teamCheck], {
+    const deniedResponse = buildDeniedResponse(barcode, [eventCheck, playerExistsCheck, teamCheck, matchCheck], {
       context: {
         scannerMode: 'keyboard_wedge',
         scannedCode: barcode,
+        playerName: player
+          ? getPlayerDisplayName(player)
+          : null,
         eventId: event?.id ?? null,
         eventName: event ? normalizeName(event.name, `Event #${event.id}`) : null,
         matchId: match?.id ?? null,
         matchLabel: match
           ? `${normalizeName(match.team1_name, `Team #${match.team1_id}`)} vs ${normalizeName(match.team2_name, `Team #${match.team2_id}`)}`
           : null,
+        matchDate: request.matchDate ?? match?.date ?? null,
         teamId: team?.id ?? null,
         teamName: team ? normalizeName(team.name, `Team #${team.id}`) : null,
       },
     });
+
+    deniedResponse.deniedScan = await registerDeniedScan(
+      client,
+      deniedResponse,
+      player ? Number(player.id) : null
+    );
+    return deniedResponse;
   }
 
   if (!event || !team || !player) {
@@ -582,24 +729,26 @@ export async function validatePlayerBarcode(
     headline: approved ? 'APPROVED' : 'DENIED',
     summary: approved
       ? checkIn?.status === 'already_checked_in'
-        ? `${normalizeName(player.full_name, `Player #${player.id}`)} was already checked in for this match.`
-        : `${normalizeName(player.full_name, `Player #${player.id}`)} is cleared and checked in for this match.`
+        ? `${getPlayerDisplayName(player)} was already checked in for this match.`
+        : `${getPlayerDisplayName(player)} is cleared and checked in for this match.`
       : failedChecks[0]?.message ?? 'Player validation failed.',
     context: {
       scannerMode: 'keyboard_wedge',
       scannedCode: barcode,
+      playerName: getPlayerDisplayName(player),
       eventId: resolvedEvent.id,
       eventName: normalizeName(resolvedEvent.name, `Event #${resolvedEvent.id}`),
       matchId: match?.id ?? null,
       matchLabel: match
         ? `${normalizeName(match.team1_name, `Team #${match.team1_id}`)} vs ${normalizeName(match.team2_name, `Team #${match.team2_id}`)}`
         : null,
+      matchDate: request.matchDate ?? match?.date ?? null,
       teamId: resolvedTeam.id,
       teamName: normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`),
     },
     player: {
       id: Number(player.id),
-      fullName: normalizeName(player.full_name, `Player #${player.id}`),
+      fullName: getPlayerDisplayName(player),
       documentId: player.document_id ?? barcode,
       photoUrl: player.photo_url ?? null,
       paidMembership: Number(player.paid_membership ?? 0) > 0,
@@ -615,17 +764,6 @@ export async function validatePlayerBarcode(
 
   if (!approved) {
     response.deniedScan = await registerDeniedScan(client, response);
-  } else if (match?.id) {
-    const { error } = await client
-      .from('scanner_denied_scans')
-      .delete()
-      .eq('match_id', match.id)
-      .eq('team_id', resolvedTeam.id)
-      .eq('scanned_code', barcode);
-
-    if (error) {
-      throw new Error(error.message);
-    }
   }
 
   return response;

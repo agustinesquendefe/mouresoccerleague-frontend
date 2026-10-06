@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Avatar,
   Box,
   Button,
@@ -37,6 +38,7 @@ import type {
 } from '@/models/scanner';
 import { useBarcodeScannerInput } from '@/hooks/useBarcodeScannerInput';
 import ScannerResultPanel from '@/app/(admin)/components/scanner/ScannerResultPanel';
+import { formatStoredDate } from '@/utils/dateOnly';
 
 type Props = {
   initialContext: ScannerContextData;
@@ -46,8 +48,8 @@ type Props = {
 
 type PersistedScannerContext = {
   eventId: string;
+  matchDate: string;
   matchId: string;
-  teamId: string;
 };
 
 type PlayerPreview = {
@@ -79,6 +81,16 @@ function getLocalDateKey() {
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function formatMatchDate(value: string) {
+  return formatStoredDate(value, 'en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 function getPlayerInitials(name: string) {
@@ -145,8 +157,8 @@ function readPersistedScannerContext(storageKey: string): PersistedScannerContex
 
     return {
       eventId: String(parsed.eventId),
+      matchDate: parsed.matchDate ? String(parsed.matchDate) : '',
       matchId: parsed.matchId ? String(parsed.matchId) : '',
-      teamId: parsed.teamId ? String(parsed.teamId) : '',
     };
   } catch {
     return null;
@@ -165,10 +177,14 @@ export default function AdminScannerClient({
   storageKey = SCANNER_CONTEXT_STORAGE_KEY,
 }: Props) {
   const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+  const [todayKey, setTodayKey] = useState<string | null>(null);
   const [persistedContext, setPersistedContext] = useState<PersistedScannerContext | null>(null);
   const [eventMatches, setEventMatches] = useState<ScannerMatchOption[]>(initialContext.matches ?? []);
+  const [eventOptions, setEventOptions] = useState<ScannerEventOption[]>(initialContext.events);
+  const [eventSearch, setEventSearch] = useState('');
   const [submitOnIdle, setSubmitOnIdle] = useState(false);
   const [idleMs, setIdleMs] = useState('180');
   const [result, setResult] = useState<ScannerValidationResponse | null>(null);
@@ -177,22 +193,102 @@ export default function AdminScannerClient({
   const [selectedPlayerPreview, setSelectedPlayerPreview] = useState<PlayerPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMatches, setLoadingMatches] = useState(false);
+  const [loadingEvents, setLoadingEvents] = useState(false);
   const [loadingCheckIns, setLoadingCheckIns] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const selectedEvent = useMemo<ScannerEventOption | null>(() => {
-    return initialContext.events.find((event) => String(event.id) === selectedEventId) ?? null;
-  }, [initialContext.events, selectedEventId]);
+    return eventOptions.find((event) => String(event.id) === selectedEventId) ?? null;
+  }, [eventOptions, selectedEventId]);
 
   const selectedMatch = useMemo<ScannerMatchOption | null>(() => {
     return eventMatches.find((match) => String(match.id) === selectedMatchId) ?? null;
   }, [eventMatches, selectedMatchId]);
+
+  const availableDates = useMemo(() => {
+    return Array.from(
+      new Set(
+        eventMatches
+          .filter((match) => {
+            const status = String(match.status ?? '').toLowerCase();
+            return Boolean(
+              match.date &&
+              (!todayKey || match.date >= todayKey) &&
+              status !== 'cancelled' &&
+              status !== 'played'
+            );
+          })
+          .map((match) => match.date as string)
+      )
+    ).sort();
+  }, [eventMatches, todayKey]);
+
+  const matchesForSelectedDate = useMemo(
+    () => eventMatches.filter((match) => {
+      const status = String(match.status ?? '').toLowerCase();
+      return match.date === selectedDate && status !== 'cancelled' && status !== 'played';
+    }),
+    [eventMatches, selectedDate]
+  );
 
   const teamOptions = useMemo(() => {
     if (!selectedMatch) return [];
 
     return [selectedMatch.team1, selectedMatch.team2];
   }, [selectedMatch]);
+
+  useEffect(() => {
+    setTodayKey(getLocalDateKey());
+  }, []);
+
+  useEffect(() => {
+    if (restrictToInitialContext) {
+      setEventOptions(initialContext.events);
+      return;
+    }
+
+    const term = eventSearch.trim();
+    if (!term) {
+      setEventOptions((current) => {
+        const selected = current.find((event) => String(event.id) === selectedEventId);
+        return selected ? [selected] : initialContext.events;
+      });
+      return;
+    }
+
+    let active = true;
+    const timeout = window.setTimeout(async () => {
+      try {
+        setLoadingEvents(true);
+        const response = await fetch(`/api/scanner/events?search=${encodeURIComponent(term)}`);
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.error ?? 'Failed to search events.');
+        }
+
+        if (!active) return;
+        const rows = (payload?.data ?? []) as ScannerEventOption[];
+        setEventOptions((current) => {
+          const selected = current.find((event) => String(event.id) === selectedEventId);
+          return selected && !rows.some((event) => event.id === selected.id)
+            ? [selected, ...rows]
+            : rows;
+        });
+      } catch (error) {
+        if (active) {
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to search events.');
+        }
+      } finally {
+        if (active) setLoadingEvents(false);
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [eventSearch, initialContext.events, restrictToInitialContext, selectedEventId]);
 
   useEffect(() => {
     const storedContext = readPersistedScannerContext(storageKey);
@@ -220,73 +316,61 @@ export default function AdminScannerClient({
 
     persistScannerContext(storageKey, {
       eventId: selectedEventId,
+      matchDate: selectedDate,
       matchId: selectedMatchId,
-      teamId: selectedTeamId,
     });
-  }, [selectedEventId, selectedMatchId, selectedTeamId, storageKey]);
+  }, [selectedDate, selectedEventId, selectedMatchId, storageKey]);
 
   useEffect(() => {
     if (!selectedEvent) {
+      setSelectedDate('');
       setSelectedMatchId('');
       setSelectedTeamId('');
       return;
     }
 
-    setSelectedMatchId((current) => {
-      if (eventMatches.some((match) => String(match.id) === current)) {
+    if (!todayKey) return;
+
+    setSelectedDate((current) => {
+      if (availableDates.includes(current)) {
         return current;
-      }
-
-      const today = getLocalDateKey();
-      const todayMatches = eventMatches.filter((match) => {
-        const status = String(match.status ?? '').toLowerCase();
-        return match.date === today && status !== 'played' && status !== 'cancelled';
-      });
-
-      if (todayMatches.length === 1) {
-        return String(todayMatches[0].id);
       }
 
       if (
         persistedContext?.eventId === selectedEventId &&
-        todayMatches.some((match) => String(match.id) === persistedContext.matchId)
+        availableDates.includes(persistedContext.matchDate)
       ) {
-        return persistedContext.matchId;
+        return persistedContext.matchDate;
       }
 
-      if (restrictToInitialContext && eventMatches.length === 1) {
-        return String(eventMatches[0].id);
-      }
+      if (availableDates.includes(todayKey)) return todayKey;
 
-      return '';
+      return availableDates[0] ?? '';
     });
-  }, [eventMatches, persistedContext, restrictToInitialContext, selectedEvent, selectedEventId]);
+  }, [availableDates, persistedContext, selectedEvent, selectedEventId, todayKey]);
 
   useEffect(() => {
-    if (!selectedMatch) {
-      setSelectedTeamId('');
-      return;
-    }
-
-    setSelectedTeamId((current) => {
-      if (teamOptions.some((team) => String(team.id) === current)) {
+    setSelectedMatchId((current) => {
+      if (matchesForSelectedDate.some((match) => String(match.id) === current)) {
         return current;
       }
 
       if (
-        persistedContext?.matchId === selectedMatchId &&
-        teamOptions.some((team) => String(team.id) === persistedContext.teamId)
+        persistedContext?.eventId === selectedEventId &&
+        persistedContext.matchDate === selectedDate &&
+        matchesForSelectedDate.some((match) => String(match.id) === persistedContext.matchId)
       ) {
-        return persistedContext.teamId;
+        return persistedContext.matchId;
       }
 
       return '';
     });
-  }, [persistedContext, selectedMatch, selectedMatchId, teamOptions]);
+  }, [matchesForSelectedDate, persistedContext, selectedDate, selectedEventId]);
 
   useEffect(() => {
     if (!selectedEvent) {
       setEventMatches([]);
+      setSelectedDate('');
       setSelectedMatchId('');
       setSelectedTeamId('');
       return;
@@ -333,10 +417,10 @@ export default function AdminScannerClient({
     };
   }, [initialContext.matches, restrictToInitialContext, selectedEvent]);
 
-  const loadCheckedInPlayers = async (matchId: number, teamId: number) => {
+  const loadCheckedInPlayers = async (matchId: number) => {
     try {
       setLoadingCheckIns(true);
-      const response = await fetch(`/api/scanner/match-check-ins?matchId=${matchId}&teamId=${teamId}`);
+      const response = await fetch(`/api/scanner/match-check-ins?matchId=${matchId}`);
       const payload = await response.json();
 
       if (!response.ok) {
@@ -352,10 +436,10 @@ export default function AdminScannerClient({
     }
   };
 
-  const loadDeniedPlayers = async (matchId: number, teamId: number) => {
+  const loadDeniedPlayers = async (matchId: number) => {
     try {
       setLoadingCheckIns(true);
-      const response = await fetch(`/api/scanner/denied-scans?matchId=${matchId}&teamId=${teamId}`);
+      const response = await fetch(`/api/scanner/denied-scans?matchId=${matchId}`);
       const payload = await response.json();
 
       if (!response.ok) {
@@ -373,20 +457,20 @@ export default function AdminScannerClient({
 
   useEffect(() => {
     const matchId = Number(selectedMatchId);
-    const teamId = Number(selectedTeamId);
 
-    if (!matchId || !teamId) {
+    if (!matchId) {
       setCheckedInPlayers([]);
+      setDeniedPlayers([]);
       return;
     }
 
-    loadCheckedInPlayers(matchId, teamId);
-    loadDeniedPlayers(matchId, teamId);
-  }, [selectedMatchId, selectedTeamId]);
+    loadCheckedInPlayers(matchId);
+    loadDeniedPlayers(matchId);
+  }, [selectedMatchId]);
 
   const handleScan = async (barcode: string) => {
-    if (!selectedEvent?.id || !selectedMatch) {
-      setErrorMessage('Select a match before scanning. The player team will be detected automatically.');
+    if (!selectedEvent?.id || !selectedDate || !selectedMatch) {
+      setErrorMessage('Select a date and a pending match before scanning.');
       return;
     }
 
@@ -403,6 +487,7 @@ export default function AdminScannerClient({
           barcode,
           eventId: selectedEvent.id,
           matchId: selectedMatch.id,
+          matchDate: selectedDate,
         }),
       });
 
@@ -415,20 +500,9 @@ export default function AdminScannerClient({
       const validationResult = payload.data as ScannerValidationResponse;
       const resolvedTeamId = validationResult.context.teamId;
       setResult(validationResult);
-
-      if (resolvedTeamId) {
-        setSelectedTeamId(String(resolvedTeamId));
-      }
-
-      if (validationResult.approved && resolvedTeamId) {
-        await loadCheckedInPlayers(selectedMatch.id, resolvedTeamId);
-        await loadDeniedPlayers(selectedMatch.id, resolvedTeamId);
-      } else if (resolvedTeamId) {
-        await loadDeniedPlayers(
-          validationResult.context.matchId ?? selectedMatch.id,
-          resolvedTeamId
-        );
-      }
+      setSelectedTeamId(resolvedTeamId ? String(resolvedTeamId) : '');
+      await loadCheckedInPlayers(selectedMatch.id);
+      await loadDeniedPlayers(selectedMatch.id);
 
       if (!response.ok && !payload.data) {
         throw new Error(payload?.error ?? 'Player validation failed.');
@@ -441,7 +515,7 @@ export default function AdminScannerClient({
   };
 
   const scanner = useBarcodeScannerInput({
-    enabled: Boolean(selectedEvent?.id && selectedMatch) && !loading,
+    enabled: Boolean(selectedEvent?.id && selectedDate && selectedMatch) && !loading,
     submitOnIdle,
     idleMs: Math.max(Number(idleMs) || 180, 50),
     onScan: handleScan,
@@ -463,69 +537,86 @@ export default function AdminScannerClient({
           ) : null}
 
           {initialContext.events.length > 0 && !selectedEvent ? (
-            <Alert severity="info">Choose an event first. Match and scanner validation will unlock after that selection.</Alert>
+            <Alert severity="info">Choose an event first. Date selection and scanner validation will unlock after that selection.</Alert>
           ) : null}
 
           {selectedEvent && eventMatches.length === 0 ? (
-            <Alert severity="info">The selected validation event has no matches yet. Create a match first so you can choose a team context for the scan.</Alert>
+            <Alert severity="info">The selected validation event has no matches yet. Create a match before using the scanner.</Alert>
+          ) : selectedEvent && !loadingMatches && availableDates.length === 0 ? (
+            <Alert severity="info">This event has no pending matches scheduled for today or a future date.</Alert>
           ) : null}
 
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 6 }}>
-              <TextField
+              <Autocomplete
                 id="scanner-validation-event"
-                select
-                label="Validation event"
-                value={selectedEventId}
-                onChange={(event) => {
+                options={eventOptions}
+                value={selectedEvent}
+                loading={loadingEvents}
+                filterOptions={(options, state) => restrictToInitialContext
+                  ? options.filter((option) =>
+                      option.name.toLowerCase().includes(state.inputValue.trim().toLowerCase())
+                    )
+                  : options
+                }
+                getOptionLabel={(option) => option.name}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                onInputChange={(_, value, reason) => {
+                  if (reason === 'input' || reason === 'clear') setEventSearch(value);
+                }}
+                onChange={(_, event) => {
                   setPersistedContext(null);
-                  setSelectedEventId(event.target.value);
+                  setEventSearch('');
+                  setSelectedEventId(event ? String(event.id) : '');
+                  setSelectedDate('');
                   setSelectedMatchId('');
                   setSelectedTeamId('');
                   setEventMatches([]);
+                  setCheckedInPlayers([]);
+                  setDeniedPlayers([]);
                   setResult(null);
                   setErrorMessage(null);
                 }}
-                fullWidth
-                disabled={initialContext.events.length === 0 || loading || loadingMatches}
-                helperText="Choose the event that should be used for payment and eligibility validation."
-                InputLabelProps={{ shrink: true }}
-                SelectProps={{ displayEmpty: true }}
-              >
-                <MenuItem value="">
-                  Select an event
-                </MenuItem>
-                {initialContext.events.map((event) => (
-                  <MenuItem key={event.id} value={String(event.id)}>
-                    {event.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField
-                id="scanner-event-status"
-                label="Event status"
-                value={selectedEvent ? formatStatusLabel(selectedEvent.status ?? null) : ''}
-                fullWidth
-                placeholder="Select an event first"
-                slotProps={{
-                  input: {
-                    readOnly: true,
-                  },
-                }}
+                disabled={loading || loadingMatches}
+                noOptionsText={eventSearch.trim() ? 'No matching events' : 'Type to search events'}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Validation event"
+                    placeholder="Type an event name"
+                    helperText={
+                      restrictToInitialContext
+                        ? 'Search within your assigned events.'
+                        : 'Type to load matching events without loading the full list.'
+                    }
+                    slotProps={{
+                      input: {
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {loadingEvents ? <CircularProgress color="inherit" size={20} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      },
+                    }}
+                  />
+                )}
               />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
-                id="scanner-match"
+                id="scanner-match-date"
                 select
-                label="Match"
-                value={selectedMatchId}
+                label="Match date"
+                value={selectedDate}
                 onChange={(event) => {
                   setPersistedContext(null);
-                  setSelectedMatchId(event.target.value);
+                  setSelectedDate(event.target.value);
+                  setSelectedMatchId('');
                   setSelectedTeamId('');
+                  setCheckedInPlayers([]);
+                  setDeniedPlayers([]);
                   setResult(null);
                   setErrorMessage(null);
                 }}
@@ -536,9 +627,46 @@ export default function AdminScannerClient({
                     ? 'Choose an event first.'
                     : loadingMatches
                       ? 'Loading matches for the selected event...'
-                    : eventMatches.length === 0
-                      ? 'No matches available for the selected event.'
-                      : 'Validation uses the selected match to define the allowed teams.'
+                    : availableDates.length === 0
+                      ? 'No pending matches are scheduled from today onward.'
+                      : 'Only dates with pending matches from today onward are available.'
+                }
+                InputLabelProps={{ shrink: true }}
+                SelectProps={{ displayEmpty: true }}
+              >
+                <MenuItem value="">
+                  Select a date
+                </MenuItem>
+                {availableDates.map((date) => (
+                  <MenuItem key={date} value={date}>
+                    {formatMatchDate(date)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                id="scanner-match"
+                select
+                label="Pending match"
+                value={selectedMatchId}
+                onChange={(event) => {
+                  setPersistedContext(null);
+                  setSelectedMatchId(event.target.value);
+                  setSelectedTeamId('');
+                  setCheckedInPlayers([]);
+                  setDeniedPlayers([]);
+                  setResult(null);
+                  setErrorMessage(null);
+                }}
+                fullWidth
+                disabled={!selectedDate || loading || loadingMatches}
+                helperText={
+                  !selectedDate
+                    ? 'Choose a date first.'
+                    : matchesForSelectedDate.length === 0
+                      ? 'No pending matches are available for this date.'
+                      : 'The history below is loaded automatically for this match.'
                 }
                 InputLabelProps={{ shrink: true }}
                 SelectProps={{ displayEmpty: true }}
@@ -546,7 +674,7 @@ export default function AdminScannerClient({
                 <MenuItem value="">
                   Select a match
                 </MenuItem>
-                {eventMatches.map((match) => (
+                {matchesForSelectedDate.map((match) => (
                   <MenuItem key={match.id} value={String(match.id)}>
                     {match.label}
                   </MenuItem>
@@ -562,7 +690,7 @@ export default function AdminScannerClient({
                   : ''}
                 fullWidth
                 placeholder={selectedMatch ? 'Detected after scanning' : 'Select a match first'}
-                helperText="The document ID automatically resolves the player's event roster team."
+                helperText="The player's roster team is detected automatically for the selected match."
                 slotProps={{ input: { readOnly: true } }}
               />
             </Grid>
@@ -581,8 +709,8 @@ export default function AdminScannerClient({
                 onBlur={scanner.handleBlur}
                 autoFocus
                 fullWidth
-                disabled={!selectedEvent || !selectedMatch || loading || loadingMatches}
-                helperText="Leading zeros are preserved. The player team is detected automatically from the event roster."
+                disabled={!selectedEvent || !selectedDate || !selectedMatch || loading || loadingMatches}
+                helperText="Leading zeros are preserved. The team is detected automatically for the selected match."
                 slotProps={{
                   input: {
                     startAdornment: <QrCodeScannerIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
@@ -595,7 +723,7 @@ export default function AdminScannerClient({
                 <Button
                   variant="contained"
                   onClick={scanner.submit}
-                  disabled={loading || loadingMatches || !scanner.value.trim()}
+                  disabled={loading || loadingMatches || !selectedMatch || !scanner.value.trim()}
                 >
                   Validate Manually
                 </Button>
@@ -636,10 +764,6 @@ export default function AdminScannerClient({
 
           {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
-          {/* <Alert severity="info">
-            Eyoyo EY-039 writes the raw `document_id`. The active event and a single match scheduled for today are selected automatically; each scan detects the player's team from that event roster.
-          </Alert> */}
-          
         </Stack>
       </Paper>
 
@@ -723,24 +847,25 @@ export default function AdminScannerClient({
           <Box>
             <Typography variant="h6" fontWeight={700}>Approved Players</Typography>
             <Typography variant="body2" color="text.secondary">
-              Players scanned and approved for the selected match and last detected team.
+              Complete approved scan history for the selected match.
             </Typography>
           </Box>
 
-          {!selectedMatch || !selectedTeamId ? (
+          {!selectedMatch ? (
             <Typography color="text.secondary">
-              Select a match and scan a player to see approved check-ins for the detected team.
+              Select a date and match to load its approved scan history.
             </Typography>
           ) : checkedInPlayers.length === 0 ? (
             <Typography color="text.secondary">
-              No approved players have been scanned for this team yet.
+              No approved players have been scanned for this match yet.
             </Typography>
           ) : (
             <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <Table size="small" sx={{ minWidth: 640 }}>
+              <Table size="small" sx={{ minWidth: 740 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell>Player</TableCell>
+                    <TableCell>Team</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Method</TableCell>
                     <TableCell>Checked In At</TableCell>
@@ -782,6 +907,7 @@ export default function AdminScannerClient({
                           photoUrl={row.photoUrl}
                         />
                       </TableCell>
+                      <TableCell>{row.teamName ?? `Team #${row.teamId}`}</TableCell>
                       <TableCell>{formatStatusLabel(row.status)}</TableCell>
                       <TableCell>{formatStatusLabel(row.method)}</TableCell>
                       <TableCell>{formatDateTime(row.checkedInAt)}</TableCell>
@@ -797,26 +923,27 @@ export default function AdminScannerClient({
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
         <Stack spacing={2}>
           <Box>
-            <Typography variant="h6" fontWeight={700}>Denied Players</Typography>
+            <Typography variant="h6" fontWeight={700}>Denied Scans</Typography>
             <Typography variant="body2" color="text.secondary">
-              Players scanned for the selected match and last detected team who were not cleared to play.
+              Complete denied scan history for the selected match, including players later approved.
             </Typography>
           </Box>
 
-          {!selectedMatch || !selectedTeamId ? (
+          {!selectedMatch ? (
             <Typography color="text.secondary">
-              Select a match and scan a player to see denied scans for the detected team.
+              Select a date and match to load its denied scan history.
             </Typography>
           ) : deniedPlayers.length === 0 ? (
             <Typography color="text.secondary">
-              No denied players have been scanned for this team yet.
+              No denied players have been scanned for this match yet.
             </Typography>
           ) : (
             <Box sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <Table size="small" sx={{ minWidth: 720 }}>
+              <Table size="small" sx={{ minWidth: 820 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell>Player</TableCell>
+                    <TableCell>Team</TableCell>
                     <TableCell>Reason</TableCell>
                     <TableCell>Method</TableCell>
                     <TableCell>Scanned At</TableCell>
@@ -858,6 +985,7 @@ export default function AdminScannerClient({
                           photoUrl={row.photoUrl}
                         />
                       </TableCell>
+                      <TableCell>{row.teamName ?? 'Not detected'}</TableCell>
                       <TableCell>{row.reason}</TableCell>
                       <TableCell>{formatStatusLabel(row.method)}</TableCell>
                       <TableCell>{formatDateTime(row.scannedAt)}</TableCell>
