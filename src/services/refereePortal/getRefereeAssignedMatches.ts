@@ -153,8 +153,6 @@ export function buildRefereeScannerContext(matches: RefereeAssignedMatch[]): Sca
   return {
     activeEvent,
     events,
-    matches: activeEvent
-      ? scannerMatches.filter((match) => match.eventId === activeEvent.id)
-      : [],
+    matches: scannerMatches,
   };
 }

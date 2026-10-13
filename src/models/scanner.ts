@@ -3,6 +3,8 @@ export type ScannerValidationRequest = {
   eventId?: number | null;
   matchId?: number | null;
   teamId?: number | null;
+  matchDate?: string | null;
+  candidateMatchIds?: number[];
 };
 
 export type ScannerValidationCheckCode =
@@ -38,10 +40,12 @@ export type ScannerPlayerSummary = {
 export type ScannerContextSummary = {
   scannerMode: 'keyboard_wedge';
   scannedCode: string;
+  playerName: string | null;
   eventId: number | null;
   eventName: string | null;
   matchId: number | null;
   matchLabel: string | null;
+  matchDate: string | null;
   teamId: number | null;
   teamName: string | null;
 };
@@ -93,6 +97,8 @@ export type ScannerDeniedPlayer = {
   playerName: string;
   documentId: string | null;
   photoUrl: string | null;
+  teamId: number | null;
+  teamName: string | null;
   reason: string;
   method: string | null;
   scannedAt: string;

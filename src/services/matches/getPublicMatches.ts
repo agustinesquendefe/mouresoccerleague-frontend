@@ -78,7 +78,15 @@ function filterUpcomingRounds(matches: RawMatch[]) {
   return matches.filter((match) => match.round_number != null && visibleRounds.has(match.round_number));
 }
 
-export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[]> {
+type GetPublicMatchesOptions = {
+  upcomingRoundsOnly?: boolean;
+};
+
+export async function getPublicMatches(
+  eventId: number,
+  options: GetPublicMatchesOptions = {}
+): Promise<PublicMatchRow[]> {
+  const { upcomingRoundsOnly = true } = options;
   const { data, error } = await supabase
     .from('matches')
     .select(`
@@ -104,7 +112,8 @@ export async function getPublicMatches(eventId: number): Promise<PublicMatchRow[
 
   if (error) throw new Error(error.message);
 
-  const matches = filterUpcomingRounds((data ?? []) as RawMatch[]);
+  const allMatches = (data ?? []) as RawMatch[];
+  const matches = upcomingRoundsOnly ? filterUpcomingRounds(allMatches) : allMatches;
 
   const teamIds = Array.from(
     new Set(matches.flatMap((m) => [m.team1_id, m.team2_id]).filter((id): id is number => Number.isFinite(id)))

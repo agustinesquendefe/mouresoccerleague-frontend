@@ -1,35 +1,19 @@
-import type { Event } from '@/models/event';
 import { getEvents } from '@/services/events/getEvents';
 import { getPublicMatches, type PublicMatchRow } from '@/services/matches/getPublicMatches';
-import { parseStoredDate } from '@/utils/dateOnly';
 import MatchesView from './MatchesView';
 
 
 export const dynamic = 'force-dynamic';
 
-async function getOldestActiveEvent(events: Event[]): Promise<Event | null> {
-  const active = events.filter((e) => e.status === 'active');
-  if (active.length === 0) return null;
-  return active.reduce((oldest, e) => {
-    const currentTime = parseStoredDate(e.start_date)?.getTime() ?? Number.POSITIVE_INFINITY;
-    const oldestTime = parseStoredDate(oldest.start_date)?.getTime() ?? Number.POSITIVE_INFINITY;
-
-    return currentTime < oldestTime ? e : oldest;
-  });
-}
-
 export default async function MatchesPage() {
   const events = await getEvents();
   const activeEvents = events.filter((e) => e.status === 'active');
-  const defaultEvent = await getOldestActiveEvent(events);
 
-  // Prefetch matches for all active events in parallel
-  const matchesByEvent: Record<number, PublicMatchRow[]> = {};
-  await Promise.all(
+  const matches = (await Promise.all(
     activeEvents.map(async (e) => {
-      matchesByEvent[e.id] = await getPublicMatches(e.id).catch(() => []);
+      return getPublicMatches(e.id, { upcomingRoundsOnly: false }).catch(() => [] as PublicMatchRow[]);
     })
-  );
+  )).flat();
 
   return (
     <main className="bg-[--color-white] text-[--color-black] min-h-screen">
@@ -43,8 +27,7 @@ export default async function MatchesPage() {
       ) : (
         <MatchesView
           events={activeEvents}
-          initialEventId={defaultEvent?.id ?? activeEvents[0].id}
-          matchesByEvent={matchesByEvent}
+          matches={matches}
         />
       )}
 

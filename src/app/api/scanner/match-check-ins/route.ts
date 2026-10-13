@@ -11,18 +11,15 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const matchId = Number(searchParams.get('matchId'));
-    const teamId = Number(searchParams.get('teamId'));
+    const teamIdValue = searchParams.get('teamId');
+    const teamId = teamIdValue ? Number(teamIdValue) : null;
 
     if (!Number.isFinite(matchId) || matchId <= 0) {
       return NextResponse.json({ error: 'Match ID is required.' }, { status: 400 });
     }
 
-    if (!Number.isFinite(teamId) || teamId <= 0) {
-      return NextResponse.json({ error: 'Team ID is required.' }, { status: 400 });
-    }
-
     const supabaseAdmin = createSupabaseAdminClient();
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('match_check_ins')
       .select(`
         id,
@@ -45,8 +42,13 @@ export async function GET(request: Request) {
         )
       `)
       .eq('match_id', matchId)
-      .eq('team_id', teamId)
       .order('checked_in_at', { ascending: false });
+
+    if (teamId !== null && Number.isFinite(teamId) && teamId > 0) {
+      query = query.eq('team_id', teamId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(error.message);

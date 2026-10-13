@@ -14,6 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { ScannerValidationResponse } from '@/models/scanner';
+import { formatStoredDate } from '@/utils/dateOnly';
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat(undefined, {
@@ -37,6 +38,8 @@ export default function ScannerResultPanel({ result }: Props) {
     );
   }
 
+  const playerName = result.player?.fullName ?? result.context.playerName;
+
   return (
     <Paper
       variant="outlined"
@@ -54,16 +57,47 @@ export default function ScannerResultPanel({ result }: Props) {
               Scanner Decision
             </Typography>
             <Typography variant="h4" fontWeight={800}>
-              {result.headline} {result.approved ? '✅' : '❌'}
+              {result.headline}{playerName ? ` — ${playerName}` : ''} {result.approved ? '✅' : '❌'}
             </Typography>
             <Typography variant="body1">{result.summary}</Typography>
           </Box>
 
           <Stack direction="row" spacing={1} alignItems="flex-start">
             <Chip label={result.context.scannedCode || 'No code'} color={result.approved ? 'success' : 'error'} />
-            <Chip label={result.context.teamName ?? 'No team'} variant="outlined" />
           </Stack>
         </Stack>
+
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+          <Alert severity="info" sx={{ flex: 1 }}>
+            <Typography variant="caption" display="block">Player</Typography>
+            <Typography variant="h6" fontWeight={800}>
+              {playerName ?? 'Player not found'}
+            </Typography>
+          </Alert>
+          <Alert severity={result.approved ? 'success' : 'error'} sx={{ flex: 1 }}>
+            <Typography variant="caption" display="block">Decision</Typography>
+            <Typography variant="h6" fontWeight={800}>
+              {result.approved ? 'APPROVED' : 'DENIED'}
+            </Typography>
+          </Alert>
+          <Alert severity="info" sx={{ flex: 1 }}>
+            <Typography variant="caption" display="block">Player team</Typography>
+            <Typography variant="h6" fontWeight={800}>
+              {result.context.teamName ?? 'Team not detected'}
+            </Typography>
+          </Alert>
+        </Stack>
+
+        {result.context.matchDate || result.context.matchLabel ? (
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            {result.context.matchDate ? (
+              <Chip label={`Date: ${formatStoredDate(result.context.matchDate)}`} variant="outlined" />
+            ) : null}
+            {result.context.matchLabel ? (
+              <Chip label={`Match: ${result.context.matchLabel}`} variant="outlined" />
+            ) : null}
+          </Stack>
+        ) : null}
 
         {result.player ? (
           <Alert severity={result.approved ? 'success' : 'warning'}>
