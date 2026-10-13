@@ -55,6 +55,12 @@ function getPaymentProgress(event: PlayerPortalEvent) {
   return Math.min((event.paid_amount / event.event_price) * 100, 100);
 }
 
+function getRegistrationPaymentCountdown(remainingMatches: number) {
+  if (remainingMatches <= 0) return "Registration payment required before the next match";
+  if (remainingMatches === 1) return "1 match remaining before registration payment is required";
+  return `${remainingMatches} matches remaining before registration payment is required`;
+}
+
 function getMagicLinkErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   const normalizedMessage = message.toLowerCase();
@@ -543,10 +549,13 @@ export default function PlayerPortalPage() {
                             label={event.payment_status === "paid" ? "Paid" : "Payment pending"}
                             color={getPaymentColor(event.payment_status)}
                           />
-                          <Chip
-                            label={`${event.free_appearances_remaining} free games left`}
-                            variant="outlined"
-                          />
+                          {event.payment_status !== "paid" && event.event_price > 0 ? (
+                            <Chip
+                              label={getRegistrationPaymentCountdown(event.free_appearances_remaining)}
+                              color={event.free_appearances_remaining > 0 ? "warning" : "error"}
+                              variant="outlined"
+                            />
+                          ) : null}
                         </Stack>
                       </Stack>
 

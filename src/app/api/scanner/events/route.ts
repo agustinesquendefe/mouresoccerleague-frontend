@@ -7,7 +7,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search')?.trim() ?? '';
     const supabaseAdmin = createSupabaseAdminClient();
-    const data = await getScannerEventOptions(supabaseAdmin, search, 20);
+    const data = await getScannerEventOptions(supabaseAdmin, search, 50);
 
     return NextResponse.json({ data });
   } catch (error) {

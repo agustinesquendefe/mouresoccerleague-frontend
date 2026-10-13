@@ -38,6 +38,12 @@ type EventTeamRow = {
   } | Array<{ name: string; key: string; logo_url: string | null }>;
 };
 
+function numericPoints(value: unknown, fallback: number): number {
+  if (value === null || value === undefined || value === '') return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 
 export async function getEventStandings(
   eventId: number,
@@ -47,13 +53,28 @@ export async function getEventStandings(
   // Get event to fetch points system
   const { data: event, error: eventError } = await supabase
     .from('events')
-    .select('points_win, points_draw, points_loss')
+    .select('match_format, points_win, points_draw, points_loss')
     .eq('id', eventId)
     .single();
   if (eventError) throw new Error(eventError.message);
-  const pointsWin = typeof event.points_win === 'number' ? event.points_win : 3;
-  const pointsDraw = typeof event.points_draw === 'number' ? event.points_draw : 1;
-  const pointsLoss = typeof event.points_loss === 'number' ? event.points_loss : 0;
+
+  let formatPoints: { points_win: unknown; points_draw: unknown; points_loss: unknown } | null = null;
+  const needsFormatFallback = event.points_win == null || event.points_draw == null || event.points_loss == null;
+
+  if (needsFormatFallback && event.match_format) {
+    const { data, error } = await supabase
+      .from('match_formats')
+      .select('points_win, points_draw, points_loss')
+      .eq('key', event.match_format)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    formatPoints = data;
+  }
+
+  const pointsWin = numericPoints(event.points_win, numericPoints(formatPoints?.points_win, 3));
+  const pointsDraw = numericPoints(event.points_draw, numericPoints(formatPoints?.points_draw, 1));
+  const pointsLoss = numericPoints(event.points_loss, numericPoints(formatPoints?.points_loss, 0));
 
   // Build matches query
   let matchesQuery = supabase

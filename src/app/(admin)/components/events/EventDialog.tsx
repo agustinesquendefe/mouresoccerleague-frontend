@@ -71,6 +71,9 @@ const initialValues: EventFormData = {
   playoff_home_away: false,
 
   group_count: null,
+  points_win: 3,
+  points_draw: 1,
+  points_loss: 0,
 };
 
 const initialConflicts: ConflictState = {
@@ -170,6 +173,9 @@ export default function EventDialog({
         playoff_home_away: event.playoff_home_away ?? false,
 
         group_count: event.group_count ?? null,
+        points_win: event.points_win ?? null,
+        points_draw: event.points_draw ?? null,
+        points_loss: event.points_loss ?? null,
       });
       setConflicts(initialConflicts);
       setSubmitError(null);
@@ -180,6 +186,25 @@ export default function EventDialog({
     setConflicts(initialConflicts);
     setSubmitError(null);
   }, [open, mode, event]);
+
+  useEffect(() => {
+    if (!open || matchFormats.length === 0) return;
+
+    setValues((prev) => {
+      const selectedFormat = matchFormats.find((format) => format.key === prev.match_format);
+      if (!selectedFormat) return prev;
+
+      const hasMissingPoints = prev.points_win == null || prev.points_draw == null || prev.points_loss == null;
+      if (!hasMissingPoints) return prev;
+
+      return {
+        ...prev,
+        points_win: prev.points_win ?? selectedFormat.points_win,
+        points_draw: prev.points_draw ?? selectedFormat.points_draw,
+        points_loss: prev.points_loss ?? selectedFormat.points_loss,
+      };
+    });
+  }, [matchFormats, open]);
 
   const generatedKey = useMemo(() => generateEventKey(values.name), [values.name]);
 

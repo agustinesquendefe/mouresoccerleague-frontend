@@ -106,9 +106,10 @@ export async function getScannerContext(client: SupabaseClient): Promise<Scanner
   }
 
   let activeEvent = activeEvents?.[0] ?? null;
+  const availableEvents = await getScannerEventOptions(client, '', 50);
 
   if (!activeEvent) {
-    activeEvent = (await getScannerEventOptions(client, '', 1))[0] ?? null;
+    activeEvent = availableEvents[0] ?? null;
   }
 
   if (!activeEvent) {
@@ -118,19 +119,19 @@ export async function getScannerContext(client: SupabaseClient): Promise<Scanner
       matches: [],
     };
   }
+  const normalizedActiveEvent = {
+    id: Number(activeEvent.id),
+    name: normalizeEventName(Number(activeEvent.id), activeEvent.name ?? null),
+    status: activeEvent.status ?? null,
+  };
+  const events = availableEvents.some((event) => event.id === normalizedActiveEvent.id)
+    ? availableEvents
+    : [normalizedActiveEvent, ...availableEvents].slice(0, 50);
   const matchOptions = await getScannerMatchesForEvent(client, Number(activeEvent.id));
 
   return {
-    activeEvent: {
-      id: Number(activeEvent.id),
-      name: normalizeEventName(Number(activeEvent.id), activeEvent.name ?? null),
-      status: activeEvent.status ?? null,
-    },
-    events: [{
-      id: Number(activeEvent.id),
-      name: normalizeEventName(Number(activeEvent.id), activeEvent.name ?? null),
-      status: activeEvent.status ?? null,
-    }],
+    activeEvent: normalizedActiveEvent,
+    events,
     matches: matchOptions,
   };
 }

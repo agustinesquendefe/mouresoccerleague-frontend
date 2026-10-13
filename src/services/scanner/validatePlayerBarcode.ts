@@ -393,12 +393,12 @@ async function resolvePlayerTeamForMatch(
   return resolveTeam(client, eligibleTeamIds[0]);
 }
 
-async function resolvePlayerContextForDate(
+async function resolvePlayerContextForEvent(
   client: SupabaseClient,
   params: {
     playerId: number;
     eventId: number;
-    matchDate: string;
+    matchDate?: string | null;
     candidateMatchIds?: number[];
   }
 ): Promise<{ team: TeamRow | null; match: MatchRow | null }> {
@@ -442,10 +442,13 @@ async function resolvePlayerContextForDate(
       team2:teams!matches_team2_id_fkey ( name )
     `)
     .eq('event_id', eventId)
-    .eq('date', matchDate)
     .or(`team1_id.in.(${rosterTeamIds.join(',')}),team2_id.in.(${rosterTeamIds.join(',')})`)
     .order('time', { ascending: true })
     .order('id', { ascending: true });
+
+  if (matchDate) {
+    matchQuery = matchQuery.eq('date', matchDate);
+  }
 
   if (allowedMatchIds.length > 0) {
     matchQuery = matchQuery.in('id', allowedMatchIds);
@@ -454,12 +457,23 @@ async function resolvePlayerContextForDate(
   const { data: matches, error: matchesError } = await matchQuery;
   if (matchesError) throw new Error(matchesError.message);
 
-  const availableMatches = ((matches ?? []) as any[]).filter(
-    (match) => String(match.status ?? '').toLowerCase() !== 'cancelled'
-  );
-  const matchRow = availableMatches.find(
-    (match) => String(match.status ?? '').toLowerCase() !== 'played'
-  ) ?? availableMatches[0] ?? null;
+  const availableMatches = ((matches ?? []) as any[])
+    .filter((match) => {
+      const status = String(match.status ?? '').toLowerCase();
+      return status !== 'cancelled' && status !== 'played';
+    })
+    .sort((left, right) => {
+      const byDate = String(left.date ?? '9999-12-31').localeCompare(String(right.date ?? '9999-12-31'));
+      if (byDate !== 0) return byDate;
+      const byTime = String(left.time ?? '99:99:99').localeCompare(String(right.time ?? '99:99:99'));
+      if (byTime !== 0) return byTime;
+      return Number(left.id) - Number(right.id);
+    });
+  const today = new Date().toISOString().slice(0, 10);
+  const matchRow = availableMatches.find((match) => match.date === today)
+    ?? availableMatches.find((match) => !match.date || match.date >= today)
+    ?? availableMatches[0]
+    ?? null;
 
   if (!matchRow) return { team: fallbackTeam, match: null };
 
@@ -516,8 +530,8 @@ export async function validatePlayerBarcode(
 
   if (!team && event && match && player) {
     team = await resolvePlayerTeamForMatch(client, Number(player.id), Number(event.id), match);
-  } else if (!team && event && player && request.matchDate) {
-    const resolvedContext = await resolvePlayerContextForDate(client, {
+  } else if (!team && event && player) {
+    const resolvedContext = await resolvePlayerContextForEvent(client, {
       playerId: Number(player.id),
       eventId: Number(event.id),
       matchDate: request.matchDate,
@@ -546,17 +560,13 @@ export async function validatePlayerBarcode(
 
   const matchCheck = buildCheck(
     'match_context',
-    request.matchDate ? 'Match detected for selected date' : 'Match belongs to event',
-    match ? matchContextPassed : !request.matchDate,
+    'Match automatically detected',
+    matchContextPassed,
     match
       ? matchContextPassed
-        ? request.matchDate
-          ? `Player match was detected for ${request.matchDate}.`
-          : 'Selected match belongs to the target event.'
-        : 'Selected match is not pending for the chosen event and date.'
-      : request.matchDate
-        ? `No match was found for the player's team on ${request.matchDate}.`
-        : 'No match selected. Validation will use only event and team context.'
+        ? `Player match was detected${match.date ? ` for ${match.date}` : ''}.`
+        : 'The detected match is not pending for the chosen event.'
+      : 'No pending match was found for the player in the selected event.'
   );
 
   const teamContextPassed =
@@ -568,12 +578,8 @@ export async function validatePlayerBarcode(
     teamContextPassed,
     !team
       ? player && match
-        ? request.matchDate
-          ? `The player is not registered with a team playing on ${request.matchDate}.`
-          : 'The player is not registered with either team in the selected match.'
-        : request.matchDate
-          ? `The player team could not be detected for ${request.matchDate}.`
-          : 'The player team could not be detected for the selected match.'
+        ? 'The player is not registered with either team in the detected match.'
+        : 'The player team could not be detected in a pending match for the selected event.'
       : !match || teamContextPassed
         ? `${request.teamId ? 'Validating against' : 'Automatically matched to'} ${normalizeName(team.name, `Team #${team.id}`)}.`
         : 'Selected team is not part of the selected match.'
@@ -600,7 +606,7 @@ export async function validatePlayerBarcode(
         matchLabel: match
           ? `${normalizeName(match.team1_name, `Team #${match.team1_id}`)} vs ${normalizeName(match.team2_name, `Team #${match.team2_id}`)}`
           : null,
-        matchDate: request.matchDate ?? match?.date ?? null,
+        matchDate: match?.date ?? request.matchDate ?? null,
         teamId: team?.id ?? null,
         teamName: team ? normalizeName(team.name, `Team #${team.id}`) : null,
       },
@@ -742,7 +748,7 @@ export async function validatePlayerBarcode(
       matchLabel: match
         ? `${normalizeName(match.team1_name, `Team #${match.team1_id}`)} vs ${normalizeName(match.team2_name, `Team #${match.team2_id}`)}`
         : null,
-      matchDate: request.matchDate ?? match?.date ?? null,
+      matchDate: match?.date ?? request.matchDate ?? null,
       teamId: resolvedTeam.id,
       teamName: normalizeName(resolvedTeam.name, `Team #${resolvedTeam.id}`),
     },
