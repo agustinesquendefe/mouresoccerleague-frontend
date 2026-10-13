@@ -8,7 +8,7 @@ export async function updatePlayer(
 ): Promise<Player> {
   const { data: currentPlayer, error: currentPlayerError } = await supabase
     .from('players')
-    .select('auth_user_id')
+    .select('auth_user_id, email')
     .eq('id', id)
     .maybeSingle();
 
@@ -16,9 +16,10 @@ export async function updatePlayer(
     throw new Error(currentPlayerError.message);
   }
 
-  const authUser = currentPlayer?.auth_user_id
-    ? { auth_user_id: currentPlayer.auth_user_id }
-    : await createPlayerAuthUser(payload);
+  const authUser = await createPlayerAuthUser(payload, {
+    authUserId: currentPlayer?.auth_user_id ?? null,
+    previousEmail: currentPlayer?.email ?? null,
+  });
 
   const { data, error } = await supabase
     .from('players')
@@ -29,7 +30,7 @@ export async function updatePlayer(
       birth_date: payload.birth_date || null,
       jersey_number: payload.jersey_number,
       phone: payload.phone || null,
-      email: payload.email || null,
+      email: payload.email.trim().toLowerCase() || null,
       document_id: payload.document_id || null,
       is_active: payload.is_active,
       notes: payload.notes || null,

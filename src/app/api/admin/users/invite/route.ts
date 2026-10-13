@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
 import type { ProfileFormData } from '@/models/profile';
+import {
+  getAdministrativeErrorStatus,
+  requireAdministrativeUser,
+} from '@/services/auth/requireAdministrativeUser';
 
 type RequestBody = {
   email?: string;
@@ -51,6 +55,7 @@ export async function POST(request: Request) {
     }
 
     const supabaseAdmin = createSupabaseAdminClient();
+    await requireAdministrativeUser(supabaseAdmin, request);
     const redirectTo = `${getPublicOrigin(request)}/authentication/callback`;
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo,
@@ -87,7 +92,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unable to invite user.' },
-      { status: 500 }
+      { status: getAdministrativeErrorStatus(error) }
     );
   }
 }

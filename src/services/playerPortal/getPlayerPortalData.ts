@@ -83,6 +83,14 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function getLocalDateKey() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export async function getPlayerPortalData(
   email: string,
   client: SupabaseClient = supabase
@@ -159,6 +167,7 @@ export async function getPlayerPortalData(
       .from('events')
       .select('id, name, start_date, status, event_price, membership_price, stripe_price_id')
       .in('id', eventIds)
+      .eq('status', 'active')
       .order('start_date', { ascending: true }),
     client
       .from('matches')
@@ -232,7 +241,7 @@ export async function getPlayerPortalData(
     ])
   );
 
-  const eventTeamPairs = eventTeamRows;
+  const eventTeamPairs = eventTeamRows.filter((row) => eventMap.has(row.event_id));
 
   const uniquePairs = Array.from(
     new Map(eventTeamPairs.map((row) => [`${row.event_id}:${row.team_id}`, row])).values()
@@ -262,9 +271,14 @@ export async function getPlayerPortalData(
 
         const upcomingMatches = matches
           .filter(
-            (match) =>
-              match.event_id === row.event_id &&
-              (match.team1_id === row.team_id || match.team2_id === row.team_id)
+            (match) => {
+              const status = String(match.status ?? '').toLowerCase();
+              return match.event_id === row.event_id &&
+                (match.team1_id === row.team_id || match.team2_id === row.team_id) &&
+                status !== 'played' &&
+                status !== 'cancelled' &&
+                (!match.date || match.date >= getLocalDateKey());
+            }
           )
           .map((match) => {
             const opponentId = match.team1_id === row.team_id ? match.team2_id : match.team1_id;

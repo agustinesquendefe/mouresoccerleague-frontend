@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
 
 type PortalType = 'player' | 'coach' | 'referee';
@@ -9,9 +10,8 @@ const PORTAL_PATHS: Record<PortalType, string> = {
   referee: '/referee/matches',
 };
 
-async function findByEmail(table: string, email: string, columns: string) {
-  const supabaseAdmin = createSupabaseAdminClient();
-  const { data, error } = await supabaseAdmin
+async function findByEmail(client: SupabaseClient, table: string, email: string, columns: string) {
+  const { data, error } = await client
     .from(table)
     .select(columns)
     .ilike('email', email)
@@ -42,14 +42,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email is required.' }, { status: 400 });
     }
 
+    const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
+    if (!token) {
+      return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 });
+    }
+
+    const supabaseAdmin = createSupabaseAdminClient();
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+    const authenticatedEmail = userData.user?.email?.trim().toLowerCase();
+    if (userError || !authenticatedEmail) {
+      return NextResponse.json({ error: 'Invalid portal session.' }, { status: 401 });
+    }
+    if (authenticatedEmail !== email) {
+      return NextResponse.json({ error: 'The requested portal does not match the authenticated user.' }, { status: 403 });
+    }
+
     const [player, coach, referee] = await Promise.all([
-      findByEmail('players', email, 'id, first_name, last_name, full_name, email'),
-      findByEmail('coaches', email, 'id, first_name, last_name, email'),
-      findByEmail('referees', email, 'id, first_name, last_name, email'),
+      findByEmail(supabaseAdmin, 'players', email, 'id, first_name, last_name, full_name, email, is_active'),
+      findByEmail(supabaseAdmin, 'coaches', email, 'id, first_name, last_name, email, status'),
+      findByEmail(supabaseAdmin, 'referees', email, 'id, first_name, last_name, email, status'),
     ]);
 
     const portals = [
-      player
+      player?.is_active
         ? {
             type: 'player' as const,
             label: 'Player',
@@ -57,7 +72,7 @@ export async function POST(request: Request) {
             name: getDisplayName(player, email),
           }
         : null,
-      coach
+      coach && coach.status !== 'inactive'
         ? {
             type: 'coach' as const,
             label: 'Coach',
@@ -65,7 +80,7 @@ export async function POST(request: Request) {
             name: getDisplayName(coach, email),
           }
         : null,
-      referee
+      referee && referee.status !== 'inactive'
         ? {
             type: 'referee' as const,
             label: 'Referee',

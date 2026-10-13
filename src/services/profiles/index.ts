@@ -21,8 +21,15 @@ export async function updateProfile(id: string, payload: ProfileFormData): Promi
 }
 
 export async function deleteProfile(id: string): Promise<void> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('An administrative session is required.');
+
   const response = await fetch(`/api/admin/users/${encodeURIComponent(id)}`, {
     method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
   const data = await response.json().catch(() => null);
 

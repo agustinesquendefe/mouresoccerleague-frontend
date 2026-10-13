@@ -15,7 +15,7 @@ export async function createPlayer(payload: PlayerFormData): Promise<Player> {
         birth_date: payload.birth_date || null,
         jersey_number: payload.jersey_number,
         phone: payload.phone || null,
-        email: payload.email || null,
+        email: payload.email.trim().toLowerCase() || null,
         document_id: payload.document_id || null,
         is_active: payload.is_active,
         notes: payload.notes || null,

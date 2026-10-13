@@ -122,10 +122,15 @@ export default function UsersPage() {
     e.preventDefault();
     try {
       setInviting(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('An administrative session is required.');
+
       const response = await fetch('/api/admin/users/invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           email: inviteEmail,

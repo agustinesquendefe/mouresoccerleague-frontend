@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
+import {
+  getAdministrativeErrorStatus,
+  requireAdministrativeUser,
+} from '@/services/auth/requireAdministrativeUser';
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -13,6 +17,7 @@ export async function DELETE(
     }
 
     const supabaseAdmin = createSupabaseAdminClient();
+    await requireAdministrativeUser(supabaseAdmin, request);
 
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
@@ -29,7 +34,7 @@ export async function DELETE(
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unable to delete user.' },
-      { status: 500 }
+      { status: getAdministrativeErrorStatus(error) }
     );
   }
 }

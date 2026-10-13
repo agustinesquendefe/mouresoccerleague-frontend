@@ -50,10 +50,15 @@ export default function PortalAccessPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const resolvePortal = async (emailToResolve: string) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) throw new Error('Please use your verification link to sign in.');
+
     const response = await fetch("/api/portal/resolve", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ email: emailToResolve }),
     });
@@ -120,13 +125,11 @@ export default function PortalAccessPage() {
       setErrorMessage(null);
       setMagicLinkSent(false);
 
-      await resolvePortal(trimmedEmail);
-
       const { error } = await supabase.auth.signInWithOtp({
         email: trimmedEmail,
         options: {
           emailRedirectTo: `${window.location.origin}/portal`,
-          shouldCreateUser: true,
+          shouldCreateUser: false,
         },
       });
 

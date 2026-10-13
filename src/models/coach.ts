@@ -7,6 +7,7 @@ export type Coach = {
   email?: string | null;
   phone?: string | null;
   status?: string | null;
+  auth_user_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };

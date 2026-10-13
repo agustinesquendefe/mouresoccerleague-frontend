@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabaseAdmin';
+import {
+  getAdministrativeErrorStatus,
+  requireAdministrativeUser,
+} from '@/services/auth/requireAdministrativeUser';
+import { syncPortalAuthUser } from '@/services/auth/syncPortalAuthUser';
 
 type PortalRole = 'player' | 'coach' | 'referee';
 
@@ -8,6 +13,8 @@ type RequestBody = {
   firstName?: string | null;
   lastName?: string | null;
   role: PortalRole;
+  authUserId?: string | null;
+  previousEmail?: string | null;
 };
 
 const ALLOWED_ROLES = new Set<PortalRole>(['player', 'coach', 'referee']);
@@ -26,54 +33,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'A valid portal role is required.' }, { status: 400 });
     }
 
-    const fullName = `${body.firstName ?? ''} ${body.lastName ?? ''}`.trim();
     const supabaseAdmin = createSupabaseAdminClient();
-
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    await requireAdministrativeUser(supabaseAdmin, request);
+    const result = await syncPortalAuthUser(supabaseAdmin, {
       email,
-      email_confirm: true,
-      user_metadata: {
-        name: fullName,
-        full_name: fullName,
-        role: 'viewer',
-        portal_role: role,
-      },
+      firstName: body.firstName,
+      lastName: body.lastName,
+      role,
+      authUserId: body.authUserId,
+      previousEmail: body.previousEmail,
     });
 
-    if (error) {
-      const alreadyRegistered =
-        error.message.toLowerCase().includes('already') ||
-        error.message.toLowerCase().includes('registered') ||
-        error.status === 422;
-
-      if (alreadyRegistered) {
-        return NextResponse.json({
-          auth_user_id: null,
-          already_exists: true,
-        });
-      }
-
-      return NextResponse.json(
-        {
-          error: error.message,
-          step: 'create_auth_user',
-          status: error.status,
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      auth_user_id: data.user?.id ?? null,
-      already_exists: false,
-    });
+    return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : 'Unable to create portal auth user.',
         step: 'portal_auth_user_route',
       },
-      { status: 500 }
+      { status: getAdministrativeErrorStatus(error) }
     );
   }
 }
