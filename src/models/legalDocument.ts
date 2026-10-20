@@ -18,7 +18,8 @@ export interface LegalDocument {
 export interface PlayerLegalDocument {
   id: string;
   player_id: string;
-  legal_document_id: string;
+  legal_document_id?: string | null;
+  document_type: 'tutor' | 'participant';
   file_url: string;
   uploaded_by: string;
   uploaded_at: string;

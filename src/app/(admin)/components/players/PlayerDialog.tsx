@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getLegalDocuments } from '@/services/legalDocuments';
-import type { LegalDocument } from '@/models/legalDocument';
 import { supabase } from '@/lib/supabaseClient';
 import { getPlayerLegalDocuments, deletePlayerLegalDocument, addPlayerLegalDocument } from '@/services/playerLegalDocuments';
 import { getAgeFromDateOnly, getLocalDateString } from '@/utils/dateOnly';
@@ -125,7 +123,6 @@ export default function PlayerDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Legal document state for minors
-  const [legalDocs, setLegalDocs] = useState<LegalDocument[]>([]);
   const [tutorFile, setTutorFile] = useState<File | null>(null);
   const [participantFile, setParticipantFile] = useState<File | null>(null);
   const [tutorFileError, setTutorFileError] = useState<string | null>(null);
@@ -136,7 +133,7 @@ export default function PlayerDialog({
   const [loadingLegalDocs, setLoadingLegalDocs] = useState(false);
     // Fetch player legal docs on edit
     useEffect(() => {
-      if (!open || mode !== 'edit' || !player || !legalDocs.length) {
+      if (!open || mode !== 'edit' || !player) {
         setPlayerLegalDocs({ tutor: null, participant: null });
         setPlayerLegalDocUrls({ tutor: null, participant: null });
         setTutorFile(null);
@@ -146,9 +143,8 @@ export default function PlayerDialog({
       setLoadingLegalDocs(true);
       getPlayerLegalDocuments(player.id.toString())
         .then(async (docs) => {
-          // Buscar por tipo (tutor/participant)
-          const tutorDoc = docs.find((d) => d.legal_document_id && legalDocs.find((ld) => ld.id === d.legal_document_id && ld.type === 'tutor')) || null;
-          const participantDoc = docs.find((d) => d.legal_document_id && legalDocs.find((ld) => ld.id === d.legal_document_id && ld.type === 'participant')) || null;
+          const tutorDoc = docs.find((doc) => doc.document_type === 'tutor') || null;
+          const participantDoc = docs.find((doc) => doc.document_type === 'participant') || null;
           // Generar signed URLs
           const tutorUrl = tutorDoc && tutorDoc.file_url ? (await supabase.storage.from('player-legal-documents').createSignedUrl(tutorDoc.file_url, 600)).data?.signedUrl : null;
           const participantUrl = participantDoc && participantDoc.file_url ? (await supabase.storage.from('player-legal-documents').createSignedUrl(participantDoc.file_url, 600)).data?.signedUrl : null;
@@ -163,7 +159,7 @@ export default function PlayerDialog({
           setParticipantFile(null);
         })
         .finally(() => setLoadingLegalDocs(false));
-    }, [open, mode, player, legalDocs]);
+    }, [open, mode, player]);
 
   useEffect(() => {
     if (!open || mode !== 'create') return;
@@ -195,12 +191,6 @@ export default function PlayerDialog({
       setPlayerLegalDocs((prev) => ({ ...prev, [type]: null }));
       setPlayerLegalDocUrls((prev) => ({ ...prev, [type]: null }));
     };
-  // Fetch legal documents (for type info)
-  useEffect(() => {
-    if (!open) return;
-    getLegalDocuments().then(setLegalDocs).catch(() => setLegalDocs([]));
-  }, [open]);
-
   useEffect(() => {
     if (!open) return;
     getCategories().then(setCategories).catch(console.error);
@@ -351,21 +341,15 @@ export default function PlayerDialog({
   const hasConflicts =
     conflicts.keyExists || conflicts.emailExists || conflicts.documentExists;
 
-  // Legal document requirements: participant always, tutor only for minors.
+  // Legal documents are optional. Tutor documents are only relevant for minors.
   const isMinor = useMemo(() => getAgeFromDateOnly(values.birth_date) < 18, [values.birth_date]);
-  const requiresParticipantDocument = true;
-  const requiresTutorDocument = isMinor;
-  const missingTutor = isMinor && !tutorFile && !playerLegalDocs.tutor;
-  const missingParticipant = requiresParticipantDocument && !participantFile && !playerLegalDocs.participant;
-  const missingRequiredDocs = missingTutor || missingParticipant;
   const isDisabled =
     !values.first_name.trim() ||
     !values.last_name.trim() ||
     !values.key.trim() ||
     loading ||
     checkingConflicts ||
-    hasConflicts ||
-    missingRequiredDocs;
+    hasConflicts;
 
   const handleSubmit = async () => {
     try {
@@ -388,29 +372,6 @@ export default function PlayerDialog({
         setSubmitError('Please resolve duplicate values before saving.');
         return;
       }
-
-      const tutorLegalDoc = legalDocs.find((doc) => doc.type === 'tutor');
-      const participantLegalDoc = legalDocs.find((doc) => doc.type === 'participant');
-
-      // Validate legal docs (solo si no existen en la base ni input)
-      let validLegalDocs = true;
-      if (requiresTutorDocument && !tutorLegalDoc) {
-        setTutorFileError('Configure a tutor legal document first');
-        validLegalDocs = false;
-      }
-      if (requiresParticipantDocument && !participantLegalDoc) {
-        setParticipantFileError('Configure a participant legal document first');
-        validLegalDocs = false;
-      }
-      if (requiresTutorDocument && !tutorFile && !playerLegalDocs.tutor) {
-        setTutorFileError('Required for minors');
-        validLegalDocs = false;
-      }
-      if (requiresParticipantDocument && !participantFile && !playerLegalDocs.participant) {
-        setParticipantFileError('Required');
-        validLegalDocs = false;
-      }
-      if (!validLegalDocs) return;
 
       // 1. Crear/editar jugador y obtener playerId
       const playerResult = await onSubmit(
@@ -441,7 +402,7 @@ export default function PlayerDialog({
       // 2. Registrar documentos legales si hay archivos nuevos
       // Verificar usuario autenticado antes de subir documentos legales
       let user: any = null;
-      if ((tutorFile && tutorLegalDoc) || (participantFile && participantLegalDoc)) {
+      if (tutorFile || participantFile) {
         // Obtener sesión y loguear detalles
         const { data: { session } } = await supabase.auth.getSession();
         console.log('session exists:', !!session);
@@ -456,10 +417,10 @@ export default function PlayerDialog({
       }
 
       // Tutor
-      if (tutorFile && tutorLegalDoc) {
+      if (tutorFile) {
         const formData = new FormData();
         formData.append('file', tutorFile);
-        formData.append('legal_document_id', tutorLegalDoc.id);
+        formData.append('document_type', 'tutor');
         formData.append('uploaded_by', user.id);
         // Solo fecha para el campo date
         const today = getLocalDateString();
@@ -467,7 +428,7 @@ export default function PlayerDialog({
         formData.append('status', 'vigente');
         console.log('[DEBUG] Insertando documento legal de tutor:', {
           playerId,
-          legal_document_id: tutorLegalDoc.id,
+          document_type: 'tutor',
           file: tutorFile.name,
           uploaded_by: user.id,
           typeof_uploaded_by: typeof user.id,
@@ -482,10 +443,10 @@ export default function PlayerDialog({
         }
       }
       // Participante
-      if (participantFile && participantLegalDoc) {
+      if (participantFile) {
         const formData = new FormData();
         formData.append('file', participantFile);
-        formData.append('legal_document_id', participantLegalDoc.id);
+        formData.append('document_type', 'participant');
         formData.append('uploaded_by', user.id);
         // Solo fecha para el campo date
         const today = getLocalDateString();
@@ -493,7 +454,7 @@ export default function PlayerDialog({
         formData.append('status', 'vigente');
         console.log('[DEBUG] Insertando documento legal de participante:', {
           playerId,
-          legal_document_id: participantLegalDoc.id,
+          document_type: 'participant',
           file: participantFile.name,
           uploaded_by: user.id,
           typeof_uploaded_by: typeof user.id,
@@ -669,16 +630,16 @@ export default function PlayerDialog({
                 {/* Legal documents */}
                 <Box mt={2} mb={1} p={2} sx={{ border: '1px solid', borderColor: isMinor ? 'warning.main' : 'divider', borderRadius: 2, bgcolor: isMinor ? 'warning.light' : 'background.paper' }}>
                   <Typography variant="subtitle1" color={isMinor ? 'warning.dark' : 'text.primary'} fontWeight={600} gutterBottom>
-                    Required Legal Documents
+                    Legal Documents (Optional)
                   </Typography>
                   <Typography variant="body2" color="text.secondary" mb={1}>
                     {isMinor
-                      ? 'Upload the tutor and participant documents to register a minor.'
-                      : 'Upload the participant document to register an adult player.'}
+                      ? 'You may attach tutor and participant documents for a minor.'
+                      : 'You may attach a participant document for an adult player.'}
                   </Typography>
                   <Stack direction="column" spacing={2}>
                     {/* Tutor */}
-                    {requiresTutorDocument && (
+                    {isMinor && (
                       <Box>
                         <Typography variant="caption" fontWeight={600}>Tutor</Typography>
                         {loadingLegalDocs ? (
