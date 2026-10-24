@@ -13,6 +13,7 @@ import {
 import type { Match } from '@/models/match';
 import type { Field } from '@/models/field';
 import { formatTime12Hour } from '@/utils/formatTime';
+import type { RoundCycle } from '@/utils/roundCycles';
 
 type Props = {
   matches: Match[];
@@ -23,12 +24,15 @@ type Props = {
   onDeleteExtraMatch?: (match: Match) => void;
   groupByDate?: boolean;
   groupByRound?: boolean;
+  roundLabel?: string;
   compact?: boolean;
   restingTeamIdsByRound?: Record<number, number[]>;
   restingTeamOptions?: Array<{ id: number; name: string }>;
   editableRestingTeamIds?: number[];
   restingTeamChangingRound?: number | null;
   onChangeRestingTeam?: (roundNumber: number, teamId: number) => void;
+  roundCycles?: RoundCycle[];
+  roundCycleMap?: Record<number, number>;
 };
 
 export default function GroupedMatchesTable({
@@ -40,12 +44,15 @@ export default function GroupedMatchesTable({
   onDeleteExtraMatch,
   groupByDate = true,
   groupByRound = false,
+  roundLabel,
   compact = false,
   restingTeamIdsByRound = {},
   restingTeamOptions = [],
   editableRestingTeamIds = [],
   restingTeamChangingRound = null,
   onChangeRestingTeam,
+  roundCycles = [],
+  roundCycleMap = {},
 }: Props) {
   const fieldMap = fields.reduce<Record<number, string>>((acc, field, index) => {
     acc[field.id] = `${field.name} (#${index + 1})`;
@@ -256,7 +263,7 @@ export default function GroupedMatchesTable({
 
             {groupByDate && groupKey !== 'all' && (
               <Typography variant="h6" fontWeight={700}>
-                Round {index + 1} — {groupKey}
+                {roundLabel ?? `Round ${index + 1}`} — {groupKey}
               </Typography>
             )}
 
@@ -271,7 +278,7 @@ export default function GroupedMatchesTable({
     return content;
   }
 
-  return (
+  const renderRoundGrid = (groupKeys: string[]) => (
     <Box
       sx={{
         display: 'grid',
@@ -285,7 +292,7 @@ export default function GroupedMatchesTable({
         minWidth: 0,
       }}
     >
-      {sortedGroups.map((groupKey) => (
+      {groupKeys.map((groupKey) => (
         <Paper key={groupKey} sx={{ p: 2, minWidth: 0 }}>
           <Stack spacing={1.5}>
             <Typography variant="subtitle1" fontWeight={700}>
@@ -302,5 +309,33 @@ export default function GroupedMatchesTable({
         </Paper>
       ))}
     </Box>
+  );
+
+  if (roundCycles.length <= 1) return renderRoundGrid(sortedGroups);
+
+  const groupsWithoutCycle = sortedGroups.filter((groupKey) =>
+    groupKey === 'No Round' || !roundCycleMap[Number(groupKey)]);
+
+  return (
+    <Stack spacing={3} sx={{ width: '100%', minWidth: 0 }}>
+      {roundCycles.map((cycle) => {
+        const cycleGroups = sortedGroups.filter((groupKey) =>
+          roundCycleMap[Number(groupKey)] === cycle.cycleNumber);
+        if (cycleGroups.length === 0) return null;
+
+        return (
+          <Box key={cycle.cycleNumber}>
+            <Stack direction="row" spacing={1} alignItems="baseline" sx={{ mb: 1.5 }}>
+              <Typography variant="h6" fontWeight={800}>Cycle {cycle.cycleNumber}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Rounds {cycle.firstRound}{cycle.firstRound === cycle.lastRound ? '' : `–${cycle.lastRound}`}
+              </Typography>
+            </Stack>
+            {renderRoundGrid(cycleGroups)}
+          </Box>
+        );
+      })}
+      {groupsWithoutCycle.length > 0 && renderRoundGrid(groupsWithoutCycle)}
+    </Stack>
   );
 }

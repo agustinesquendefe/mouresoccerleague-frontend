@@ -22,6 +22,7 @@ export default function EventDetailClient({ eventId }: Props) {
   const [playerRecordsRefreshKey, setPlayerRecordsRefreshKey] = useState(0);
   const [membershipsRefreshKey, setMembershipsRefreshKey] = useState(0);
   const [formatType, setFormatType] = useState<string | null>(null);
+  const [roundRobinCycles, setRoundRobinCycles] = useState(1);
   const [matchFormat, setMatchFormat] = useState<string | null>(null);
   const [eventName, setEventName] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -31,7 +32,7 @@ export default function EventDetailClient({ eventId }: Props) {
     Promise.all([
       supabase
         .from('events')
-        .select('name, format_type, match_format')
+        .select('name, format_type, match_format, round_robin_cycles')
         .eq('id', eventId)
         .single(),
       getAppSettings(),
@@ -42,6 +43,7 @@ export default function EventDetailClient({ eventId }: Props) {
         const data = eventResult.data;
         setEventName(data?.name ?? null);
         setFormatType(data?.format_type ?? null);
+        setRoundRobinCycles(Math.max(1, Number(data?.round_robin_cycles) || 1));
         setMatchFormat(data?.match_format ?? null);
         setSettings(appSettings);
         setLoadError(null);
@@ -99,6 +101,7 @@ export default function EventDetailClient({ eventId }: Props) {
         eventId={eventId}
         eventName={eventName ?? `Event #${eventId}`}
         eventFormat={formatType}
+        eventCycles={roundRobinCycles}
         printCompany={settings}
         onMatchUpdated={handleMatchUpdated}
       />

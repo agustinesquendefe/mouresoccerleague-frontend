@@ -18,6 +18,7 @@ import CompactFixtureButton from './CompactFixtureButton';
 import { escapeHtml, printHtml } from '@/utils/printHtml';
 import { formatTime12Hour } from '@/utils/formatTime';
 import type { AppSettings } from '@/models/appSettings';
+import { createRoundCycleMap, groupRoundsByCycle } from '@/utils/roundCycles';
 
 type MatchQuickFilter = 'all' | 'played' | 'pending' | 'rescheduled';
 
@@ -38,11 +39,12 @@ type Props = {
   eventId: number;
   eventName?: string;
   eventFormat?: string | null;
+  eventCycles?: number;
   printCompany?: Partial<AppSettings> | null;
   onMatchUpdated?: () => void;
 };
 
-export default function EventMatchesSection({ eventId, eventName, eventFormat, printCompany, onMatchUpdated }: Props) {
+export default function EventMatchesSection({ eventId, eventName, eventFormat, eventCycles = 1, printCompany, onMatchUpdated }: Props) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [eventTeams, setEventTeams] = useState<EventTeamRow[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
@@ -58,6 +60,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
   const [restingTeamChangingRound, setRestingTeamChangingRound] = useState<number | null>(null);
 
   const [selectedLeagueTab, setSelectedLeagueTab] = useState('all');
+  const [selectedCycleTab, setSelectedCycleTab] = useState('all');
   const [teamSearch, setTeamSearch] = useState('');
   const [quickFilter, setQuickFilter] = useState<MatchQuickFilter>('all');
 
@@ -148,6 +151,49 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
     ).sort((a, b) => a - b);
   }, [leagueMatches]);
 
+  const leagueCycles = useMemo(
+    () => groupRoundsByCycle(uniqueLeagueRounds, eventCycles),
+    [eventCycles, uniqueLeagueRounds]
+  );
+
+  const roundCycleMap = useMemo(
+    () => createRoundCycleMap(leagueCycles),
+    [leagueCycles]
+  );
+
+  const roundsForSelectedCycle = useMemo(() => {
+    if (leagueCycles.length <= 1) return uniqueLeagueRounds;
+    if (selectedCycleTab === 'all') return [];
+    return leagueCycles.find((cycle) => String(cycle.cycleNumber) === selectedCycleTab)?.rounds ?? [];
+  }, [leagueCycles, selectedCycleTab, uniqueLeagueRounds]);
+
+  useEffect(() => {
+    if (
+      selectedCycleTab !== 'all' &&
+      !leagueCycles.some((cycle) => String(cycle.cycleNumber) === selectedCycleTab)
+    ) {
+      setSelectedCycleTab('all');
+      setSelectedLeagueTab('all');
+    }
+  }, [leagueCycles, selectedCycleTab]);
+
+  useEffect(() => {
+    if (
+      selectedLeagueTab !== 'all' &&
+      !roundsForSelectedCycle.some((round) => String(round) === selectedLeagueTab)
+    ) {
+      setSelectedLeagueTab('all');
+    }
+  }, [roundsForSelectedCycle, selectedLeagueTab]);
+
+  const getRoundLabel = (roundNumber: number | string) => {
+    const numericRound = Number(roundNumber);
+    const cycleNumber = roundCycleMap[numericRound];
+    return leagueCycles.length > 1 && cycleNumber
+      ? `Cycle ${cycleNumber} · Round ${numericRound}`
+      : `Round ${numericRound}`;
+  };
+
   const restingTeamIdsByRound = useMemo(() => {
     const result: Record<number, number[]> = {};
     uniqueLeagueRounds.forEach((roundNumber) => {
@@ -181,9 +227,15 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
   )), [leagueMatches, restingTeamIdsByRound]);
 
   const visibleLeagueMatches = useMemo(() => {
-    const tabMatches = selectedLeagueTab === 'all'
+    const cycleMatches = selectedCycleTab === 'all'
       ? leagueMatches
-      : leagueMatches.filter(
+      : leagueMatches.filter((match) =>
+        match.round_number != null &&
+        String(roundCycleMap[match.round_number]) === selectedCycleTab);
+
+    const tabMatches = selectedLeagueTab === 'all'
+      ? cycleMatches
+      : cycleMatches.filter(
         (match) => String(match.round_number) === String(selectedLeagueTab)
       );
 
@@ -205,12 +257,18 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
       const team2Name = teamMap[match.team2_id]?.toLowerCase() ?? '';
       return team1Name.includes(term) || team2Name.includes(term);
     });
-  }, [leagueMatches, selectedLeagueTab, quickFilter, teamSearch, teamMap]);
+  }, [leagueMatches, selectedCycleTab, selectedLeagueTab, quickFilter, teamSearch, teamMap, roundCycleMap]);
 
   const quickFilterCounts = useMemo(() => {
-    const sourceMatches = selectedLeagueTab === 'all'
+    const cycleMatches = selectedCycleTab === 'all'
       ? leagueMatches
-      : leagueMatches.filter((match) => String(match.round_number) === String(selectedLeagueTab));
+      : leagueMatches.filter((match) =>
+        match.round_number != null &&
+        String(roundCycleMap[match.round_number]) === selectedCycleTab);
+
+    const sourceMatches = selectedLeagueTab === 'all'
+      ? cycleMatches
+      : cycleMatches.filter((match) => String(match.round_number) === String(selectedLeagueTab));
 
     return sourceMatches.reduce(
       (acc, match) => {
@@ -223,7 +281,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
       },
       { all: 0, played: 0, pending: 0, rescheduled: 0 }
     );
-  }, [leagueMatches, selectedLeagueTab]);
+  }, [leagueMatches, selectedCycleTab, selectedLeagueTab, roundCycleMap]);
 
   const knockoutGroups = useMemo(() => {
     return knockoutMatches.reduce<Record<string, Match[]>>((acc, match) => {
@@ -444,7 +502,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
 
             return `
               <tr>
-                <td>${escapeHtml(match.round_number ? `Round ${match.round_number}` : '-')}</td>
+                <td>${escapeHtml(match.round_number ? getRoundLabel(match.round_number) : '-')}</td>
                 <td>${escapeHtml(`${team1} vs ${team2}`)}</td>
                 <td>${escapeHtml(match.date ?? '-')}</td>
                 <td>${escapeHtml(match.rescheduled_from_date ?? '-')}</td>
@@ -499,7 +557,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
           <div class="round-grid">
             ${sortedRounds.map((round) => `
               <section class="round-card">
-                <h2>${escapeHtml(round === 'No Round' ? 'No Round' : `Round ${round}`)}</h2>
+                <h2>${escapeHtml(round === 'No Round' ? 'No Round' : getRoundLabel(round))}</h2>
                 ${buildMatchesTable(groupedByRound[round])}
               </section>
             `).join('')}
@@ -510,7 +568,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
     }
 
     printHtml({
-      title: `${eventName ?? `Event #${eventId}`} - Round ${selectedLeagueTab}`,
+      title: `${eventName ?? `Event #${eventId}`} - ${getRoundLabel(selectedLeagueTab)}`,
       company: printCompany,
       subtitle: 'League matchups for this round.',
       body: buildMatchesTable(visibleLeagueMatches),
@@ -542,21 +600,83 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
           </Stack>
         </Stack>
 
-        {!loading && leagueMatches.length > 0 && (
-          <Tabs
-            value={selectedLeagueTab}
-            onChange={(_, value) => {
-              setSelectedLeagueTab(value);
-              setTeamSearch('');
+        {!loading && leagueMatches.length > 0 && leagueCycles.length > 1 && (
+          <Alert severity="info" variant="outlined">
+            <Typography component="span" fontWeight={700}>
+              {leagueCycles.length} {leagueCycles.length === 1 ? 'cycle' : 'cycles'}:
+            </Typography>{' '}
+            {leagueCycles.map((cycle) => (
+              `Cycle ${cycle.cycleNumber}: ${cycle.firstRound === cycle.lastRound ? 'Round' : 'Rounds'} ${cycle.firstRound}${cycle.firstRound === cycle.lastRound ? '' : `–${cycle.lastRound}`}`
+            )).join(' · ')}
+          </Alert>
+        )}
+
+        {!loading && leagueMatches.length > 0 && leagueCycles.length > 1 && (
+          <Box
+            sx={{
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 2,
+              bgcolor: 'action.hover',
+              px: 1.5,
+              pt: 1,
             }}
-            variant="scrollable"
-            scrollButtons="auto"
           >
-            <Tab label="All" value="all" />
-            {uniqueLeagueRounds.map((round) => (
-              <Tab key={round} label={`Round ${round}`} value={String(round)} />
-            ))}
-          </Tabs>
+            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ px: 1 }}>
+              CYCLE
+            </Typography>
+            <Tabs
+              value={selectedCycleTab}
+              onChange={(_, value) => {
+                setSelectedCycleTab(value);
+                setSelectedLeagueTab('all');
+                setTeamSearch('');
+              }}
+              variant="scrollable"
+              scrollButtons="auto"
+              aria-label="Filter matches by cycle"
+            >
+              <Tab label="All cycles" value="all" />
+              {leagueCycles.map((cycle) => (
+                <Tab
+                  key={cycle.cycleNumber}
+                  label={`Cycle ${cycle.cycleNumber}`}
+                  value={String(cycle.cycleNumber)}
+                />
+              ))}
+            </Tabs>
+          </Box>
+        )}
+
+        {!loading && leagueMatches.length > 0 && roundsForSelectedCycle.length > 0 && (
+          <Box
+            sx={{
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 2,
+              px: 1.5,
+              pt: 1,
+            }}
+          >
+            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ px: 1 }}>
+              ROUND
+            </Typography>
+            <Tabs
+              value={roundsForSelectedCycle.some((round) => String(round) === selectedLeagueTab) ? selectedLeagueTab : 'all'}
+              onChange={(_, value) => {
+                setSelectedLeagueTab(value);
+                setTeamSearch('');
+              }}
+              variant="scrollable"
+              scrollButtons="auto"
+              aria-label="Filter matches by round"
+            >
+              <Tab label="All rounds" value="all" />
+              {roundsForSelectedCycle.map((round) => (
+                <Tab key={round} label={`Round ${round}`} value={String(round)} />
+              ))}
+            </Tabs>
+          </Box>
         )}
 
         {!loading && leagueMatches.length > 0 && (
@@ -624,7 +744,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
               </Stack>
             </Stack>
             <RoundSchedulePlanner
-              roundLabel={`Round ${selectedLeagueTab}`}
+              roundLabel={getRoundLabel(selectedLeagueTab)}
               matches={visibleLeagueMatches}
               teamMap={teamMap}
               fields={fields}
@@ -645,7 +765,10 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, p
               onDeleteExtraMatch={handleDeleteExtraMatch}
               groupByDate={selectedLeagueTab !== 'all'}
               groupByRound={selectedLeagueTab === 'all'}
+              roundLabel={selectedLeagueTab === 'all' ? undefined : getRoundLabel(selectedLeagueTab)}
               compact={selectedLeagueTab === 'all'}
+              roundCycles={selectedCycleTab === 'all' ? leagueCycles : []}
+              roundCycleMap={roundCycleMap}
               restingTeamIdsByRound={restingTeamIdsByRound}
               restingTeamOptions={restingTeamOptions}
               editableRestingTeamIds={editableRestingTeamIds}
