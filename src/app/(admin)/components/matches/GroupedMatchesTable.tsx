@@ -335,7 +335,14 @@ export default function GroupedMatchesTable({
           </Box>
         );
       })}
-      {groupsWithoutCycle.length > 0 && renderRoundGrid(groupsWithoutCycle)}
+      {groupsWithoutCycle.length > 0 && (
+        <Box>
+          <Typography variant="h6" fontWeight={800} sx={{ mb: 1.5 }}>
+            Outside configured cycles
+          </Typography>
+          {renderRoundGrid(groupsWithoutCycle)}
+        </Box>
+      )}
     </Stack>
   );
 }

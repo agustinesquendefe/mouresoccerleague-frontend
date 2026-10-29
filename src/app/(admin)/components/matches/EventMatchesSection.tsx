@@ -20,7 +20,7 @@ import { formatTime12Hour } from '@/utils/formatTime';
 import type { AppSettings } from '@/models/appSettings';
 import { createRoundCycleMap, groupRoundsByCycle } from '@/utils/roundCycles';
 
-type MatchQuickFilter = 'all' | 'played' | 'pending' | 'rescheduled';
+type MatchQuickFilter = 'all' | 'played' | 'pending' | 'rescheduled' | 'cancelled';
 
 type EventTeamRow = {
   id: number;
@@ -145,6 +145,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
     return Array.from(
       new Set(
         leagueMatches
+          .filter((match) => String(match.status ?? '').toLowerCase() !== 'cancelled')
           .map((match) => match.round_number)
           .filter((value): value is number => value !== null && value !== undefined)
       )
@@ -244,9 +245,10 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
 
       if (quickFilter === 'played') return status === 'played';
       if (quickFilter === 'pending') return status !== 'played' && status !== 'cancelled';
-      if (quickFilter === 'rescheduled') return Boolean(match.rescheduled_from_date);
+      if (quickFilter === 'rescheduled') return status !== 'cancelled' && Boolean(match.rescheduled_from_date);
+      if (quickFilter === 'cancelled') return status === 'cancelled';
 
-      return true;
+      return status !== 'cancelled';
     });
 
     const term = teamSearch.trim().toLowerCase();
@@ -273,13 +275,14 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
     return sourceMatches.reduce(
       (acc, match) => {
         const status = String(match.status ?? '').toLowerCase();
-        acc.all += 1;
+        if (status !== 'cancelled') acc.all += 1;
         if (status === 'played') acc.played += 1;
         if (status !== 'played' && status !== 'cancelled') acc.pending += 1;
-        if (match.rescheduled_from_date) acc.rescheduled += 1;
+        if (status !== 'cancelled' && match.rescheduled_from_date) acc.rescheduled += 1;
+        if (status === 'cancelled') acc.cancelled += 1;
         return acc;
       },
-      { all: 0, played: 0, pending: 0, rescheduled: 0 }
+      { all: 0, played: 0, pending: 0, rescheduled: 0, cancelled: 0 }
     );
   }, [leagueMatches, selectedCycleTab, selectedLeagueTab, roundCycleMap]);
 
@@ -682,10 +685,11 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
         {!loading && leagueMatches.length > 0 && (
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             {([
-              ['all', 'All', quickFilterCounts.all],
+              ['all', 'Active', quickFilterCounts.all],
               ['played', 'Played', quickFilterCounts.played],
               ['pending', 'Pending', quickFilterCounts.pending],
               ['rescheduled', 'Rescheduled', quickFilterCounts.rescheduled],
+              ['cancelled', 'Cancelled', quickFilterCounts.cancelled],
             ] as const).map(([value, label, count]) => (
               <Button
                 key={value}
