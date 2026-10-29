@@ -14,7 +14,7 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
   const [eventResult, teamsResult, matchesResult, fields] = await Promise.all([
     supabase.from('events').select('format_type, round_robin_cycles, start_date, match_day_of_week').eq('id', eventId).single(),
     supabase.from('event_teams').select('id, team_id, order_index, status').eq('event_id', eventId).eq('status', 'active').order('order_index').order('id'),
-    supabase.from('matches').select('id, team1_id, team2_id, round_number, pos, num, is_extra, status, date').eq('event_id', eventId).eq('stage_type', 'league'),
+    supabase.from('matches').select('id, team1_id, team2_id, round_number, pos, num, is_extra, status, score1, score2, date').eq('event_id', eventId).or('stage_type.eq.league,stage_type.is.null'),
     getFieldsByEvent(eventId),
   ]);
   if (eventResult.error) throw new Error(eventResult.error.message);
@@ -27,6 +27,14 @@ export async function generateRoundRobinMatches(eventId: number): Promise<void> 
 
   const teamIds = Array.from(new Set((teamsResult.data ?? []).map((row) => row.team_id)));
   const allMatches = matchesResult.data ?? [];
+  if (allMatches.some((match) =>
+    match.status === 'played' ||
+    match.status === 'in_progress' ||
+    (match.status !== 'cancelled' && (match.score1 != null || match.score2 != null)))) {
+    throw new Error(
+      'This fixture has results or has already started and cannot be regenerated. Use Compact Future Rounds for scheduled matches.'
+    );
+  }
   const cycles = event.round_robin_cycles || 1;
   const activeTeamIds = new Set(teamIds);
   const lockedRoundNumbers = new Set(allMatches

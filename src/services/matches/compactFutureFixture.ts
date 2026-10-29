@@ -1,14 +1,14 @@
 import { supabase } from '@/lib/supabaseClient';
-import {
-  formatDate,
-  getOpenRoundNumbers,
-  reassignPairsToEarlierRounds,
-  type ExistingFixtureMatch,
-} from './incrementalFixture';
 
-type CompactionMatch = ExistingFixtureMatch & {
+type CompactionMatch = {
   id: number;
+  team1_id: number;
+  team2_id: number;
   group_id: number | null;
+  round_number: number | null;
+  status: string | null;
+  score1: number | null;
+  score2: number | null;
   is_extra: boolean | null;
   pos: number | null;
 };
@@ -22,7 +22,6 @@ type PlannedMatchUpdate = {
   id: number;
   fromRound: number;
   toRound: number;
-  date: string | null;
 };
 
 export type FixtureCompactionPreview = {
@@ -31,6 +30,7 @@ export type FixtureCompactionPreview = {
   roundsAfter: number;
   roundsRemoved: number;
   firstDestinationRound: number | null;
+  expectedRoundCount: number;
 };
 
 type FixtureCompactionPlan = FixtureCompactionPreview & {
@@ -70,19 +70,11 @@ function getExpectedRoundCount(
   throw new Error('Future-round compaction is only available for round robin and group events.');
 }
 
-function findLateTeamIds(matches: CompactionMatch[]): Set<number> {
-  const appearances = new Map<number, number>();
-  matches.forEach((match) => {
-    appearances.set(match.team1_id, (appearances.get(match.team1_id) ?? 0) + 1);
-    appearances.set(match.team2_id, (appearances.get(match.team2_id) ?? 0) + 1);
-  });
-  const highestAppearanceCount = Math.max(0, ...appearances.values());
-  if (highestAppearanceCount < 2) return new Set();
-  return new Set(
-    Array.from(appearances.entries())
-      .filter(([, count]) => count === highestAppearanceCount)
-      .map(([teamId]) => teamId)
-  );
+function hasStarted(match: CompactionMatch): boolean {
+  return match.status === 'played' ||
+    match.status === 'in_progress' ||
+    match.score1 != null ||
+    match.score2 != null;
 }
 
 async function buildFixtureCompactionPlan(eventId: number): Promise<FixtureCompactionPlan> {
@@ -101,9 +93,9 @@ async function buildFixtureCompactionPlan(eventId: number): Promise<FixtureCompa
       .eq('status', 'active'),
     supabase
       .from('matches')
-      .select('id, team1_id, team2_id, group_id, round_number, status, date, is_extra, pos')
+      .select('id, team1_id, team2_id, group_id, round_number, status, score1, score2, is_extra, pos')
       .eq('event_id', eventId)
-      .eq('stage_type', 'league')
+      .or('stage_type.eq.league,stage_type.is.null')
       .order('round_number')
       .order('pos')
       .order('id'),
@@ -121,59 +113,109 @@ async function buildFixtureCompactionPlan(eventId: number): Promise<FixtureCompa
     teams,
     event.round_robin_cycles || 1
   );
-  if (expectedRoundCount === 0) throw new Error('There are not enough active teams to compact this fixture.');
+  if (expectedRoundCount === 0) {
+    throw new Error('There are not enough active teams to compact this fixture.');
+  }
 
-  const today = formatDate(new Date());
-  const openRoundNumbers = getOpenRoundNumbers(matches, today);
-  const openRoundSet = new Set(openRoundNumbers);
-  const extendedMatches = matches.filter((match) => {
+  const activeTeamIds = new Set(teams.map((team) => team.team_id));
+  const fixtureMatches = matches.filter((match) =>
+    !match.is_extra &&
+    match.status !== 'cancelled' &&
+    activeTeamIds.has(match.team1_id) &&
+    activeTeamIds.has(match.team2_id));
+
+  const startedOutsideRange = fixtureMatches.filter((match) =>
+    hasStarted(match) && Number(match.round_number) > expectedRoundCount);
+  if (startedOutsideRange.length > 0) {
+    throw new Error(
+      `${startedOutsideRange.length} match${startedOutsideRange.length === 1 ? ' with a result is' : 'es with results are'} ` +
+      `outside the configured ${expectedRoundCount} rounds. Review those matches manually before compacting.`
+    );
+  }
+
+  const invalidRounds = fixtureMatches.filter((match) => {
     const roundNumber = Number(match.round_number);
-    return !match.is_extra &&
-      match.status === 'scheduled' &&
-      roundNumber > expectedRoundCount &&
-      openRoundSet.has(roundNumber);
+    return !Number.isInteger(roundNumber) || roundNumber < 1;
   });
-  const lateTeamIds = findLateTeamIds(extendedMatches);
-  const movableMatches = matches.filter((match) => {
-    const roundNumber = Number(match.round_number);
-    return !match.is_extra &&
-      match.status === 'scheduled' &&
-      openRoundSet.has(roundNumber) &&
-      (roundNumber > expectedRoundCount ||
-        lateTeamIds.has(match.team1_id) ||
-        lateTeamIds.has(match.team2_id));
-  });
+  if (invalidRounds.length > 0) {
+    throw new Error('One or more active fixture matches have no valid round number.');
+  }
+
+  const lockedRoundNumbers = new Set(fixtureMatches
+    .filter(hasStarted)
+    .map((match) => Number(match.round_number)));
+  const destinationRounds = Array.from(
+    { length: expectedRoundCount },
+    (_, index) => index + 1
+  ).filter((roundNumber) => !lockedRoundNumbers.has(roundNumber));
+
+  const movableMatches = fixtureMatches
+    .filter((match) =>
+      match.status === 'scheduled' && Number(match.round_number) > expectedRoundCount)
+    .sort((left, right) =>
+      Number(left.round_number) - Number(right.round_number) ||
+      Number(left.pos ?? Number.MAX_SAFE_INTEGER) - Number(right.pos ?? Number.MAX_SAFE_INTEGER) ||
+      left.id - right.id);
+
+  if (movableMatches.length > 0 && destinationRounds.length === 0) {
+    throw new Error('There are no editable configured rounds available for compaction.');
+  }
+
   const movableIds = new Set(movableMatches.map((match) => match.id));
-  const retainedMatches = matches.filter((match) => !movableIds.has(match.id));
-  const assignments = reassignPairsToEarlierRounds(
-    movableMatches,
-    retainedMatches,
-    openRoundNumbers,
-    lateTeamIds
-  );
+  const matchesPerRound = new Map<number, number>();
+  const teamsPerRound = new Map<number, Map<number, number>>();
+  fixtureMatches
+    .filter((match) => !movableIds.has(match.id))
+    .forEach((match) => {
+      const roundNumber = Number(match.round_number);
+      if (roundNumber < 1 || roundNumber > expectedRoundCount) return;
+      matchesPerRound.set(roundNumber, (matchesPerRound.get(roundNumber) ?? 0) + 1);
+      const appearances = teamsPerRound.get(roundNumber) ?? new Map<number, number>();
+      appearances.set(match.team1_id, (appearances.get(match.team1_id) ?? 0) + 1);
+      appearances.set(match.team2_id, (appearances.get(match.team2_id) ?? 0) + 1);
+      teamsPerRound.set(roundNumber, appearances);
+    });
 
-  const dateByRound = new Map<number, string>();
-  matches.forEach((match) => {
-    const roundNumber = Number(match.round_number);
-    if (roundNumber > 0 && match.date && !dateByRound.has(roundNumber)) {
-      dateByRound.set(roundNumber, match.date);
-    }
-  });
-  const updates = assignments.flatMap(({ pair, roundNumber }) => {
-    const fromRound = Number(pair.round_number);
-    if (fromRound === roundNumber) return [];
-    return [{
-      id: pair.id,
-      fromRound,
-      toRound: roundNumber,
-      date: dateByRound.get(roundNumber) ?? pair.date ?? null,
-    }];
+  const updates: PlannedMatchUpdate[] = movableMatches.map((match) => {
+    const normalizedRound = ((Number(match.round_number) - 1) % expectedRoundCount) + 1;
+    const toRound = [...destinationRounds].sort((left, right) => {
+      const leftAppearances = teamsPerRound.get(left);
+      const rightAppearances = teamsPerRound.get(right);
+      const leftConflict = (leftAppearances?.get(match.team1_id) ?? 0) +
+        (leftAppearances?.get(match.team2_id) ?? 0);
+      const rightConflict = (rightAppearances?.get(match.team1_id) ?? 0) +
+        (rightAppearances?.get(match.team2_id) ?? 0);
+      if (leftConflict !== rightConflict) return leftConflict - rightConflict;
+
+      const leftCount = matchesPerRound.get(left) ?? 0;
+      const rightCount = matchesPerRound.get(right) ?? 0;
+      if (leftCount !== rightCount) return leftCount - rightCount;
+
+      const leftDistance = Math.abs(left - normalizedRound);
+      const rightDistance = Math.abs(right - normalizedRound);
+      if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+      return left - right;
+    })[0];
+
+    if (toRound == null) throw new Error('No configured destination round is available.');
+
+    matchesPerRound.set(toRound, (matchesPerRound.get(toRound) ?? 0) + 1);
+    const appearances = teamsPerRound.get(toRound) ?? new Map<number, number>();
+    appearances.set(match.team1_id, (appearances.get(match.team1_id) ?? 0) + 1);
+    appearances.set(match.team2_id, (appearances.get(match.team2_id) ?? 0) + 1);
+    teamsPerRound.set(toRound, appearances);
+
+    return {
+      id: match.id,
+      fromRound: Number(match.round_number),
+      toRound,
+    };
   });
 
-  const roundsBefore = Math.max(0, ...matches.map((match) => Number(match.round_number) || 0));
-  const assignedRoundById = new Map(assignments.map(({ pair, roundNumber }) => [pair.id, roundNumber]));
-  const roundsAfter = Math.max(0, ...matches.map((match) =>
-    assignedRoundById.get(match.id) ?? (Number(match.round_number) || 0)));
+  const roundsBefore = Math.max(0, ...fixtureMatches.map((match) => Number(match.round_number) || 0));
+  const assignedRoundById = new Map(updates.map((update) => [update.id, update.toRound]));
+  const roundsAfter = Math.max(0, ...fixtureMatches.map((match) =>
+    (assignedRoundById.get(match.id) ?? Number(match.round_number)) || 0));
 
   return {
     updates,
@@ -184,6 +226,7 @@ async function buildFixtureCompactionPlan(eventId: number): Promise<FixtureCompa
     firstDestinationRound: updates.length > 0
       ? Math.min(...updates.map((update) => update.toRound))
       : null,
+    expectedRoundCount,
   };
 }
 
@@ -201,20 +244,17 @@ export async function compactFutureFixture(eventId: number): Promise<FixtureComp
     return preview;
   }
 
-  const results = await Promise.all(plan.updates.map((update) =>
-    supabase
-      .from('matches')
-      .update({ round_number: update.toRound, date: update.date })
-      .eq('id', update.id)
-      .eq('status', 'scheduled')
-      .eq('round_number', update.fromRound)
-      .select('id')
-  ));
-  const failed = results.find((result) => result.error);
-  if (failed?.error) throw new Error(failed.error.message);
-  const skipped = results.find((result) => (result.data?.length ?? 0) !== 1);
-  if (skipped) {
-    throw new Error('The fixture changed while it was being compacted. Reload it and try again.');
+  const { data, error } = await supabase.rpc('apply_match_round_compaction', {
+    p_event_id: eventId,
+    p_updates: plan.updates.map((update) => ({
+      id: update.id,
+      from_round: update.fromRound,
+      to_round: update.toRound,
+    })),
+  });
+  if (error) throw new Error(error.message);
+  if (Number(data) !== plan.updates.length) {
+    throw new Error('The compacted match count did not match the preview. Reload the fixture.');
   }
 
   const { updates: _updates, ...preview } = plan;

@@ -587,7 +587,6 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
             {(eventFormat === 'round_robin' || eventFormat === 'groups') && (
               <CompactFixtureButton
                 eventId={eventId}
-                eventFormat={eventFormat}
                 onCompacted={loadData}
                 onSuccess={(message) => showToast(message, 'success')}
                 onError={(message) => showToast(message, 'error')}

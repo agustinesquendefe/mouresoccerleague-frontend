@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { Button } from '@mui/material';
-import { generateRoundRobinMatches } from '@/services/matches/generateRoundRobinMatches';
-import { generateGroupStageMatches } from '@/services/matches/generateGroupStageMatches';
-import type { EventFormatType } from '@/models/event';
+import {
+  compactFutureFixture,
+  previewFutureFixtureCompaction,
+} from '@/services/matches/compactFutureFixture';
 
 type Props = {
   eventId: number;
-  eventFormat?: EventFormatType | string | null;
   onCompacted: () => Promise<void> | void;
   onSuccess?: (message: string) => void;
   onError?: (message: string) => void;
@@ -16,7 +16,6 @@ type Props = {
 
 export default function CompactFixtureButton({
   eventId,
-  eventFormat,
   onCompacted,
   onSuccess,
   onError,
@@ -26,18 +25,25 @@ export default function CompactFixtureButton({
   const handleCompact = async () => {
     try {
       setLoading(true);
+      const preview = await previewFutureFixtureCompaction(eventId);
+      if (preview.matchesToMove === 0) {
+        onSuccess?.(`The active fixture already fits within its ${preview.expectedRoundCount} configured rounds.`);
+        return;
+      }
+
       const confirmed = window.confirm(
-        'Rebalance all pending rounds? Played, in-progress, and extra matches will not be changed. Scheduled matches may move to another round or date.'
+        `Move ${preview.matchesToMove} scheduled match${preview.matchesToMove === 1 ? '' : 'es'} ` +
+        `into rounds 1–${preview.expectedRoundCount}? Played, in-progress, extra matches, dates, ` +
+        `scores, referees, and payments will not change.`
       );
       if (!confirmed) return;
 
-      if (eventFormat === 'groups') {
-        await generateGroupStageMatches(eventId);
-      } else {
-        await generateRoundRobinMatches(eventId);
-      }
+      const result = await compactFutureFixture(eventId);
       await onCompacted();
-      onSuccess?.('Pending rounds rebalanced successfully.');
+      onSuccess?.(
+        `Future rounds compacted: ${result.matchesToMove} scheduled match${result.matchesToMove === 1 ? '' : 'es'} moved. ` +
+        `The active fixture now ends at round ${result.roundsAfter}.`
+      );
     } catch (error) {
       console.error(error);
       onError?.(error instanceof Error ? error.message : 'Failed to compact future rounds');
@@ -48,7 +54,7 @@ export default function CompactFixtureButton({
 
   return (
     <Button variant="outlined" onClick={handleCompact} disabled={loading}>
-      {loading ? 'Balancing...' : 'Compact Future Rounds'}
+      {loading ? 'Checking...' : 'Compact Future Rounds'}
     </Button>
   );
 }
