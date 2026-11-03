@@ -14,7 +14,6 @@ import {
   Typography,
 } from '@mui/material';
 import ShuffleIcon from '@mui/icons-material/Shuffle';
-import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { supabase } from '@/lib/supabaseClient';
 import {
   getEventGroups,
@@ -22,7 +21,7 @@ import {
   autoAssignGroups,
   assignTeamToGroup,
 } from '@/services/eventGroups';
-import { generateGroupStageMatches } from '@/services/matches/generateGroupStageMatches';
+import GenerateFixtureButton from '@/app/(admin)/components/matches/GenerateFixtureButton';
 import type { EventGroupWithTeams } from '@/models/eventGroup';
 
 type Props = {
@@ -102,24 +101,6 @@ export default function EventGroupsSection({ eventId }: Props) {
     }
   };
 
-  const handleGenerateMatches = async () => {
-    const confirmed = window.confirm(
-      'Generate the group fixture? Played and in-progress matches will be preserved. Scheduled matches may be moved to balance the remaining rounds for the active teams.'
-    );
-    if (!confirmed) return;
-
-    try {
-      setBusy(true);
-      setError(null);
-      await generateGroupStageMatches(eventId);
-      setSuccess('Group fixture generated. Completed matches were preserved and pending rounds were balanced.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate matches');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const totalAssigned = groups.reduce((sum, g) => sum + g.teams.length, 0);
   const allGroupsHaveTeams = groups.length > 0 && groups.every((g) => g.teams.length >= 2);
 
@@ -160,15 +141,15 @@ export default function EventGroupsSection({ eventId }: Props) {
                 Auto-assign Teams
               </Button>
 
-              <Button
-                variant="contained"
+              <GenerateFixtureButton
+                eventId={eventId}
+                eventFormat="groups"
                 size="small"
-                startIcon={<AutoFixHighIcon />}
-                onClick={handleGenerateMatches}
                 disabled={busy || !allGroupsHaveTeams}
-              >
-                Generate Fixture
-              </Button>
+                onGenerated={loadData}
+                onSuccess={setSuccess}
+                onError={setError}
+              />
             </>
           )}
         </Stack>

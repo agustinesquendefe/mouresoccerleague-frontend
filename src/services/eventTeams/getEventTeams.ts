@@ -7,8 +7,10 @@ export async function getEventTeams(eventId: number) {
       id,
       team_id,
       display_name,
+      group_id,
       order_index,
       status,
+      fixture_start_round,
       teams (
         id,
         name,

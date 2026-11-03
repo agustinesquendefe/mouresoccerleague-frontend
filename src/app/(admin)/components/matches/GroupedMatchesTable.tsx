@@ -14,6 +14,7 @@ import type { Match } from '@/models/match';
 import type { Field } from '@/models/field';
 import { formatTime12Hour } from '@/utils/formatTime';
 import type { RoundCycle } from '@/utils/roundCycles';
+import type { PendingFixtureAssignment } from '@/services/matches/pendingFixtureAssignments';
 
 type Props = {
   matches: Match[];
@@ -28,11 +29,12 @@ type Props = {
   compact?: boolean;
   restingTeamIdsByRound?: Record<number, number[]>;
   restingTeamOptions?: Array<{ id: number; name: string }>;
-  editableRestingTeamIds?: number[];
   restingTeamChangingRound?: number | null;
   onChangeRestingTeam?: (roundNumber: number, teamId: number) => void;
   roundCycles?: RoundCycle[];
   roundCycleMap?: Record<number, number>;
+  pendingAssignments?: PendingFixtureAssignment[];
+  onAssignPendingOpponent?: (roundNumber: number, groupId: number | null) => void;
 };
 
 export default function GroupedMatchesTable({
@@ -48,11 +50,12 @@ export default function GroupedMatchesTable({
   compact = false,
   restingTeamIdsByRound = {},
   restingTeamOptions = [],
-  editableRestingTeamIds = [],
   restingTeamChangingRound = null,
   onChangeRestingTeam,
   roundCycles = [],
   roundCycleMap = {},
+  pendingAssignments = [],
+  onAssignPendingOpponent,
 }: Props) {
   const fieldMap = fields.reduce<Record<number, string>>((acc, field, index) => {
     acc[field.id] = `${field.name} (#${index + 1})`;
@@ -205,11 +208,9 @@ export default function GroupedMatchesTable({
     const editable = roundMatches.length > 0 && roundMatches.every((match) =>
       match.status === 'scheduled' || match.status === 'cancelled') &&
       !roundMatches.some((match) => match.is_extra);
+    const playingTeamIds = new Set(roundMatches.flatMap((match) => [match.team1_id, match.team2_id]));
     const candidates = restingTeamOptions.filter((team) =>
-      !restingTeamIds.includes(team.id) &&
-      editableRestingTeamIds.includes(team.id) &&
-      Object.entries(restingTeamIdsByRound).some(([otherRound, teamIds]) =>
-        Number(otherRound) !== roundNumber && teamIds.includes(team.id)));
+      !restingTeamIds.includes(team.id) && playingTeamIds.has(team.id));
 
     return (
       <Stack spacing={1}>
@@ -242,6 +243,38 @@ export default function GroupedMatchesTable({
     );
   };
 
+  const renderPendingMatches = (roundNumber: number) => {
+    const pendingInRound = pendingAssignments.filter((item) => item.round_number === roundNumber);
+    const byGroup = pendingInRound.reduce<Record<string, PendingFixtureAssignment[]>>((result, item) => {
+      const key = String(item.group_id ?? 'league');
+      result[key] = result[key] ?? [];
+      result[key].push(item);
+      return result;
+    }, {});
+    return Object.entries(byGroup).map(([groupKey, assignments]) => {
+      const groupId = groupKey === 'league' ? null : Number(groupKey);
+      return (
+        <Paper key={`pending-${roundNumber}-${groupKey}`} variant="outlined" sx={{ p: compact ? 1.25 : 2, borderStyle: 'dashed' }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
+            <Stack spacing={0.5}>
+              {assignments.map((assignment) => (
+                <Typography key={assignment.id} fontWeight={600} variant={compact ? 'body2' : 'body1'}>
+                  {teamMap[assignment.team_id] ?? `#${assignment.team_id}`} vs Opponent pending
+                </Typography>
+              ))}
+              <Typography variant="body2" color="warning.main">Opponent must be assigned before this round starts.</Typography>
+            </Stack>
+            {onAssignPendingOpponent && (
+              <Button variant="outlined" size="small" onClick={() => onAssignPendingOpponent(roundNumber, groupId)}>
+                Edit Opponent
+              </Button>
+            )}
+          </Stack>
+        </Paper>
+      );
+    });
+  };
+
   const content = (
     <Stack spacing={3} sx={{ width: '100%', minWidth: 0 }}>
       {sortedGroups.map((groupKey, index) => (
@@ -260,12 +293,15 @@ export default function GroupedMatchesTable({
               </Stack>
             )}
             {groupByRound && renderRestingTeams(groupKey)}
+            {groupByRound && groupKey !== 'No Round' && renderPendingMatches(Number(groupKey))}
 
             {groupByDate && groupKey !== 'all' && (
               <Typography variant="h6" fontWeight={700}>
                 {roundLabel ?? `Round ${index + 1}`} — {groupKey}
               </Typography>
             )}
+
+            {!groupByRound && index === 0 && matches[0]?.round_number != null && renderPendingMatches(matches[0].round_number)}
 
             {grouped[groupKey].map(renderMatch)}
           </Stack>
@@ -304,6 +340,7 @@ export default function GroupedMatchesTable({
               </Button>
             )}
             {renderRestingTeams(groupKey)}
+            {groupKey !== 'No Round' && renderPendingMatches(Number(groupKey))}
             {grouped[groupKey].map(renderMatch)}
           </Stack>
         </Paper>

@@ -9,7 +9,11 @@ import {
   Stack,
   Checkbox,
   Alert,
+  IconButton,
+  InputAdornment,
 } from "@mui/material";
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import Link from "next/link";
 import { supabase } from '@/lib/supabaseClient';
 
@@ -28,6 +32,7 @@ const AuthLogin = ({ title, subtitle, subtext }: loginType) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,7 +113,30 @@ const AuthLogin = ({ title, subtitle, subtext }: loginType) => {
             >
               Password
             </Typography>
-            <CustomTextField id="password" type="password" variant="outlined" fullWidth value={form.password} onChange={handleChange} />
+            <CustomTextField
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              variant="outlined"
+              fullWidth
+              value={form.password}
+              onChange={handleChange}
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowPassword((visible) => !visible)}
+                        onMouseDown={(event) => event.preventDefault()}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
           </Box>
           <Stack
             justifyContent="space-between"

@@ -7,7 +7,7 @@ export async function addTeamToEvent(
   teamId: number,
   rosterImportMode: EventRosterImportMode = 'empty'
 ) {
-  const [lastEventTeamResult, defaultRosterResult] = await Promise.all([
+  const [lastEventTeamResult, defaultRosterResult, startedMatchesResult] = await Promise.all([
     supabase
       .from('event_teams')
       .select('order_index')
@@ -22,6 +22,11 @@ export async function addTeamToEvent(
         .eq('team_id', teamId)
         .is('event_id', null)
       : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from('matches')
+      .select('round_number, status, score1, score2')
+      .eq('event_id', eventId)
+      .or('stage_type.eq.league,stage_type.is.null'),
   ]);
 
   const { data: lastEventTeam, error: lastEventTeamError } = lastEventTeamResult;
@@ -32,6 +37,18 @@ export async function addTeamToEvent(
   if (defaultRosterResult.error) {
     throw new Error(defaultRosterResult.error.message);
   }
+  if (startedMatchesResult.error) {
+    throw new Error(startedMatchesResult.error.message);
+  }
+
+  const lastStartedRound = Math.max(0, ...(startedMatchesResult.data ?? [])
+    .filter((match) =>
+      match.status !== 'cancelled' && (
+        match.status === 'played' ||
+        match.status === 'in_progress' ||
+        match.score1 != null ||
+        match.score2 != null))
+    .map((match) => Number(match.round_number) || 0));
 
   const defaultRoster = Array.from(
     new Map((defaultRosterResult.data ?? []).map((row) => [row.player_id, row])).values()
@@ -60,6 +77,7 @@ export async function addTeamToEvent(
         team_id: teamId,
         order_index: (lastEventTeam?.order_index ?? -1) + 1,
         status: 'active',
+        fixture_start_round: lastStartedRound + 1,
       },
     ])
     .select('id')

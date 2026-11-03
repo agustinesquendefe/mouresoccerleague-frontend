@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { changeRoundRestingTeam, createExtraMatch, deleteMatch, getMatchesByEvent, updateMatch, updateMatchesSchedule, type MatchScheduleUpdate } from '@/services/matches';
+import { changeRoundRestingTeam, createExtraMatch, deleteMatch, getMatchesByEvent, getPendingFixtureAssignments, updateMatch, updateMatchesSchedule, type MatchScheduleUpdate, type PendingFixtureAssignment } from '@/services/matches';
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
 import { getFieldsByEvent } from '@/services/eventFields/getFieldsByEvent';
 import type { Match, MatchFormData } from '@/models/match';
@@ -14,11 +14,11 @@ import MatchDialog from './MatchDialog';
 import ExtraMatchDialog from './ExtraMatchDialog';
 import AdvanceKnockoutRoundButton from './AdvanceKnockoutRoundButton';
 import RoundSchedulePlanner from './RoundSchedulePlanner';
-import CompactFixtureButton from './CompactFixtureButton';
 import { escapeHtml, printHtml } from '@/utils/printHtml';
 import { formatTime12Hour } from '@/utils/formatTime';
 import type { AppSettings } from '@/models/appSettings';
 import { createRoundCycleMap, groupRoundsByCycle } from '@/utils/roundCycles';
+import PendingFixtureAssignments from './PendingFixtureAssignments';
 
 type MatchQuickFilter = 'all' | 'played' | 'pending' | 'rescheduled' | 'cancelled';
 
@@ -28,6 +28,7 @@ type EventTeamRow = {
   display_name?: string | null;
   group_id?: number | null;
   status?: 'active' | 'disqualified' | null;
+  fixture_start_round?: number | null;
   teams?: Array<{
     id: number;
     name: string;
@@ -48,6 +49,11 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
   const [matches, setMatches] = useState<Match[]>([]);
   const [eventTeams, setEventTeams] = useState<EventTeamRow[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
+  const [pendingAssignments, setPendingAssignments] = useState<PendingFixtureAssignment[]>([]);
+  const [pendingAssignmentTarget, setPendingAssignmentTarget] = useState<{
+    roundNumber: number;
+    groupId: number | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
@@ -86,15 +92,17 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
     try {
       setLoading(true);
 
-      const [matchesData, eventTeamsData, eventFieldsData] = await Promise.all([
+      const [matchesData, eventTeamsData, eventFieldsData, pendingData] = await Promise.all([
         getMatchesByEvent(eventId),
         getEventTeams(eventId),
         getFieldsByEvent(eventId),
+        getPendingFixtureAssignments(eventId),
       ]);
 
       setMatches(matchesData);
       setEventTeams((eventTeamsData ?? []) as EventTeamRow[]);
       setFields(eventFieldsData ?? []);
+      setPendingAssignments(pendingData);
     } catch (error) {
       console.error(error);
       setToast({
@@ -195,6 +203,12 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
       : `Round ${numericRound}`;
   };
 
+  const pendingTeamIdsByRound = useMemo(() => pendingAssignments.reduce<Record<number, Set<number>>>((result, item) => {
+    result[item.round_number] = result[item.round_number] ?? new Set<number>();
+    result[item.round_number].add(item.team_id);
+    return result;
+  }, {}), [pendingAssignments]);
+
   const restingTeamIdsByRound = useMemo(() => {
     const result: Record<number, number[]> = {};
     uniqueLeagueRounds.forEach((roundNumber) => {
@@ -206,26 +220,14 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
       const playingTeamIds = new Set(activeRoundMatches.flatMap((match) =>
         [match.team1_id, match.team2_id]));
       result[roundNumber] = activeEventTeams
+        .filter((team) => Number(team.fixture_start_round ?? 1) <= roundNumber)
         .map((team) => team.team_id)
-        .filter((teamId) => !playingTeamIds.has(teamId));
+        .filter((teamId) =>
+          !playingTeamIds.has(teamId) &&
+          !pendingTeamIdsByRound[roundNumber]?.has(teamId));
     });
     return result;
-  }, [activeEventTeams, leagueMatches, uniqueLeagueRounds]);
-
-  const editableRestingTeamIds = useMemo(() => Array.from(new Set(
-    Object.entries(restingTeamIdsByRound).flatMap(([roundNumber, restingTeamIds]) => {
-      const activeRoundMatches = leagueMatches.filter((match) =>
-        match.round_number === Number(roundNumber) &&
-        match.status !== 'cancelled' &&
-        !match.is_extra);
-      return activeRoundMatches.length > 0 &&
-        !leagueMatches.some((match) =>
-          match.round_number === Number(roundNumber) && match.is_extra) &&
-        activeRoundMatches.every((match) => match.status === 'scheduled')
-        ? restingTeamIds
-        : [];
-    })
-  )), [leagueMatches, restingTeamIdsByRound]);
+  }, [activeEventTeams, leagueMatches, pendingTeamIdsByRound, uniqueLeagueRounds]);
 
   const visibleLeagueMatches = useMemo(() => {
     const cycleMatches = selectedCycleTab === 'all'
@@ -584,14 +586,6 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
         <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
           <Typography variant="h6">League Matches</Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            {(eventFormat === 'round_robin' || eventFormat === 'groups') && (
-              <CompactFixtureButton
-                eventId={eventId}
-                onCompacted={loadData}
-                onSuccess={(message) => showToast(message, 'success')}
-                onError={(message) => showToast(message, 'error')}
-              />
-            )}
             <GenerateFixtureButton
               eventId={eventId}
               eventFormat={eventFormat}
@@ -774,19 +768,29 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
               roundCycleMap={roundCycleMap}
               restingTeamIdsByRound={restingTeamIdsByRound}
               restingTeamOptions={restingTeamOptions}
-              editableRestingTeamIds={editableRestingTeamIds}
               restingTeamChangingRound={restingTeamChangingRound}
               onChangeRestingTeam={
                 selectedLeagueTab === 'all' && quickFilter === 'all' && !teamSearch.trim()
                   ? handleChangeRestingTeam
                   : undefined
               }
+              pendingAssignments={pendingAssignments}
+              onAssignPendingOpponent={(roundNumber, groupId) =>
+                setPendingAssignmentTarget({ roundNumber, groupId })}
             />
           ) : (
             <Alert severity="info">No matches found for the selected filters.</Alert>
           )
         )}
       </Stack>
+
+      <PendingFixtureAssignments
+        eventId={eventId}
+        target={pendingAssignmentTarget}
+        onClose={() => setPendingAssignmentTarget(null)}
+        onResolved={loadData}
+        onError={(message) => showToast(message, 'error')}
+      />
 
       <Stack spacing={2}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>

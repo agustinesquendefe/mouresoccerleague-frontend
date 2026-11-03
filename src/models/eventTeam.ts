@@ -7,4 +7,5 @@ export type EventTeamParticipation = {
   display_name: string | null;
   order_index: number;
   status: EventTeamStatus;
+  fixture_start_round: number;
 };
