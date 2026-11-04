@@ -14,6 +14,7 @@ import {
   MenuItem,
   Radio,
   RadioGroup,
+  Stack,
   TextField,
   Typography,
 } from '@mui/material';
@@ -60,6 +61,7 @@ export default function AddTeamToEventDialog({
   const [eventMatchDay, setEventMatchDay] = useState<number | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<number | ''>('');
   const [dayFilter, setDayFilter] = useState<number | ''>('');
   const [filtersReady, setFiltersReady] = useState(false);
@@ -74,6 +76,7 @@ export default function AddTeamToEventDialog({
         setLoading(true);
         setFiltersReady(false);
         setSearch('');
+        setAppliedSearch('');
 
         const [eventResponse, categoriesResponse] = await Promise.all([
           supabase
@@ -117,7 +120,7 @@ export default function AddTeamToEventDialog({
 
         const categoryId = categoryFilter === '' ? null : Number(categoryFilter);
         const matchDay = dayFilter === '' ? null : Number(dayFilter);
-        const term = search.trim();
+        const term = appliedSearch;
         const baseSelect = [
           'id',
           'name',
@@ -164,7 +167,11 @@ export default function AddTeamToEventDialog({
     };
 
     loadTeams();
-  }, [open, filtersReady, eventId, categoryFilter, dayFilter, search]);
+  }, [open, filtersReady, eventId, categoryFilter, dayFilter, appliedSearch]);
+
+  const handleSearch = () => {
+    setAppliedSearch(search.trim());
+  };
 
   const availableTeams = useMemo(() => {
     const existingTeamIds = new Set(existingEventTeams.map((item) => item.team_id));
@@ -228,15 +235,31 @@ export default function AddTeamToEventDialog({
           </Alert>
         )}
 
-        <TextField
-          label="Search team"
-          placeholder="Name or code"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          fullWidth
-          sx={{ mt: 2 }}
-          disabled={loading}
-        />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
+          <TextField
+            label="Search team"
+            placeholder="Name or code"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSearch();
+              }
+            }}
+            helperText="Press Enter or use the Search button when you finish typing."
+            fullWidth
+            disabled={loading}
+          />
+          <Button
+            variant="outlined"
+            onClick={handleSearch}
+            disabled={loading}
+            sx={{ alignSelf: { sm: 'flex-start' }, minHeight: 56, minWidth: 110 }}
+          >
+            Search
+          </Button>
+        </Stack>
 
         <TextField
           select

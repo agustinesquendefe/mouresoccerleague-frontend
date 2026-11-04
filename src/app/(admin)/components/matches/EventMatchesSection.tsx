@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Box, Button, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Alert, Backdrop, Box, Button, CircularProgress, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { changeRoundRestingTeam, createExtraMatch, deleteMatch, getMatchesByEvent, getPendingFixtureAssignments, updateMatch, updateMatchesSchedule, type MatchScheduleUpdate, type PendingFixtureAssignment } from '@/services/matches';
 import { getEventTeams } from '@/services/eventTeams/getEventTeams';
 import { getFieldsByEvent } from '@/services/eventFields/getFieldsByEvent';
@@ -64,6 +64,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
   const [extraMatchSaving, setExtraMatchSaving] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [restingTeamChangingRound, setRestingTeamChangingRound] = useState<number | null>(null);
+  const [changeMessage, setChangeMessage] = useState<string | null>(null);
 
   const [selectedLeagueTab, setSelectedLeagueTab] = useState('all');
   const [selectedCycleTab, setSelectedCycleTab] = useState('all');
@@ -336,6 +337,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
 
     try {
       setSaving(true);
+      setChangeMessage('Updating match and event data...');
       const updated = await updateMatch(selectedMatch.id, values);
 
       setMatches((prev) =>
@@ -360,6 +362,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
       });
     } finally {
       setSaving(false);
+      setChangeMessage(null);
     }
   };
 
@@ -368,6 +371,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
 
     try {
       setExtraMatchSaving(true);
+      setChangeMessage('Adding match to this event...');
       const created = await createExtraMatch(eventId, extraMatchRound, values);
 
       setMatches((prev) => [...prev, created].sort((left, right) => {
@@ -393,6 +397,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
       });
     } finally {
       setExtraMatchSaving(false);
+      setChangeMessage(null);
     }
   };
 
@@ -402,6 +407,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
     if (!confirmed) return;
 
     try {
+      setChangeMessage('Removing match from this event...');
       await deleteMatch(match.id);
       setMatches((prev) => prev.filter((item) => item.id !== match.id));
       onMatchUpdated?.();
@@ -416,12 +422,15 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
         message: error instanceof Error ? error.message : 'Failed to delete extra match',
         severity: 'error',
       });
+    } finally {
+      setChangeMessage(null);
     }
   };
 
   const handleSaveRoundSchedule = async (updates: MatchScheduleUpdate[]) => {
     try {
       setScheduleSaving(true);
+      setChangeMessage('Updating the round schedule...');
       const updatedMatches = await updateMatchesSchedule(updates);
 
       setMatches((prev) => {
@@ -443,6 +452,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
       });
     } finally {
       setScheduleSaving(false);
+      setChangeMessage(null);
     }
   };
 
@@ -455,6 +465,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
 
     try {
       setRestingTeamChangingRound(roundNumber);
+      setChangeMessage(`Updating round ${roundNumber}...`);
       await changeRoundRestingTeam(eventId, roundNumber, teamId);
       await loadData();
       onMatchUpdated?.();
@@ -463,6 +474,7 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
       showToast(error instanceof Error ? error.message : 'Failed to change the resting team', 'error');
     } finally {
       setRestingTeamChangingRound(null);
+      setChangeMessage(null);
     }
   };
 
@@ -868,6 +880,31 @@ export default function EventMatchesSection({ eventId, eventName, eventFormat, e
           {toast.message}
         </Alert>
       </Snackbar>
+
+      <Backdrop
+        open={Boolean(changeMessage)}
+        sx={{
+          zIndex: (theme) => theme.zIndex.modal + 1,
+          color: 'common.white',
+          backgroundColor: 'rgba(15, 23, 42, 0.72)',
+        }}
+      >
+        <Stack
+          spacing={2}
+          alignItems="center"
+          role="status"
+          aria-live="polite"
+          sx={{ px: 3, textAlign: 'center' }}
+        >
+          <CircularProgress color="inherit" />
+          <Typography variant="h6" fontWeight={700}>
+            {changeMessage}
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+            Please wait. You will remain on this event page.
+          </Typography>
+        </Stack>
+      </Backdrop>
     </Stack>
   );
 }

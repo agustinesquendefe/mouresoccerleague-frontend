@@ -136,7 +136,9 @@ export default function ExtraMatchDialog({
 
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>Cancel</Button>
-        <Button variant="contained" onClick={handleSubmit} disabled={loading || !roundNumber}>Add Match</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={loading || !roundNumber}>
+          {loading ? 'Adding...' : 'Add Match'}
+        </Button>
       </DialogActions>
     </Dialog>
   );

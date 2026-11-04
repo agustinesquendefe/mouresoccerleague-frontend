@@ -1161,7 +1161,7 @@ export default function MatchDialog({
           Cancel
         </Button>
         <Button variant="contained" onClick={handleSubmit} disabled={loading}>
-          Save
+          {loading ? 'Saving...' : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>
