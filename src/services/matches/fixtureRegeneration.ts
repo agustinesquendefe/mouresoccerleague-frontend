@@ -3,10 +3,9 @@ import { getFieldsByEvent } from '@/services/eventFields/getFieldsByEvent';
 import {
   addDays,
   formatDate,
-  generateRoundRobinRounds,
   getFirstMatchDate,
-  type FixturePair,
 } from './incrementalFixture';
+import { reconcileFixture } from './fixtureReconciliation';
 
 type EventTeam = {
   id: number;
@@ -36,6 +35,7 @@ type FixtureMatch = {
 };
 
 export type PlannedFixtureMatch = {
+  match_id: number | null;
   team1_id: number;
   team2_id: number;
   group_id: number | null;
@@ -75,6 +75,7 @@ export type FixtureRegenerationPreview = {
   lastExistingRound: number;
   selectableStartRounds: number[];
   joiningTeamNames: string[];
+  preservedMatchCount: number;
   scheduledMatchesToReplace: number;
   plannedMatchCount: number;
   rounds: FixtureRoundPreview[];
@@ -87,6 +88,7 @@ export type FixtureRegenerationPreview = {
 export type FixtureRegenerationResult = {
   cancelled_match_count: number;
   inserted_match_count: number;
+  reused_match_count: number;
   updated_team_count: number;
 };
 
@@ -97,61 +99,9 @@ function hasStarted(match: FixtureMatch): boolean {
     match.score2 != null;
 }
 
-function matchupKey(pair: FixturePair): string {
-  return [pair.team1_id, pair.team2_id].sort((left, right) => left - right).join(':');
-}
-
-function expectedRoundCount(teamCount: number, cycles: number): number {
-  if (teamCount < 2) return 0;
-  return (teamCount % 2 === 0 ? teamCount - 1 : teamCount) * Math.max(1, cycles);
-}
-
 function teamName(team: EventTeam): string {
   const relation = Array.isArray(team.teams) ? team.teams[0] : team.teams;
   return relation?.name?.trim() || `#${team.team_id}`;
-}
-
-function chooseRoundPairs(
-  teamIds: number[],
-  matchupCounts: Map<string, number>,
-  appearanceCounts: Map<number, number>,
-  roundNumber: number
-): FixturePair[] {
-  if (teamIds.length < 2) return [];
-
-  const candidates = generateRoundRobinRounds(teamIds);
-  const ranked = candidates.map((pairs, index) => {
-    const duplicateCost = pairs.reduce(
-      (total, pair) => total + (matchupCounts.get(matchupKey(pair)) ?? 0),
-      0
-    );
-    const appearanceCost = pairs.reduce(
-      (total, pair) => total +
-        (appearanceCounts.get(pair.team1_id) ?? 0) +
-        (appearanceCounts.get(pair.team2_id) ?? 0),
-      0
-    );
-    return { pairs, index, score: duplicateCost * 10_000 + appearanceCost };
-  }).sort((left, right) => left.score - right.score || left.index - right.index);
-
-  const selected = ranked[0]?.pairs ?? [];
-  const invert = roundNumber % 2 === 0;
-  return selected.map((pair) => invert
-    ? { team1_id: pair.team2_id, team2_id: pair.team1_id }
-    : pair);
-}
-
-function recordPairs(
-  pairs: FixturePair[],
-  matchupCounts: Map<string, number>,
-  appearanceCounts: Map<number, number>
-) {
-  pairs.forEach((pair) => {
-    const key = matchupKey(pair);
-    matchupCounts.set(key, (matchupCounts.get(key) ?? 0) + 1);
-    appearanceCounts.set(pair.team1_id, (appearanceCounts.get(pair.team1_id) ?? 0) + 1);
-    appearanceCounts.set(pair.team2_id, (appearanceCounts.get(pair.team2_id) ?? 0) + 1);
-  });
 }
 
 export async function previewFixtureRegeneration(
@@ -216,108 +166,34 @@ export async function previewFixtureRegeneration(
     .map((match) => Number(match.round_number))
     .filter((roundNumber) => Number.isInteger(roundNumber) && roundNumber > 0);
   const lastStartedRound = Math.max(0, ...startedRounds);
-  const firstEditableRound = lastStartedRound + 1;
-
-  const configuredRoundCount = event.format_type === 'round_robin'
-    ? expectedRoundCount(teams.length, event.round_robin_cycles || 1)
-    : Math.max(0, ...Array.from(new Set(teams.map((team) => team.group_id))).map((groupId) =>
-      expectedRoundCount(
-        teams.filter((team) => team.group_id === groupId).length,
-        event.round_robin_cycles || 1
-      )));
-  const existingRoundCount = Math.max(0, ...activeFixtureMatches
-    .map((match) => Number(match.round_number))
-    .filter((roundNumber) => Number.isInteger(roundNumber) && roundNumber > 0));
-  const lastExistingRound = existingRoundCount || configuredRoundCount;
-
-  if (lastExistingRound < firstEditableRound) {
-    throw new Error('There are no future rounds available to regenerate.');
-  }
-
-  const selectableStartRounds = Array.from(
-    { length: lastExistingRound - firstEditableRound + 1 },
-    (_, index) => firstEditableRound + index
-  );
-  const effectiveTeamStartRound = selectedTeamStartRound ?? firstEditableRound;
-  if (!selectableStartRounds.includes(effectiveTeamStartRound)) {
-    throw new Error(`Choose a team start round between ${firstEditableRound} and ${lastExistingRound}.`);
-  }
-
   const historicalTeamIds = new Set(activeFixtureMatches
-    .filter((match) => Number(match.round_number) <= lastStartedRound)
     .flatMap((match) => [match.team1_id, match.team2_id]));
-  const previouslyAssignedTeamIds = new Set((pendingResult.data ?? [])
-    .filter((item) => item.status !== 'cancelled')
-    .map((item) => item.team_id));
-  const joiningTeams = lastStartedRound === 0
-    ? []
-    : teams.filter((team) =>
-      !previouslyAssignedTeamIds.has(team.team_id) && (
-        Number(team.fixture_start_round) >= firstEditableRound ||
-        !historicalTeamIds.has(team.team_id)));
-  const joiningTeamIds = new Set(joiningTeams.map((team) => team.team_id));
-  const teamStartUpdates = joiningTeams
-    .filter((team) => Number(team.fixture_start_round) !== effectiveTeamStartRound)
-    .map((team) => ({
-      event_team_id: team.id,
-      from_round: Number(team.fixture_start_round),
-      to_round: effectiveTeamStartRound,
-    }));
+  const joiningTeams = teams.filter((team) => !historicalTeamIds.has(team.team_id));
+  const reconciliation = reconcileFixture(
+    event.format_type,
+    event.round_robin_cycles || 1,
+    teams,
+    matches
+  );
+  const replaceableMatches = reconciliation.replaceableMatches as FixtureMatch[];
+  const firstEditableRound = Math.min(
+    ...replaceableMatches
+      .map((match) => Number(match.round_number))
+      .filter((roundNumber) => Number.isInteger(roundNumber) && roundNumber > 0),
+    reconciliation.lastPlannedRound || 1
+  );
+  const lastExistingRound = reconciliation.lastPlannedRound;
+  const selectableStartRounds: number[] = [];
+  const effectiveTeamStartRound = selectedTeamStartRound ?? Math.min(
+    ...joiningTeams.map((team) => Math.max(1, Number(team.fixture_start_round) || 1)),
+    firstEditableRound
+  );
+  const teamStartUpdates: TeamStartUpdate[] = [];
   const startRoundByTeamId = new Map(teams.map((team) => [
     team.team_id,
-    joiningTeamIds.has(team.team_id)
-      ? effectiveTeamStartRound
-      : Math.max(1, Number(team.fixture_start_round) || 1),
+    Math.max(1, Number(team.fixture_start_round) || 1),
   ]));
 
-  const retainedMatches = activeFixtureMatches.filter((match) =>
-    Number(match.round_number) < firstEditableRound);
-  const matchupCounts = new Map<string, number>();
-  const appearanceCounts = new Map<number, number>();
-  retainedMatches.forEach((match) => recordPairs([match], matchupCounts, appearanceCounts));
-
-  const groupRoundLimits = new Map<number | null, number>();
-  if (event.format_type === 'round_robin') {
-    groupRoundLimits.set(null, lastExistingRound);
-  } else {
-    Array.from(new Set(teams.map((team) => team.group_id))).forEach((groupId) => {
-      const existingGroupLastRound = Math.max(0, ...activeFixtureMatches
-        .filter((match) => match.group_id === groupId)
-        .map((match) => Number(match.round_number))
-        .filter((roundNumber) => Number.isInteger(roundNumber) && roundNumber > 0));
-      const configuredGroupRounds = expectedRoundCount(
-        teams.filter((team) => team.group_id === groupId).length,
-        event.round_robin_cycles || 1
-      );
-      groupRoundLimits.set(groupId, existingGroupLastRound || configuredGroupRounds);
-    });
-  }
-
-  const plannedPairs: Array<FixturePair & { group_id: number | null; round_number: number }> = [];
-  for (let roundNumber = firstEditableRound; roundNumber <= lastExistingRound; roundNumber += 1) {
-    const groupIds = event.format_type === 'groups'
-      ? Array.from(new Set(teams.map((team) => team.group_id)))
-      : [null];
-
-    groupIds.forEach((groupId) => {
-      if (roundNumber > (groupRoundLimits.get(groupId) ?? 0)) return;
-      const eligibleTeamIds = teams
-        .filter((team) =>
-          (event.format_type !== 'groups' || team.group_id === groupId) &&
-          (startRoundByTeamId.get(team.team_id) ?? 1) <= roundNumber)
-        .map((team) => team.team_id);
-      const pairs = chooseRoundPairs(eligibleTeamIds, matchupCounts, appearanceCounts, roundNumber);
-      recordPairs(pairs, matchupCounts, appearanceCounts);
-      plannedPairs.push(...pairs.map((pair) => ({ ...pair, group_id: groupId, round_number: roundNumber })));
-    });
-  }
-
-  const replaceableMatches = matches.filter((match) =>
-    !match.is_extra &&
-    match.status === 'scheduled' &&
-    match.score1 == null &&
-    match.score2 == null &&
-    Number(match.round_number) >= firstEditableRound);
   const slotsByRound = new Map<number, FixtureMatch[]>();
   replaceableMatches.forEach((match) => {
     const roundNumber = Number(match.round_number);
@@ -328,13 +204,21 @@ export async function previewFixtureRegeneration(
 
   const firstDate = getFirstMatchDate(event.start_date, event.match_day_of_week);
   const plannedCountByRound = new Map<number, number>();
-  const plannedMatches: PlannedFixtureMatch[] = plannedPairs.map((pair) => {
+  const reusableMatches = [...replaceableMatches];
+  const plannedMatches: PlannedFixtureMatch[] = reconciliation.plannedPairs.map((pair) => {
     const matchIndex = plannedCountByRound.get(pair.round_number) ?? 0;
     plannedCountByRound.set(pair.round_number, matchIndex + 1);
     const existingSlot = slotsByRound.get(pair.round_number)?.[matchIndex];
+    const reusableMatch = reusableMatches.find((match) =>
+      match.team1_id === pair.team1_id && match.team2_id === pair.team2_id) ??
+      reusableMatches[0];
+    if (reusableMatch) {
+      reusableMatches.splice(reusableMatches.indexOf(reusableMatch), 1);
+    }
     const field = fields[matchIndex % fields.length];
     return {
       ...pair,
+      match_id: reusableMatch?.id ?? null,
       match_date: existingSlot?.date ?? formatDate(addDays(firstDate, (pair.round_number - 1) * 7)),
       match_time: existingSlot?.time ?? null,
       field_id: existingSlot?.field_id ?? field?.id ?? null,
@@ -343,9 +227,14 @@ export async function previewFixtureRegeneration(
   });
 
   const namesByTeamId = new Map(teams.map((team) => [team.team_id, teamName(team)]));
-  const rounds = selectableStartRounds.map((roundNumber) => {
+  const rounds = Array.from({ length: lastExistingRound }, (_, index) => index + 1).map((roundNumber) => {
     const plannedInRound = plannedMatches.filter((match) => match.round_number === roundNumber);
-    const playingTeamIds = new Set(plannedInRound.flatMap((match) => [match.team1_id, match.team2_id]));
+    const immutableInRound = reconciliation.immutableMatches.filter((match) =>
+      Number(match.round_number) === roundNumber);
+    const playingTeamIds = new Set([
+      ...immutableInRound.flatMap((match) => [match.team1_id, match.team2_id]),
+      ...plannedInRound.flatMap((match) => [match.team1_id, match.team2_id]),
+    ]);
     const restingTeamNames = teams
       .filter((team) =>
         (startRoundByTeamId.get(team.team_id) ?? 1) <= roundNumber &&
@@ -353,8 +242,9 @@ export async function previewFixtureRegeneration(
       .map((team) => namesByTeamId.get(team.team_id) ?? `#${team.team_id}`);
     return {
       roundNumber,
-      currentMatchCount: replaceableMatches.filter((match) => Number(match.round_number) === roundNumber).length,
-      plannedMatchCount: plannedInRound.length,
+      currentMatchCount: activeFixtureMatches.filter((match) =>
+        Number(match.round_number) === roundNumber).length,
+      plannedMatchCount: immutableInRound.length + plannedInRound.length,
       restingTeamNames,
     };
   });
@@ -368,22 +258,14 @@ export async function previewFixtureRegeneration(
     lastExistingRound,
     selectableStartRounds,
     joiningTeamNames: joiningTeams.map(teamName),
+    preservedMatchCount: reconciliation.immutableMatches.length,
     scheduledMatchesToReplace: replaceableMatches.length,
     plannedMatchCount: plannedMatches.length,
     rounds,
     expectedMatchIds: replaceableMatches.map((match) => match.id).sort((left, right) => left - right),
     teamStartUpdates,
     plannedMatches,
-    pendingAssignments: joiningTeams.flatMap((team) => selectableStartRounds
-      .filter((roundNumber) =>
-        roundNumber >= effectiveTeamStartRound &&
-        roundNumber <= (groupRoundLimits.get(event.format_type === 'groups' ? team.group_id : null) ?? lastExistingRound))
-      .map((roundNumber) => ({
-        event_team_id: team.id,
-        team_id: team.team_id,
-        group_id: event.format_type === 'groups' ? team.group_id : null,
-        round_number: roundNumber,
-      }))),
+    pendingAssignments: [],
   };
 }
 
