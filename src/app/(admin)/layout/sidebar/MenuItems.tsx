@@ -14,6 +14,7 @@ import ViewListIcon from '@mui/icons-material/ViewList';
 import SportsSoccerOutlinedIcon from '@mui/icons-material/SportsSoccerOutlined';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import ScoreboardIcon from '@mui/icons-material/Scoreboard';
 
 const Menuitems = [
   {
@@ -41,6 +42,12 @@ const Menuitems = [
     title: "Events",
     icon: EmojiEventsIcon,
     href: "/admin/events",
+  },
+  {
+    id: "scores",
+    title: "Scores",
+    icon: ScoreboardIcon,
+    href: "/admin/scores",
   },
   {
     id: "teams",

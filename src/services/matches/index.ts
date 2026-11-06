@@ -6,6 +6,7 @@ export * from './pendingFixtureAssignments';
 export * from './generateKnockoutMatches';
 export * from './advanceKnockoutRound';
 export * from './updateMatch';
+export * from './updateMatchScore';
 export * from './updateMatchesSchedule';
 export * from './createExtraMatch';
 export * from './deleteMatch';

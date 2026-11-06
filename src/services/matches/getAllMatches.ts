@@ -5,6 +5,7 @@ export type GetAllMatchesParams = {
   eventId?: number | null;
   status?: string | null;
   stageType?: string | null;
+  date?: string | null;
 };
 
 export type MatchListRow = Match & {
@@ -35,6 +36,10 @@ export async function getAllMatches(
 
   if (params.stageType) {
     matchesQuery = matchesQuery.eq('stage_type', params.stageType);
+  }
+
+  if (params.date) {
+    matchesQuery = matchesQuery.eq('date', params.date);
   }
 
   const { data: matches, error: matchesError } = await matchesQuery;
